@@ -1,7 +1,7 @@
 # ream
-<a href="https://t.me/ReamLabs">
-    <img src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white">
-</a>
+
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)][tg-url]
+
 
 ## What is Ream
 
@@ -25,6 +25,8 @@ Building the first Beam Chain client which is
 
 ## Getting Help
 
-- Join the [Telegram](https://t.me/ReamLabs) to get help, or
+- Join the [Telegram](tg-url) to get help, or
 - Open an issue with [a bug](https://github.com/ReamLabs/ream/issues/new)
+
+[tg-url]: https://t.me/ReamLabs
 
