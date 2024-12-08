@@ -7,3 +7,10 @@ title = "ream Book"
 
 [build]
 build-dir = "target/book"
+
+[output.html]
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 1
