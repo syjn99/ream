@@ -1,6 +1,5 @@
 use clap::Parser;
 use tracing::{info, Level};
-use tracing_subscriber;
 
 use ream::cli::{Cli, Commands};
 
