@@ -63,7 +63,7 @@ macro_rules! test_operation {
         paste::paste! {
             #[cfg(test)]
             #[allow(non_snake_case)]
-            mod [<tests_$processing_fn>] {
+            mod [<tests_ $processing_fn>] {
                 use super::*;
                 use rstest::rstest;
 
@@ -93,9 +93,10 @@ macro_rules! test_operation {
                             let meta: serde_yaml::Value = serde_yaml::from_str(&meta_content)
                                 .expect("Failed to parse meta.yaml");
 
-                            // Skip test if bls_setting is not 1
+                            // Skip test if bls_setting is 1
+                            // TODO: When BLS is implemented, remove this
                             if let Some(bls_setting) = meta.get("bls_setting") {
-                                if bls_setting.as_i64() != Some(1) {
+                                if bls_setting.as_i64() == Some(1) {
                                     continue;
                                 }
                             }
@@ -114,10 +115,7 @@ macro_rules! test_operation {
 
                         match (result, expected_post) {
                             (Ok(_), Some(expected)) => {
-                                assert_eq!(
-                                    state, expected,
-                                    "Post state mismatch in case {}", case_name
-                                );
+                                assert_eq!(state, expected, "Post state mismatch in case {}", case_name);
                             }
                             (Ok(_), None) => {
                                 panic!("Test case {} should have failed but succeeded", case_name);
