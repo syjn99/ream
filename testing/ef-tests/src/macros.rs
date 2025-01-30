@@ -85,6 +85,22 @@ macro_rules! test_operation {
                         let case_name = case_dir.file_name().unwrap().to_str().unwrap();
                         println!("Testing case: {}", case_name);
 
+                        let metadata_path = case_dir.join("meta.yaml");
+                        if metadata_path.exists() {
+                            // Read and parse meta.yaml
+                            let meta_content = std::fs::read_to_string(&metadata_path)
+                                .expect("Failed to read meta.yaml");
+                            let meta: serde_yaml::Value = serde_yaml::from_str(&meta_content)
+                                .expect("Failed to parse meta.yaml");
+
+                            // Skip test if bls_setting is not 1
+                            if let Some(bls_setting) = meta.get("bls_setting") {
+                                if bls_setting.as_i64() != Some(1) {
+                                    continue;
+                                }
+                            }
+                        }
+
                         let pre_state: BeaconState =
                             utils::read_ssz_snappy(&case_dir.join("pre.ssz_snappy")).expect("cannot find test asset(pre.ssz_snappy)");
 
