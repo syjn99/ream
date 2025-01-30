@@ -1,6 +1,6 @@
 #![cfg(feature = "ef-tests")]
 
-use ef_tests::test_consensus_type;
+use ef_tests::{test_consensus_type, test_operation, utils};
 use ream_consensus::{
     attestation::Attestation,
     attestation_data::AttestationData,
@@ -32,6 +32,7 @@ use ream_consensus::{
     withdrawal::Withdrawal,
 };
 
+// Testing consensus types
 test_consensus_type!(Attestation);
 test_consensus_type!(AttestationData);
 test_consensus_type!(AttesterSlashing);
@@ -61,3 +62,6 @@ test_consensus_type!(SyncCommittee);
 test_consensus_type!(Validator);
 test_consensus_type!(VoluntaryExit);
 test_consensus_type!(Withdrawal);
+
+// Testing operations for block processing
+test_operation!(attestation, Attestation, "attestation", process_attestation);
