@@ -1,5 +1,6 @@
-use snap::raw::Decoder;
 use std::path::Path;
+
+use snap::raw::Decoder;
 
 pub fn read_ssz_snappy<T: ssz::Decode>(path: &Path) -> Option<T> {
     let ssz_snappy = std::fs::read(path).ok()?;
