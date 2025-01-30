@@ -1,6 +1,6 @@
 #![cfg(feature = "ef-tests")]
 
-use ef_tests::{test_consensus_type, test_operation, utils};
+use ef_tests::test_consensus_type;
 use ream_consensus::{
     attestation::Attestation,
     attestation_data::AttestationData,
@@ -64,8 +64,11 @@ test_consensus_type!(VoluntaryExit);
 test_consensus_type!(Withdrawal);
 
 // Testing operations for block processing
-// TODO: All operations are unimplemented, so these tests will fail.
+// TODO: All operations are unimplemented, so tests from this line will fail.
 // If you implement the operations, you can uncomment these tests.
+#[allow(unused_imports)]
+use ef_tests::{test_operation, utils};
+
 // test_operation!(attestation, Attestation, "attestation", process_attestation);
 // test_operation!(
 //     attester_slashing,
