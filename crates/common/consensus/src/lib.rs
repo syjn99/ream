@@ -23,7 +23,6 @@ pub mod proposer_slashing;
 pub mod pubkey;
 pub mod signature;
 pub mod signing_data;
-pub mod state_transition;
 pub mod sync_aggregate;
 pub mod sync_committee;
 pub mod validator;
