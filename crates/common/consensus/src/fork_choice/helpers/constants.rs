@@ -23,6 +23,7 @@ pub const ETH1_ADDRESS_WITHDRAWAL_PREFIX: [u8; 1] = [1];
 pub const FAR_FUTURE_EPOCH: u64 = 18446744073709551615;
 pub const GENESIS_SLOT: u64 = 0;
 pub const GENESIS_EPOCH: u64 = 0;
+pub const GENESIS_FORK_VERSION: B32 = fixed_bytes!("0x00000000");
 pub const G2_POINT_AT_INFINITY: BlsSignature = BlsSignature {
     signature: [
         0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -279,7 +279,7 @@ impl BeaconState {
     }
 
     /// Return the signature domain (fork version concatenated with domain type) of a message.
-    pub fn get_domain(&self, domain_type: B32, epoch: Option<u64>) -> anyhow::Result<B256> {
+    pub fn get_domain(&self, domain_type: B32, epoch: Option<u64>) -> B256 {
         let epoch = match epoch {
             Some(epoch) => epoch,
             None => self.get_current_epoch(),
