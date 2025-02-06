@@ -31,6 +31,7 @@ blst = "0.3"
 kzg = { git = "https://github.com/grandinetech/rust-kzg" }
 clap = "4"
 discv5 = "0.9"
+ethereum_hashing = { git = "https://github.com/ReamLabs/ethereum_hashing.git" }
 ethereum_serde_utils = "0.7"
 ethereum_ssz = "0.8"
 ethereum_ssz_derive = "0.8"
@@ -57,4 +58,5 @@ ream-discv5 = { path = "crates/networking/discv5"}
 ream-executor = { path = "crates/common/executor" }
 ream-p2p = { path = "crates/networking/p2p" }
 
-
+[patch.crates-io]
+ethereum_hashing = { git = "https://github.com/ReamLabs/ethereum_hashing.git" }
