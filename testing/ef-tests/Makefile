@@ -13,6 +13,7 @@ $(EXTRACT_DIR): $(TARGET)
 		echo "Extracting $(TARGET) into $(EXTRACT_DIR)..."; \
 		mkdir -p $(EXTRACT_DIR); \
 		tar -xzf $(TARGET) -C $(EXTRACT_DIR); \
+		rm -f $(TARGET); \
 		echo "Extraction complete."; \
 	fi
 
