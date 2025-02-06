@@ -98,7 +98,8 @@ pub fn compute_domain(
     genesis_validators_root: Option<B256>,
 ) -> B256 {
     let fork_data = ForkData {
-        current_version: fork_version.unwrap_or(GENESIS_FORK_VERSION), // Fork version for Ethereum mainnet
+        current_version: fork_version.unwrap_or(GENESIS_FORK_VERSION), /* Fork version for
+                                                                        * Ethereum mainnet */
         genesis_validators_root: genesis_validators_root.unwrap_or_default(),
     };
     let fork_data_root = fork_data.compute_fork_data_root();
