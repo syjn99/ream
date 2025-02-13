@@ -1122,7 +1122,7 @@ impl BeaconState {
         Ok(())
     }
 
-    pub fn process_sync_aggregate(&mut self, sync_aggregate: SyncAggregate) -> anyhow::Result<()> {
+    pub fn process_sync_aggregate(&mut self, sync_aggregate: &SyncAggregate) -> anyhow::Result<()> {
         // Verify sync committee aggregate signature signing over the previous slot block root
         let committee_pubkeys = &self.current_sync_committee.pubkeys;
         let mut participant_pubkeys = vec![];
