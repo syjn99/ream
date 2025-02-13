@@ -294,7 +294,6 @@ impl BeaconState {
             Some(fork_version),
             Some(self.genesis_validators_root),
         )
-        .map_err(|err| anyhow!("Domain computation failed: {:?}", err))
     }
 
     /// Return the beacon committee at ``slot`` for ``index``.
@@ -335,7 +334,7 @@ impl BeaconState {
         let domain = self.get_domain(
             DOMAIN_BEACON_ATTESTER,
             Some(indexed_attestation.data.target.epoch),
-        )?;
+        );
 
         let sig = blst::min_pk::Signature::from_bytes(&indexed_attestation.signature.signature)
             .map_err(|err| anyhow!("Signarure conversion failed:{:?}", err))?;
@@ -819,7 +818,7 @@ impl BeaconState {
                 withdrawal_credentials,
                 amount,
             };
-            let domain = compute_domain(DOMAIN_DEPOSIT, None, None)?; // # Fork-agnostic domain since deposits are valid across forks
+            let domain = compute_domain(DOMAIN_DEPOSIT, None, None); // # Fork-agnostic domain since deposits are valid across forks
             let signing_root = compute_signing_root(deposit_message, domain);
             let sig = blst::min_pk::Signature::from_bytes(&signature.signature)
                 .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
@@ -883,7 +882,7 @@ impl BeaconState {
             DOMAIN_BLS_TO_EXECUTION_CHANGE,
             None,
             Some(self.genesis_validators_root),
-        )?;
+        );
 
         let signing_root = compute_signing_root(&address_change, domain);
         let sig = blst::min_pk::Signature::from_bytes(&signed_address_change.signature.signature)
@@ -955,7 +954,7 @@ impl BeaconState {
             DOMAIN_VOLUNTARY_EXIT,
             Some(CAPELLA_FORK_VERSION),
             Some(self.genesis_validators_root),
-        )?;
+        );
         let signing_root = compute_signing_root(voluntary_exit, domain);
 
         let sig = blst::min_pk::Signature::from_bytes(&signed_voluntary_exit.signature.signature)
@@ -1043,7 +1042,7 @@ impl BeaconState {
             let domain = self.get_domain(
                 DOMAIN_BEACON_PROPOSER,
                 Some(compute_epoch_at_slot(signed_header.message.slot)),
-            )?;
+            );
 
             let signing_root = compute_signing_root(&signed_header.message, domain);
 
@@ -1140,7 +1139,7 @@ impl BeaconState {
         let domain = self.get_domain(
             DOMAIN_SYNC_COMMITTEE,
             Some(compute_epoch_at_slot(previous_slot)),
-        )?;
+        );
         let signing_root =
             compute_signing_root(self.get_block_root_at_slot(previous_slot)?, domain);
 
@@ -1329,7 +1328,7 @@ impl BeaconState {
             .get(self.get_beacon_proposer_index()? as usize)
         {
             let signing_root =
-                compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch))?);
+                compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
 
             ensure!(eth_fast_aggregate_verify(
                 &[&proposer.pubkey],
@@ -1535,7 +1534,7 @@ impl BeaconState {
         let proposer = &self.validators[signed_block.message.proposer_index as usize];
         let signing_root = compute_signing_root(
             signed_block.message,
-            self.get_domain(DOMAIN_BEACON_PROPOSER, None)?,
+            self.get_domain(DOMAIN_BEACON_PROPOSER, None),
         );
         let sig = blst::min_pk::Signature::from_bytes(&signed_block.signature.signature).map_err(
             |err| {
