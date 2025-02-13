@@ -945,8 +945,12 @@ impl BeaconState {
         );
 
         // Verify the validator has been active long enough
+        let earlist_exit_epoch = validator
+            .activation_epoch
+            .checked_add(SHARD_COMMITTEE_PERIOD)
+            .ok_or(anyhow!("Failed to calculate earlist exit epoch"))?;
         ensure!(
-            self.get_current_epoch() >= validator.activation_epoch + SHARD_COMMITTEE_PERIOD,
+            self.get_current_epoch() >= earlist_exit_epoch,
             "Validator has not been active long enough"
         );
 
