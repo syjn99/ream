@@ -885,7 +885,7 @@ impl BeaconState {
             Some(self.genesis_validators_root),
         )?;
 
-        let signing_root = compute_signing_root(&address_change, domain);
+        let signing_root = compute_signing_root(address_change, domain);
         let sig = blst::min_pk::Signature::from_bytes(&signed_address_change.signature.signature)
             .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
         let public_key = PublicKey::from_bytes(&address_change.from_bls_pubkey.inner)
