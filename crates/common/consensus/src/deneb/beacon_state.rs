@@ -405,7 +405,7 @@ impl BeaconState {
     /// Decrease the validator balance at index ``index`` by ``delta`` with underflow protection.
     pub fn decrease_balance(&mut self, index: u64, delta: u64) {
         if let Some(balance) = self.balances.get_mut(index as usize) {
-            let _ = balance.saturating_sub(delta);
+            *balance = balance.saturating_sub(delta);
         }
     }
 
