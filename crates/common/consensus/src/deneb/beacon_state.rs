@@ -841,7 +841,7 @@ impl BeaconState {
         Ok(())
     }
 
-    pub fn process_deposit(&mut self, deposit: Deposit) -> anyhow::Result<()> {
+    pub fn process_deposit(&mut self, deposit: &Deposit) -> anyhow::Result<()> {
         // Verify the Merkle branch
         ensure!(is_valid_merkle_branch(
             deposit.data.tree_hash_root(),
@@ -855,10 +855,10 @@ impl BeaconState {
         self.eth1_deposit_index += 1;
 
         self.apply_deposit(
-            deposit.data.pubkey,
+            deposit.data.pubkey.clone(),
             deposit.data.withdrawal_credentials,
             deposit.data.amount,
-            deposit.data.signature,
+            deposit.data.signature.clone(),
         )
     }
 
@@ -916,7 +916,7 @@ impl BeaconState {
 
     pub fn process_voluntary_exit(
         &mut self,
-        signed_voluntary_exit: SignedVoluntaryExit,
+        signed_voluntary_exit: &SignedVoluntaryExit,
     ) -> anyhow::Result<()> {
         let voluntary_exit = &signed_voluntary_exit.message;
         let validator_index = voluntary_exit.validator_index as usize;
@@ -1083,7 +1083,7 @@ impl BeaconState {
 
     pub fn process_attester_slashing(
         &mut self,
-        attester_slashing: AttesterSlashing,
+        attester_slashing: &AttesterSlashing,
     ) -> anyhow::Result<()> {
         let attestation_1 = &attester_slashing.attestation_1;
         let attestation_2 = &attester_slashing.attestation_2;
@@ -1509,23 +1509,23 @@ impl BeaconState {
                 )
         );
 
-        for operation in body.proposer_slashings {
-            self.process_proposer_slashing(&operation)?;
+        for proposer_slashing in body.proposer_slashings {
+            self.process_proposer_slashing(&proposer_slashing)?;
         }
-        for operation in body.attester_slashings {
-            self.process_attester_slashing(operation)?;
+        for attester_slashing in body.attester_slashings {
+            self.process_attester_slashing(&attester_slashing)?;
         }
-        for operation in body.attestations {
-            self.process_attestation(&operation)?;
+        for attestation in body.attestations {
+            self.process_attestation(&attestation)?;
         }
-        for operation in body.deposits {
-            self.process_deposit(operation)?;
+        for deposit in body.deposits {
+            self.process_deposit(&deposit)?;
         }
-        for operation in body.voluntary_exits {
-            self.process_voluntary_exit(operation)?;
+        for voluntary_exit in body.voluntary_exits {
+            self.process_voluntary_exit(&voluntary_exit)?;
         }
-        for operation in body.bls_to_execution_changes {
-            self.process_bls_to_execution_change(operation)?;
+        for bls_to_execution_change in body.bls_to_execution_changes {
+            self.process_bls_to_execution_change(bls_to_execution_change)?;
         }
 
         Ok(())
