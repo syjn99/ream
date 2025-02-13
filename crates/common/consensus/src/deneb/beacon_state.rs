@@ -864,9 +864,9 @@ impl BeaconState {
 
     pub fn process_bls_to_execution_change(
         &mut self,
-        signed_address_change: SignedBLSToExecutionChange,
+        signed_address_change: &SignedBLSToExecutionChange,
     ) -> anyhow::Result<()> {
-        let address_change = signed_address_change.message;
+        let address_change = &signed_address_change.message;
 
         ensure!(address_change.validator_index < self.validators.len() as u64);
 
@@ -1525,7 +1525,7 @@ impl BeaconState {
             self.process_voluntary_exit(&voluntary_exit)?;
         }
         for bls_to_execution_change in body.bls_to_execution_changes {
-            self.process_bls_to_execution_change(bls_to_execution_change)?;
+            self.process_bls_to_execution_change(&bls_to_execution_change)?;
         }
 
         Ok(())
