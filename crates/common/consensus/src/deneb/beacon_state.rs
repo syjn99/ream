@@ -834,7 +834,7 @@ impl BeaconState {
                 .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
             let public_key = match PublicKey::from_bytes(&pubkey.inner) {
                 Ok(pk) => pk,
-                Err(_) => return Ok(()) // Skip deposits with invalid public keys
+                Err(_) => return Ok(()), // Skip deposits with invalid public keys
             };
             let verification_result =
                 sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
