@@ -797,6 +797,15 @@ impl BeaconState {
         self.balances
             .push(amount)
             .map_err(|err| anyhow!("Couldn't push to balances {:?}", err))?;
+        self.previous_epoch_participation
+            .push(0b00000000)
+            .map_err(|err| anyhow!("Couldn't push to previous_epoch_participation {:?}", err))?;
+        self.current_epoch_participation
+            .push(0b00000000)
+            .map_err(|err| anyhow!("Couldn't push to current_epoch_participation {:?}", err))?;
+        self.inactivity_scores
+            .push(0)
+            .map_err(|err| anyhow!("Couldn't push to inactivity_scores {:?}", err))?;
         Ok(())
     }
 
@@ -823,8 +832,10 @@ impl BeaconState {
             let signing_root = compute_signing_root(deposit_message, domain);
             let sig = blst::min_pk::Signature::from_bytes(&signature.signature)
                 .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
-            let public_key = PublicKey::from_bytes(&pubkey.inner)
-                .map_err(|err| anyhow!("Failed to convert pubkey type {err:?}"))?;
+            let public_key = match PublicKey::from_bytes(&pubkey.inner) {
+                Ok(pk) => pk,
+                Err(_) => return Ok(()) // Skip deposits with invalid public keys
+            };
             let verification_result =
                 sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
             if verification_result == blst::BLST_ERROR::BLST_SUCCESS {
