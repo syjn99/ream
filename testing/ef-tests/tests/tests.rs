@@ -1,6 +1,7 @@
 #![cfg(feature = "ef-tests")]
 
 use ef_tests::test_consensus_type;
+use ef_tests::{test_operation, utils};
 use ream_consensus::{
     attestation::Attestation,
     attestation_data::AttestationData,
@@ -64,6 +65,4 @@ test_consensus_type!(VoluntaryExit);
 test_consensus_type!(Withdrawal);
 
 // Testing operations for block processing
-use ef_tests::{test_operation, utils};
-
 test_operation!(deposit, Deposit, "deposit", process_deposit);

@@ -798,10 +798,10 @@ impl BeaconState {
             .push(amount)
             .map_err(|err| anyhow!("Couldn't push to balances {:?}", err))?;
         self.previous_epoch_participation
-            .push(0b00000000)
+            .push(0)
             .map_err(|err| anyhow!("Couldn't push to previous_epoch_participation {:?}", err))?;
         self.current_epoch_participation
-            .push(0b00000000)
+            .push(0)
             .map_err(|err| anyhow!("Couldn't push to current_epoch_participation {:?}", err))?;
         self.inactivity_scores
             .push(0)
