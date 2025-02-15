@@ -1,7 +1,6 @@
 #![cfg(feature = "ef-tests")]
 
-use ef_tests::test_consensus_type;
-use ef_tests::{test_operation, utils};
+use ef_tests::{test_consensus_type, test_operation, utils};
 use ream_consensus::{
     attestation::Attestation,
     attestation_data::AttestationData,
