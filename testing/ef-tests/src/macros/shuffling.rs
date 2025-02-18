@@ -1,59 +1,57 @@
 #[macro_export]
 macro_rules! test_shuffling {
     () => {
-        paste::paste! {
-            #[cfg(test)]
-            mod tests_shuffling {
-                use super::*;
-                use rstest::rstest;
-                use serde_yaml::Value;
-                use std::str::FromStr;
+        #[cfg(test)]
+        mod tests_shuffling {
+            use std::str::FromStr;
 
-                #[derive(Debug, serde::Deserialize)]
-                struct ShufflingTest {
-                    seed: String,
-                    count: usize,
-                    mapping: Vec<usize>,
-                }
+            use rstest::rstest;
+            use serde_yaml::Value;
 
-                #[rstest]
-                fn test_shuffling() {
-                    let base_path = "mainnet/tests/mainnet/phase0/shuffling/core/shuffle";
+            use super::*;
 
-                    for entry in std::fs::read_dir(base_path).unwrap() {
-                        let entry = entry.unwrap();
-                        let case_dir = entry.path();
+            #[derive(Debug, serde::Deserialize)]
+            struct ShufflingTest {
+                seed: String,
+                count: usize,
+                mapping: Vec<usize>,
+            }
 
-                        if !case_dir.is_dir() {
-                            continue;
-                        }
+            #[rstest]
+            fn test_shuffling() {
+                let base_path = "mainnet/tests/mainnet/phase0/shuffling/core/shuffle";
 
-                        let case_name = case_dir.file_name().unwrap().to_str().unwrap();
-                        println!("Testing case: {}", case_name);
+                for entry in std::fs::read_dir(base_path).unwrap() {
+                    let entry = entry.unwrap();
+                    let case_dir = entry.path();
 
-                        // Read and parse mapping.yaml
-                        let test_data: ShufflingTest = {
-                            let mapping_path = case_dir.join("mapping.yaml");
-                            let content = std::fs::read_to_string(mapping_path)
-                                .expect("Failed to read mapping.yaml");
-                            serde_yaml::from_str(&content)
-                                .expect("Failed to parse mapping.yaml")
-                        };
+                    if !case_dir.is_dir() {
+                        continue;
+                    }
 
-                        // Convert hex seed to bytes
-                        let seed = alloy_primitives::B256::from_str(&test_data.seed)
-                            .expect("Failed to parse seed");
+                    let case_name = case_dir.file_name().unwrap().to_str().unwrap();
+                    println!("Testing case: {}", case_name);
 
-                        // Test compute_shuffled_index for each index
-                        for i in 0..test_data.count {
-                            let shuffled = compute_shuffled_index(i, test_data.count, seed)
-                                .expect("shuffling should not fail");
-                            assert_eq!(
-                                shuffled,
-                                test_data.mapping[i],
-                                "Mismatch at index {i} in case {case_name}"
-                            );
-                        }
+                    // Read and parse mapping.yaml
+                    let test_data: ShufflingTest = {
+                        let mapping_path = case_dir.join("mapping.yaml");
+                        let content = std::fs::read_to_string(mapping_path)
+                            .expect("Failed to read mapping.yaml");
+                        serde_yaml::from_str(&content).expect("Failed to parse mapping.yaml")
+                    };
+
+                    // Convert hex seed to bytes
+                    let seed = alloy_primitives::B256::from_str(&test_data.seed)
+                        .expect("Failed to parse seed");
+
+                    // Test compute_shuffled_index for each index
+                    for i in 0..test_data.count {
+                        let shuffled = compute_shuffled_index(i, test_data.count, seed)
+                            .expect("shuffling should not fail");
+                        assert_eq!(
+                            shuffled, test_data.mapping[i],
+                            "Mismatch at index {i} in case {case_name}"
+                        );
                     }
                 }
             }
