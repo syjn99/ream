@@ -1,6 +1,6 @@
 #![cfg(feature = "ef-tests")]
 
-use ef_tests::{test_consensus_type, test_operation, utils};
+use ef_tests::{test_consensus_type, test_operation, test_shuffling, utils};
 use ream_consensus::{
     attestation::Attestation,
     attestation_data::AttestationData,
@@ -23,6 +23,7 @@ use ream_consensus::{
     historical_batch::HistoricalBatch,
     historical_summary::HistoricalSummary,
     indexed_attestation::IndexedAttestation,
+    misc::compute_shuffled_index,
     proposer_slashing::ProposerSlashing,
     signing_data::SigningData,
     sync_aggregate::SyncAggregate,
@@ -83,3 +84,6 @@ test_operation!(
     "address_change",
     process_bls_to_execution_change
 );
+
+// Testing shuffling
+test_shuffling!();
