@@ -839,7 +839,7 @@ impl BeaconState {
                 Err(_) => return Ok(()), // Skip deposits with invalid public keys
             };
             let verification_result =
-                sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
+                sig.verify(true, signing_root.as_ref(), DST, &[], &public_key, false);
             if verification_result == blst::BLST_ERROR::BLST_SUCCESS {
                 self.add_validator_to_registry(pubkey, withdrawal_credentials, amount)?;
             }
@@ -904,7 +904,7 @@ impl BeaconState {
         let public_key = PublicKey::from_bytes(&address_change.from_bls_pubkey.inner)
             .map_err(|err| anyhow!("Failed to convert pubkey type {err:?}"))?;
         let verification_result =
-            sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
+            sig.verify(true, signing_root.as_ref(), DST, &[], &public_key, false);
         ensure!(
             verification_result == blst::BLST_ERROR::BLST_SUCCESS,
             "BLS Signature verification failed!"
@@ -983,7 +983,7 @@ impl BeaconState {
             .map_err(|err| anyhow!("Failed to convert pubkey to blst PublicKey type, {err:?}"))?;
 
         let verification_result =
-            sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
+            sig.verify(true, signing_root.as_ref(), DST, &[], &public_key, false);
 
         ensure!(
             verification_result == blst::BLST_ERROR::BLST_SUCCESS,
@@ -1071,7 +1071,7 @@ impl BeaconState {
                 .map_err(|err| anyhow!("Unable to convert PublicKey, {:?}", err))?;
 
             let verification_result =
-                sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
+                sig.verify(true, signing_root.as_ref(), DST, &[], &public_key, false);
 
             ensure!(
                 verification_result == blst::BLST_ERROR::BLST_SUCCESS,
@@ -1347,12 +1347,17 @@ impl BeaconState {
         {
             let signing_root =
                 compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
+            let sig = blst::min_pk::Signature::from_bytes(&body.randao_reveal.signature)
+                .map_err(|err| anyhow!("Signarure conversion failed:{:?}", err))?;
+            let public_key = blst::min_pk::PublicKey::from_bytes(&proposer.pubkey.inner)
+                .map_err(|err| anyhow!("PublicKey conversion failed:{:?}", err))?;
+            let verification_result =
+                sig.verify(true, signing_root.as_ref(), DST, &[], &public_key, false);
 
-            ensure!(eth_fast_aggregate_verify(
-                &[&proposer.pubkey],
-                signing_root,
-                &body.randao_reveal
-            )?);
+            ensure!(
+                matches!(verification_result, blst::BLST_ERROR::BLST_SUCCESS),
+                "RANDAO reveal signature verification failed"
+            );
 
             // Mix in RANDAO reveal
             let mix = xor(
@@ -1565,7 +1570,7 @@ impl BeaconState {
         let public_key = PublicKey::from_bytes(&proposer.pubkey.inner)
             .map_err(|err| anyhow!("Failed to convert pubkey to BLS PublicKey type, {:?}", err))?;
         let verification_result =
-            sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
+            sig.verify(true, signing_root.as_ref(), DST, &[], &public_key, false);
         Ok(matches!(
             verification_result,
             blst::BLST_ERROR::BLST_SUCCESS
