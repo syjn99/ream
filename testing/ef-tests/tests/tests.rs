@@ -66,6 +66,12 @@ test_consensus_type!(Withdrawal);
 
 // Testing operations for block processing
 test_operation!(attestation, Attestation, "attestation", process_attestation);
+test_operation!(
+    bls_to_execution_change,
+    SignedBLSToExecutionChange,
+    "address_change",
+    process_bls_to_execution_change
+);
 test_operation!(deposit, Deposit, "deposit", process_deposit);
 test_operation!(
     voluntary_exit,
@@ -78,12 +84,6 @@ test_operation!(
     ExecutionPayload,
     "execution_payload",
     process_withdrawals
-);
-test_operation!(
-    bls_to_execution_change,
-    SignedBLSToExecutionChange,
-    "address_change",
-    process_bls_to_execution_change
 );
 
 // Testing shuffling
