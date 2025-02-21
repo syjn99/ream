@@ -827,15 +827,8 @@ impl BeaconState {
             };
             let domain = compute_domain(DOMAIN_DEPOSIT, None, None); // # Fork-agnostic domain since deposits are valid across forks
             let signing_root = compute_signing_root(deposit_message, domain);
-            let sig = blst::min_pk::Signature::from_bytes(&signature.inner)
-                .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
-            let public_key = match pubkey.to_blst_pubkey() {
-                Ok(pk) => pk,
-                Err(_) => return Ok(()), // Skip deposits with invalid public keys
-            };
-            let verification_result =
-                sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
-            if verification_result == blst::BLST_ERROR::BLST_SUCCESS {
+
+            if signature.verify(&pubkey, signing_root.as_ref()) {
                 self.add_validator_to_registry(pubkey, withdrawal_credentials, amount)?;
             }
         } else {
@@ -894,13 +887,10 @@ impl BeaconState {
         );
 
         let signing_root = compute_signing_root(address_change, domain);
-        let sig = blst::min_pk::Signature::from_bytes(&signed_address_change.signature.inner)
-            .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
-        let public_key = address_change.from_bls_pubkey.to_blst_pubkey()?;
-        let verification_result =
-            sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
         ensure!(
-            verification_result == blst::BLST_ERROR::BLST_SUCCESS,
+            signed_address_change
+                .signature
+                .verify(&address_change.from_bls_pubkey, signing_root.as_ref()),
             "BLS Signature verification failed!"
         );
 
@@ -969,17 +959,10 @@ impl BeaconState {
         );
         let signing_root = compute_signing_root(voluntary_exit, domain);
 
-        let sig = blst::min_pk::Signature::from_bytes(&signed_voluntary_exit.signature.inner)
-            .map_err(|err| {
-                anyhow!("Failed to convert signature to blst Signature type, {err:?}")
-            })?;
-        let public_key = validator.pubkey.to_blst_pubkey()?;
-
-        let verification_result =
-            sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
-
         ensure!(
-            verification_result == blst::BLST_ERROR::BLST_SUCCESS,
+            signed_voluntary_exit
+                .signature
+                .verify(&validator.pubkey, signing_root.as_ref()),
             "BLS Signature verification failed!"
         );
 
@@ -1057,16 +1040,10 @@ impl BeaconState {
 
             let signing_root = compute_signing_root(&signed_header.message, domain);
 
-            let sig = blst::min_pk::Signature::from_bytes(&signed_header.signature.inner)
-                .map_err(|err| anyhow!("Unable to retrieve BLS Signature from byets, {:?}", err))?;
-
-            let public_key = proposer.pubkey.to_blst_pubkey()?;
-
-            let verification_result =
-                sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
-
             ensure!(
-                verification_result == blst::BLST_ERROR::BLST_SUCCESS,
+                signed_header
+                    .signature
+                    .verify(&proposer.pubkey, signing_root.as_ref()),
                 "BLS Signature verification failed!"
             );
         }
@@ -1340,11 +1317,10 @@ impl BeaconState {
             let signing_root =
                 compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
 
-            ensure!(eth_fast_aggregate_verify(
-                &[&proposer.pubkey],
-                signing_root,
-                &body.randao_reveal
-            )?);
+            ensure!(
+                body.randao_reveal.verify(&proposer.pubkey, signing_root.as_ref()),
+                "BLS Signature verification failed!"
+            );
 
             // Mix in RANDAO reveal
             let mix = xor(
@@ -1540,26 +1516,16 @@ impl BeaconState {
         Ok(())
     }
 
-    pub fn verify_block_signature(&self, signed_block: SignedBeaconBlock) -> anyhow::Result<bool> {
+    pub fn verify_block_signature(&self, signed_block: SignedBeaconBlock) -> bool {
         let proposer = &self.validators[signed_block.message.proposer_index as usize];
         let signing_root = compute_signing_root(
             signed_block.message,
             self.get_domain(DOMAIN_BEACON_PROPOSER, None),
         );
-        let sig =
-            blst::min_pk::Signature::from_bytes(&signed_block.signature.inner).map_err(|err| {
-                anyhow!(
-                    "Failed to convert signature to BLS Signature type, {:?}",
-                    err
-                )
-            })?;
-        let public_key = proposer.pubkey.to_blst_pubkey()?;
-        let verification_result =
-            sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
-        Ok(matches!(
-            verification_result,
-            blst::BLST_ERROR::BLST_SUCCESS
-        ))
+
+        signed_block
+            .signature
+            .verify(&proposer.pubkey, signing_root.as_ref())
     }
 
     /// Check if ``validator`` is eligible for activation.
