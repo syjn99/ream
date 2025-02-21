@@ -7,7 +7,6 @@ use std::{
 
 use alloy_primitives::{aliases::B32, Address, B256};
 use anyhow::{anyhow, bail, ensure};
-use blst::min_pk::PublicKey;
 use ethereum_hashing::{hash, hash_fixed};
 use itertools::Itertools;
 use kzg::eth::c_bindings::KZGCommitment;
@@ -344,11 +343,8 @@ impl BeaconState {
 
         let publickeys = pubkeys
             .iter()
-            .map(|key| {
-                blst::min_pk::PublicKey::from_bytes(&key.inner)
-                    .map_err(|e| anyhow!(format!("Public key conversion failed:{:?}", e)))
-            })
-            .collect::<Result<Vec<blst::min_pk::PublicKey>, _>>()?;
+            .map(|key| key.to_blst_pubkey())
+            .collect::<Result<Vec<_>, _>>()?;
 
         let verification_result = sig.fast_aggregate_verify(
             true,
@@ -833,7 +829,7 @@ impl BeaconState {
             let signing_root = compute_signing_root(deposit_message, domain);
             let sig = blst::min_pk::Signature::from_bytes(&signature.inner)
                 .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
-            let public_key = match PublicKey::from_bytes(&pubkey.inner) {
+            let public_key = match pubkey.to_blst_pubkey() {
                 Ok(pk) => pk,
                 Err(_) => return Ok(()), // Skip deposits with invalid public keys
             };
@@ -900,8 +896,7 @@ impl BeaconState {
         let signing_root = compute_signing_root(address_change, domain);
         let sig = blst::min_pk::Signature::from_bytes(&signed_address_change.signature.inner)
             .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
-        let public_key = PublicKey::from_bytes(&address_change.from_bls_pubkey.inner)
-            .map_err(|err| anyhow!("Failed to convert pubkey type {err:?}"))?;
+        let public_key = address_change.from_bls_pubkey.to_blst_pubkey()?;
         let verification_result =
             sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
         ensure!(
@@ -978,8 +973,7 @@ impl BeaconState {
             .map_err(|err| {
                 anyhow!("Failed to convert signature to blst Signature type, {err:?}")
             })?;
-        let public_key = PublicKey::from_bytes(&validator.pubkey.inner)
-            .map_err(|err| anyhow!("Failed to convert pubkey to blst PublicKey type, {err:?}"))?;
+        let public_key = validator.pubkey.to_blst_pubkey()?;
 
         let verification_result =
             sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
@@ -1066,8 +1060,7 @@ impl BeaconState {
             let sig = blst::min_pk::Signature::from_bytes(&signed_header.signature.inner)
                 .map_err(|err| anyhow!("Unable to retrieve BLS Signature from byets, {:?}", err))?;
 
-            let public_key = PublicKey::from_bytes(&proposer.pubkey.inner)
-                .map_err(|err| anyhow!("Unable to convert PublicKey, {:?}", err))?;
+            let public_key = proposer.pubkey.to_blst_pubkey()?;
 
             let verification_result =
                 sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
@@ -1560,8 +1553,7 @@ impl BeaconState {
                     err
                 )
             })?;
-        let public_key = PublicKey::from_bytes(&proposer.pubkey.inner)
-            .map_err(|err| anyhow!("Failed to convert pubkey to BLS PublicKey type, {:?}", err))?;
+        let public_key = proposer.pubkey.to_blst_pubkey()?;
         let verification_result =
             sig.fast_aggregate_verify(true, signing_root.as_ref(), DST, &[&public_key]);
         Ok(matches!(
@@ -1761,13 +1753,10 @@ pub fn eth_fast_aggregate_verify(
         return Ok(true);
     }
 
-    let public_keys: Vec<blst::min_pk::PublicKey> = pubkeys
+    let public_keys = pubkeys
         .iter()
-        .map(|key| {
-            blst::min_pk::PublicKey::from_bytes(&key.inner)
-                .map_err(|err| anyhow!("Could not parse public key: {err:?}"))
-        })
-        .collect::<Result<_, _>>()?;
+        .map(|key| key.to_blst_pubkey())
+        .collect::<Result<Vec<_>, _>>()?;
 
     let sig = blst::min_pk::Signature::from_bytes(&signature.inner)
         .map_err(|err| anyhow!("Could not parse signature: {err:?}"))?;
