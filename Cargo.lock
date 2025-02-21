@@ -3555,7 +3555,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "anyhow",
- "blst",
  "ethereum_hashing",
  "ethereum_serde_utils",
  "ethereum_ssz",
