@@ -311,52 +311,32 @@ impl BeaconState {
 
     /// Check if ``indexed_attestation`` is not empty, has sorted and unique indices and has a valid
     /// aggregate signature.
-    pub fn is_valid_indexed_attestation(
-        &self,
-        indexed_attestation: &IndexedAttestation,
-    ) -> anyhow::Result<bool> {
+    pub fn is_valid_indexed_attestation(&self, indexed_attestation: &IndexedAttestation) -> bool {
         let indices: Vec<usize> = indexed_attestation
             .attesting_indices
             .iter()
             .map(|&i| i as usize)
             .collect();
+
         // Verify indices are sorted and unique
         if indices.is_empty() || !is_sorted_and_unique(&indices) {
-            return Ok(false);
+            return false;
         }
 
-        // Collect public keys of attesting validators
-        let pubkeys: Vec<_> = indices
-            .iter()
-            .filter_map(|&i| self.validators.get(i).map(|v| v.pubkey.clone()))
-            .collect();
-
-        // Compute domain and signing root
         let domain = self.get_domain(
             DOMAIN_BEACON_ATTESTER,
             Some(indexed_attestation.data.target.epoch),
         );
+        let signing_root: alloy_primitives::FixedBytes<32> =
+            compute_signing_root(&indexed_attestation.data, domain);
 
-        let sig = blst::min_pk::Signature::from_bytes(&indexed_attestation.signature.inner)
-            .map_err(|err| anyhow!("Signarure conversion failed:{:?}", err))?;
-        let signing_root = compute_signing_root(&indexed_attestation.data, domain);
-
-        let publickeys = pubkeys
-            .iter()
-            .map(|key| key.to_blst_pubkey())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let verification_result = sig.fast_aggregate_verify(
-            true,
+        indexed_attestation.signature.fast_aggregate_verify(
+            indices
+                .iter()
+                .filter_map(|&i| self.validators.get(i).map(|v| &v.pubkey))
+                .collect::<Vec<_>>(),
             signing_root.as_ref(),
-            DST,
-            publickeys.iter().collect::<Vec<_>>().as_slice(),
-        );
-
-        Ok(matches!(
-            verification_result,
-            blst::BLST_ERROR::BLST_SUCCESS
-        ))
+        )
     }
 
     /// Return the set of attesting indices corresponding to ``data`` and ``bits``.
@@ -1082,11 +1062,11 @@ impl BeaconState {
 
         // Validate both attestations
         ensure!(
-            self.is_valid_indexed_attestation(attestation_1)?,
+            self.is_valid_indexed_attestation(attestation_1),
             "First attestation is invalid"
         );
         ensure!(
-            self.is_valid_indexed_attestation(attestation_2)?,
+            self.is_valid_indexed_attestation(attestation_2),
             "Second attestation is invalid"
         );
 
@@ -1134,7 +1114,7 @@ impl BeaconState {
             &participant_pubkeys,
             signing_root,
             &sync_aggregate.sync_committee_signature,
-        )?;
+        );
 
         ensure!(is_valid, "Sync aggregate signature verification failed.");
 
@@ -1318,7 +1298,8 @@ impl BeaconState {
                 compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
 
             ensure!(
-                body.randao_reveal.verify(&proposer.pubkey, signing_root.as_ref()),
+                body.randao_reveal
+                    .verify(&proposer.pubkey, signing_root.as_ref()),
                 "BLS Signature verification failed!"
             );
 
@@ -1386,7 +1367,7 @@ impl BeaconState {
         )?;
 
         ensure!(
-            self.is_valid_indexed_attestation(&self.get_indexed_attestation(attestation)?)?,
+            self.is_valid_indexed_attestation(&self.get_indexed_attestation(attestation)?),
             "Attestation signature must be valid"
         );
 
@@ -1714,25 +1695,12 @@ pub fn eth_fast_aggregate_verify(
     pubkeys: &[&PubKey],
     message: B256,
     signature: &BlsSignature,
-) -> anyhow::Result<bool> {
+) -> bool {
     if pubkeys.is_empty() && *signature == G2_POINT_AT_INFINITY {
-        return Ok(true);
+        return true;
     }
 
-    let public_keys = pubkeys
-        .iter()
-        .map(|key| key.to_blst_pubkey())
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let sig = blst::min_pk::Signature::from_bytes(&signature.inner)
-        .map_err(|err| anyhow!("Could not parse signature: {err:?}"))?;
-
-    let message = message.as_ref();
-
-    Ok(
-        sig.fast_aggregate_verify(true, message, DST, &public_keys.iter().collect::<Vec<_>>())
-            == blst::BLST_ERROR::BLST_SUCCESS,
-    )
+    signature.fast_aggregate_verify(pubkeys, message.as_ref())
 }
 
 /// Return the aggregate public key for the public keys in ``pubkeys``.

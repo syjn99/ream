@@ -111,4 +111,36 @@ impl BlsSignature {
                 sig.verify(true, message, DST, &[], &pk, false) == blst::BLST_ERROR::BLST_SUCCESS
             })
     }
+
+    /// Verifies the signature against an aggregate of multiple public keys and a message
+    ///
+    /// # Arguments
+    /// * `pubkeys` - Collection of public key references to be aggregated
+    /// * `message` - Message that was signed
+    ///
+    /// # Returns
+    /// * `bool` - Returns true if the signature is valid for the aggregated public keys and
+    ///   message, false if the signature is invalid or if any error occurs during verification
+    pub fn fast_aggregate_verify<'a, P>(&self, pubkeys: P, message: &[u8]) -> bool
+    where
+        P: AsRef<[&'a PubKey]>,
+    {
+        self.to_blst_signature()
+            .and_then(|sig| {
+                let public_keys = pubkeys
+                    .as_ref()
+                    .iter()
+                    .map(|key| key.to_blst_pubkey())
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((sig, public_keys))
+            })
+            .is_ok_and(|(sig, public_keys)| {
+                sig.fast_aggregate_verify(
+                    true,
+                    message,
+                    DST,
+                    &public_keys.iter().collect::<Vec<_>>(),
+                ) == blst::BLST_ERROR::BLST_SUCCESS
+            })
+    }
 }
