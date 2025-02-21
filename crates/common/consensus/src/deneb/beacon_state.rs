@@ -11,6 +11,7 @@ use blst::min_pk::{AggregatePublicKey, PublicKey};
 use ethereum_hashing::{hash, hash_fixed};
 use itertools::Itertools;
 use kzg::eth::c_bindings::KZGCommitment;
+use ream_bls::{BlsSignature, PubKey};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{
@@ -70,8 +71,6 @@ use crate::{
     },
     predicates::is_slashable_attestation_data,
     proposer_slashing::ProposerSlashing,
-    pubkey::PubKey,
-    signature::BlsSignature,
     sync_aggregate::SyncAggregate,
     sync_committee::SyncCommittee,
     validator::Validator,
@@ -339,7 +338,7 @@ impl BeaconState {
             Some(indexed_attestation.data.target.epoch),
         );
 
-        let sig = blst::min_pk::Signature::from_bytes(&indexed_attestation.signature.signature)
+        let sig = blst::min_pk::Signature::from_bytes(&indexed_attestation.signature.inner)
             .map_err(|err| anyhow!("Signarure conversion failed:{:?}", err))?;
         let signing_root = compute_signing_root(&indexed_attestation.data, domain);
 
@@ -832,7 +831,7 @@ impl BeaconState {
             };
             let domain = compute_domain(DOMAIN_DEPOSIT, None, None); // # Fork-agnostic domain since deposits are valid across forks
             let signing_root = compute_signing_root(deposit_message, domain);
-            let sig = blst::min_pk::Signature::from_bytes(&signature.signature)
+            let sig = blst::min_pk::Signature::from_bytes(&signature.inner)
                 .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
             let public_key = match PublicKey::from_bytes(&pubkey.inner) {
                 Ok(pk) => pk,
@@ -899,7 +898,7 @@ impl BeaconState {
         );
 
         let signing_root = compute_signing_root(address_change, domain);
-        let sig = blst::min_pk::Signature::from_bytes(&signed_address_change.signature.signature)
+        let sig = blst::min_pk::Signature::from_bytes(&signed_address_change.signature.inner)
             .map_err(|err| anyhow!("Failed to convert signiture type {err:?}"))?;
         let public_key = PublicKey::from_bytes(&address_change.from_bls_pubkey.inner)
             .map_err(|err| anyhow!("Failed to convert pubkey type {err:?}"))?;
@@ -975,10 +974,10 @@ impl BeaconState {
         );
         let signing_root = compute_signing_root(voluntary_exit, domain);
 
-        let sig = blst::min_pk::Signature::from_bytes(&signed_voluntary_exit.signature.signature)
+        let sig = blst::min_pk::Signature::from_bytes(&signed_voluntary_exit.signature.inner)
             .map_err(|err| {
-            anyhow!("Failed to convert signature to blst Signature type, {err:?}")
-        })?;
+                anyhow!("Failed to convert signature to blst Signature type, {err:?}")
+            })?;
         let public_key = PublicKey::from_bytes(&validator.pubkey.inner)
             .map_err(|err| anyhow!("Failed to convert pubkey to blst PublicKey type, {err:?}"))?;
 
@@ -1064,7 +1063,7 @@ impl BeaconState {
 
             let signing_root = compute_signing_root(&signed_header.message, domain);
 
-            let sig = blst::min_pk::Signature::from_bytes(&signed_header.signature.signature)
+            let sig = blst::min_pk::Signature::from_bytes(&signed_header.signature.inner)
                 .map_err(|err| anyhow!("Unable to retrieve BLS Signature from byets, {:?}", err))?;
 
             let public_key = PublicKey::from_bytes(&proposer.pubkey.inner)
@@ -1357,7 +1356,7 @@ impl BeaconState {
             // Mix in RANDAO reveal
             let mix = xor(
                 self.get_randao_mix(epoch).as_slice(),
-                hash(&body.randao_reveal.signature).as_slice(),
+                hash(&body.randao_reveal.inner).as_slice(),
             );
             self.randao_mixes[(epoch % EPOCHS_PER_HISTORICAL_VECTOR) as usize] = mix;
         }
@@ -1554,14 +1553,13 @@ impl BeaconState {
             signed_block.message,
             self.get_domain(DOMAIN_BEACON_PROPOSER, None),
         );
-        let sig = blst::min_pk::Signature::from_bytes(&signed_block.signature.signature).map_err(
-            |err| {
+        let sig =
+            blst::min_pk::Signature::from_bytes(&signed_block.signature.inner).map_err(|err| {
                 anyhow!(
                     "Failed to convert signature to BLS Signature type, {:?}",
                     err
                 )
-            },
-        )?;
+            })?;
         let public_key = PublicKey::from_bytes(&proposer.pubkey.inner)
             .map_err(|err| anyhow!("Failed to convert pubkey to BLS PublicKey type, {:?}", err))?;
         let verification_result =
@@ -1771,7 +1769,7 @@ pub fn eth_fast_aggregate_verify(
         })
         .collect::<Result<_, _>>()?;
 
-    let sig = blst::min_pk::Signature::from_bytes(&signature.signature)
+    let sig = blst::min_pk::Signature::from_bytes(&signature.inner)
         .map_err(|err| anyhow!("Could not parse signature: {err:?}"))?;
 
     let message = message.as_ref();

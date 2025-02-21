@@ -5,7 +5,7 @@ use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlsSignature {
-    pub signature: [u8; 96],
+    pub inner: [u8; 96],
 }
 
 impl Encode for BlsSignature {
@@ -13,7 +13,7 @@ impl Encode for BlsSignature {
         true
     }
     fn ssz_append(&self, buf: &mut Vec<u8>) {
-        buf.extend_from_slice(&self.signature);
+        buf.extend_from_slice(&self.inner);
     }
     fn ssz_bytes_len(&self) -> usize {
         96
@@ -35,7 +35,7 @@ impl Decode for BlsSignature {
     fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
         let mut signature = [0u8; 96];
         signature.copy_from_slice(bytes);
-        Ok(Self { signature })
+        Ok(Self { inner: signature })
     }
 }
 
@@ -44,7 +44,7 @@ impl Serialize for BlsSignature {
     where
         S: Serializer,
     {
-        let val = hex::encode(self.signature);
+        let val = hex::encode(self.inner);
         serializer.serialize_str(&val)
     }
 }
@@ -58,7 +58,7 @@ impl<'de> Deserialize<'de> for BlsSignature {
         let result = hex::decode(&result).map_err(serde::de::Error::custom)?;
         let mut signature = [0u8; 96];
         signature.copy_from_slice(&result);
-        Ok(Self { signature })
+        Ok(Self { inner: signature })
     }
 }
 
@@ -68,7 +68,7 @@ impl TreeHash for BlsSignature {
     }
 
     fn tree_hash_packed_encoding(&self) -> PackedEncoding {
-        PackedEncoding::from_vec(self.signature.to_vec())
+        PackedEncoding::from_vec(self.inner.to_vec())
     }
 
     fn tree_hash_packing_factor() -> usize {
@@ -76,6 +76,6 @@ impl TreeHash for BlsSignature {
     }
 
     fn tree_hash_root(&self) -> Hash256 {
-        merkle_root(&self.signature, 1)
+        merkle_root(&self.inner, 1)
     }
 }
