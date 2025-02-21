@@ -5,8 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz::{Decode, Encode};
 use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
 
-use super::constants::DST;
-use crate::PubKey;
+use crate::{constants::DST, PubKey};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlsSignature {
