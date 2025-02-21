@@ -1,7 +1,12 @@
 use alloy_primitives::hex;
+use anyhow;
+use blst::min_pk::Signature;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz::{Decode, Encode};
 use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
+
+use super::constants::DST;
+use crate::PubKey;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlsSignature {
@@ -77,5 +82,33 @@ impl TreeHash for BlsSignature {
 
     fn tree_hash_root(&self) -> Hash256 {
         merkle_root(&self.inner, 1)
+    }
+}
+
+impl BlsSignature {
+    fn to_blst_signature(&self) -> anyhow::Result<Signature> {
+        Signature::from_bytes(&self.inner)
+            .map_err(|e| anyhow::anyhow!("Failed to convert signature: {:?}", e))
+    }
+
+    /// Verifies a BLS signature against a public key and message.
+    ///
+    /// This function will return `false` in any error case, including:
+    /// - If the signature bytes are invalid or malformed
+    /// - If the public key bytes are invalid or malformed
+    /// - If the actual signature verification fails
+    ///
+    /// # Arguments
+    /// * `pubkey` - The public key to verify against
+    /// * `message` - The message that was signed
+    ///
+    /// # Returns
+    /// `bool` - true if the signature is valid, false otherwise
+    pub fn verify(&self, pubkey: &PubKey, message: &[u8]) -> bool {
+        self.to_blst_signature()
+            .and_then(|sig| pubkey.to_blst_pubkey().map(|pk| (sig, pk)))
+            .is_ok_and(|(sig, pk)| {
+                sig.verify(true, message, DST, &[], &pk, false) == blst::BLST_ERROR::BLST_SUCCESS
+            })
     }
 }
