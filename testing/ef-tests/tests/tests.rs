@@ -67,12 +67,25 @@ test_consensus_type!(Withdrawal);
 // Testing operations for block processing
 test_operation!(attestation, Attestation, "attestation", process_attestation);
 test_operation!(
+    attester_slashing,
+    AttesterSlashing,
+    "attester_slashing",
+    process_attester_slashing
+);
+test_operation!(block_header, BeaconBlock, "block", process_block_header);
+test_operation!(
     bls_to_execution_change,
     SignedBLSToExecutionChange,
     "address_change",
     process_bls_to_execution_change
 );
 test_operation!(deposit, Deposit, "deposit", process_deposit);
+test_operation!(
+    proposer_slashing,
+    ProposerSlashing,
+    "proposer_slashing",
+    process_proposer_slashing
+);
 test_operation!(
     voluntary_exit,
     SignedVoluntaryExit,
