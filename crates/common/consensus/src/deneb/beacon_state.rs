@@ -512,12 +512,12 @@ impl BeaconState {
     }
 
     pub fn add_flag(flags: u8, flag_index: u8) -> u8 {
-        let flag = 2 << flag_index;
+        let flag = 1 << flag_index;
         flags | flag
     }
 
     pub fn has_flag(flags: u8, flag_index: u8) -> bool {
-        let flag = 2 << flag_index;
+        let flag = 1 << flag_index;
         flags & flag == flag
     }
 
@@ -645,7 +645,7 @@ impl BeaconState {
         if is_matching_source && inclusion_delay <= (SLOTS_PER_EPOCH as f64).sqrt() as u64 {
             participation_flag_indices.push(TIMELY_SOURCE_FLAG_INDEX);
         }
-        if is_matching_target && inclusion_delay <= SLOTS_PER_EPOCH {
+        if is_matching_target {
             participation_flag_indices.push(TIMELY_TARGET_FLAG_INDEX);
         }
         if is_matching_head && inclusion_delay == MIN_ATTESTATION_INCLUSION_DELAY {
