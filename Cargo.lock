@@ -3537,6 +3537,7 @@ name = "ream-bls"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "anyhow",
  "blst",
  "ethereum_ssz",
  "ethereum_ssz_derive",

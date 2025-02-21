@@ -7,11 +7,11 @@ use std::{
 
 use alloy_primitives::{aliases::B32, Address, B256};
 use anyhow::{anyhow, bail, ensure};
-use blst::min_pk::{AggregatePublicKey, PublicKey};
+use blst::min_pk::PublicKey;
 use ethereum_hashing::{hash, hash_fixed};
 use itertools::Itertools;
 use kzg::eth::c_bindings::KZGCommitment;
-use ream_bls::{BlsSignature, PubKey};
+use ream_bls::{AggregatePubKey, BlsSignature, PubKey};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{
@@ -1694,7 +1694,7 @@ impl BeaconState {
 
         Ok(SyncCommittee {
             pubkeys: FixedVector::from(pubkeys),
-            aggregate_pubkey: aggregate_pubkey.into(),
+            aggregate_pubkey,
         })
     }
 
@@ -1785,20 +1785,11 @@ pub fn eth_fast_aggregate_verify(
 /// input elliptic curve points that must be decoded from the input ``BLSPubkey``s.
 /// This implementation is for demonstrative purposes only and ignores encoding/decoding concerns.
 /// Refer to the BLS signature draft standard for more information.
-pub fn eth_aggregate_pubkeys(pubkeys: &[&PubKey]) -> anyhow::Result<PublicKey> {
+pub fn eth_aggregate_pubkeys(pubkeys: &[&PubKey]) -> anyhow::Result<PubKey> {
     ensure!(!pubkeys.is_empty(), "Public keys list cannot be empty");
 
-    let pubkeys = pubkeys
-        .iter()
-        .map(|public_key| {
-            PublicKey::from_bytes(&public_key.inner)
-                .map_err(|err| anyhow!("Failed to decode public key {err:?}"))
-        })
-        .collect::<anyhow::Result<Vec<PublicKey>>>()?;
-    let aggregate_public_key =
-        AggregatePublicKey::aggregate(&pubkeys.iter().collect::<Vec<_>>(), true)
-            .map_err(|err| anyhow!("Failed to aggregate and validate public keys {err:?}"))?;
-    Ok(aggregate_public_key.to_public_key())
+    let aggregate_pubkey = AggregatePubKey::aggregate(pubkeys)?;
+    Ok(aggregate_pubkey.to_pubkey())
 }
 
 pub fn kzg_commitment_to_versioned_hash(kzg_commitment: &KZGCommitment) -> B256 {
