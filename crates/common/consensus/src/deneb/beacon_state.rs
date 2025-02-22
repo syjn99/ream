@@ -1296,7 +1296,6 @@ impl BeaconState {
         {
             let signing_root =
                 compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
-
             ensure!(
                 body.randao_reveal
                     .verify(&proposer.pubkey, signing_root.as_ref()),
