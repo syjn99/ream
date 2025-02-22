@@ -1,74 +1,41 @@
 use alloy_primitives::hex;
 use bls12_381::{G1Affine, G1Projective};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
-use ssz::{Decode, Encode};
-use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use ssz::Encode;
+use ssz_derive::{Decode, Encode};
+use ssz_types::{typenum, FixedVector};
+use tree_hash_derive::TreeHash;
 
-#[derive(Debug, PartialEq, Clone, Default)]
+use crate::errors::BLSError;
+
+#[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Default)]
 pub struct PubKey {
-    pub inner: G1Projective,
+    pub inner: FixedVector<u8, typenum::U48>,
 }
 
-impl PubKey {
-    fn validate_point(point: &G1Affine) -> Result<(), String> {
-        if bool::from(point.is_identity()) {
-            return Err("Invalid point: infinity of G1".to_string());
+impl From<G1Projective> for PubKey {
+    fn from(value: G1Projective) -> Self {
+        Self {
+            inner: G1Affine::from(value).to_compressed().to_vec().into(),
         }
-
-        if !bool::from(point.is_torsion_free()) {
-            return Err("Invalid torsion component".to_string());
-        }
-
-        Ok(())
     }
 }
 
-impl Encode for PubKey {
-    fn is_ssz_fixed_len() -> bool {
-        true
-    }
-    fn ssz_append(&self, buf: &mut Vec<u8>) {
-        buf.extend_from_slice(&G1Affine::from(&self.inner).to_compressed());
-    }
-    fn ssz_bytes_len(&self) -> usize {
-        48
-    }
-    fn ssz_fixed_len() -> usize {
-        48
-    }
-}
+impl TryFrom<PubKey> for G1Affine {
+    type Error = BLSError;
 
-impl Decode for PubKey {
-    fn is_ssz_fixed_len() -> bool {
-        true
-    }
-
-    fn ssz_fixed_len() -> usize {
-        48
-    }
-
-    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        let point = match G1Affine::from_compressed(bytes.try_into().map_err(|_| {
-            ssz::DecodeError::InvalidByteLength {
-                len: bytes.len(),
-                expected: 48,
-            }
-        })?)
+    fn try_from(value: PubKey) -> Result<Self, Self::Error> {
+        match G1Affine::from_compressed(
+            &value
+                .to_bytes()
+                .try_into()
+                .map_err(|_| BLSError::InvalidByteLength)?,
+        )
         .into_option()
         {
-            Some(p) => p,
-            None => {
-                return Err(ssz::DecodeError::BytesInvalid(
-                    "Invalid public key".to_string(),
-                ))
-            }
-        };
-
-        Self::validate_point(&point).map_err(|e| ssz::DecodeError::BytesInvalid(e.to_string()))?;
-
-        Ok(Self {
-            inner: G1Projective::from(point),
-        })
+            Some(point) => Ok(point),
+            None => Err(BLSError::InvalidPublicKey),
+        }
     }
 }
 
@@ -77,7 +44,8 @@ impl Serialize for PubKey {
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(&G1Affine::from(&self.inner).to_compressed())
+        let val = hex::encode(self.inner.as_ssz_bytes());
+        serializer.serialize_str(&val)
     }
 }
 
@@ -87,43 +55,14 @@ impl<'de> Deserialize<'de> for PubKey {
         D: Deserializer<'de>,
     {
         let result: String = Deserialize::deserialize(deserializer)?;
-        let result = hex::decode(&result).map_err(SerdeError::custom)?;
-        let mut pubkey = [0u8; 48];
-        pubkey.copy_from_slice(&result);
-
-        let point = match G1Affine::from_compressed(&pubkey).into_option() {
-            Some(p) => p,
-            None => return Err(SerdeError::custom("Invalid public key")),
-        };
-
-        Self::validate_point(&point).map_err(SerdeError::custom)?;
-
-        Ok(Self {
-            inner: G1Projective::from(point),
-        })
-    }
-}
-
-impl TreeHash for PubKey {
-    fn tree_hash_type() -> tree_hash::TreeHashType {
-        TreeHashType::Vector
-    }
-
-    fn tree_hash_packed_encoding(&self) -> PackedEncoding {
-        PackedEncoding::from_vec(G1Affine::from(&self.inner).to_compressed().to_vec())
-    }
-
-    fn tree_hash_packing_factor() -> usize {
-        1
-    }
-
-    fn tree_hash_root(&self) -> Hash256 {
-        merkle_root(&G1Affine::from(&self.inner).to_compressed(), 1)
+        let result = hex::decode(&result).map_err(serde::de::Error::custom)?;
+        let key = FixedVector::from(result);
+        Ok(Self { inner: key })
     }
 }
 
 impl PubKey {
-    pub fn to_bytes(&self) -> [u8; 48] {
-        G1Affine::from(&self.inner).to_compressed()
+    pub fn to_bytes(&self) -> &[u8] {
+        self.inner.iter().as_slice()
     }
 }

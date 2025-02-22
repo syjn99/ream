@@ -85,8 +85,8 @@ impl TreeHash for BlsSignature {
 }
 
 impl BlsSignature {
-    pub fn to_bytes(&self) -> [u8; 96] {
-        self.inner
+    pub fn to_bytes(&self) -> &[u8] {
+        self.inner.iter().as_slice()
     }
 
     pub fn infinity() -> Self {

@@ -1,64 +1,37 @@
 use alloy_primitives::hex;
 use bls12_381::{
     hash_to_curve::{ExpandMsgXmd, HashToCurve},
-    pairing, G1Affine, G1Projective, G2Affine, G2Projective,
+    pairing, G1Affine, G2Affine, G2Projective,
 };
-use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
-use ssz::{Decode, Encode};
-use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use ssz::Encode;
+use ssz_derive::{Decode, Encode};
+use ssz_types::{typenum, FixedVector};
+use tree_hash_derive::TreeHash;
 
 use super::pubkey::PubKey;
-use crate::{constants::DST, errors::BLSError};
+use crate::{constants::DST, errors::BLSError, AggregatePubKey};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Default)]
 pub struct BlsSignature {
-    pub inner: G2Projective,
+    pub inner: FixedVector<u8, typenum::U96>,
 }
 
-impl Encode for BlsSignature {
-    fn is_ssz_fixed_len() -> bool {
-        true
-    }
-    fn ssz_append(&self, buf: &mut Vec<u8>) {
-        buf.extend_from_slice(&G2Affine::from(&self.inner).to_compressed());
-    }
-    fn ssz_bytes_len(&self) -> usize {
-        96
-    }
-    fn ssz_fixed_len() -> usize {
-        96
-    }
-}
+impl TryFrom<BlsSignature> for G2Affine {
+    type Error = BLSError;
 
-impl Decode for BlsSignature {
-    fn is_ssz_fixed_len() -> bool {
-        true
-    }
-
-    fn ssz_fixed_len() -> usize {
-        96
-    }
-
-    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        let point = match G2Affine::from_compressed(bytes.try_into().map_err(|_| {
-            ssz::DecodeError::InvalidByteLength {
-                len: bytes.len(),
-                expected: 96,
-            }
-        })?)
+    fn try_from(value: BlsSignature) -> Result<Self, Self::Error> {
+        match G2Affine::from_compressed(
+            &value
+                .to_bytes()
+                .try_into()
+                .map_err(|_| BLSError::InvalidByteLength)?,
+        )
         .into_option()
         {
-            Some(p) => p,
-            None => {
-                return Err(ssz::DecodeError::BytesInvalid(
-                    "Invalid signature dd".to_string(),
-                ));
-            }
-        };
-
-        Ok(Self {
-            inner: point.into(),
-        })
+            Some(point) => Ok(point),
+            None => Err(BLSError::InvalidSignature),
+        }
     }
 }
 
@@ -67,7 +40,8 @@ impl Serialize for BlsSignature {
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(&G2Affine::from(&self.inner).to_compressed())
+        let val = hex::encode(self.inner.as_ssz_bytes());
+        serializer.serialize_str(&val)
     }
 }
 
@@ -78,48 +52,19 @@ impl<'de> Deserialize<'de> for BlsSignature {
     {
         let result: String = Deserialize::deserialize(deserializer)?;
         let result = hex::decode(&result).map_err(serde::de::Error::custom)?;
-        let mut signature = [0u8; 96];
-        signature.copy_from_slice(&result);
-
-        let point = match G2Affine::from_compressed(&signature).into_option() {
-            Some(p) => p,
-            None => {
-                return Err(SerdeError::custom("Invalid signature"));
-            }
-        };
-
-        Ok(Self {
-            inner: point.into(),
-        })
-    }
-}
-
-impl TreeHash for BlsSignature {
-    fn tree_hash_type() -> tree_hash::TreeHashType {
-        TreeHashType::Vector
-    }
-
-    fn tree_hash_packed_encoding(&self) -> PackedEncoding {
-        PackedEncoding::from_vec(G2Affine::from(&self.inner).to_compressed().to_vec())
-    }
-
-    fn tree_hash_packing_factor() -> usize {
-        1
-    }
-
-    fn tree_hash_root(&self) -> Hash256 {
-        merkle_root(&G2Affine::from(&self.inner).to_compressed(), 1)
+        let key = FixedVector::from(result);
+        Ok(Self { inner: key })
     }
 }
 
 impl BlsSignature {
-    pub fn to_bytes(&self) -> [u8; 96] {
-        G2Affine::from(&self.inner).to_compressed()
+    pub fn to_bytes(&self) -> &[u8] {
+        self.inner.iter().as_slice()
     }
 
     pub fn infinity() -> Self {
         Self {
-            inner: G2Projective::identity(),
+            inner: FixedVector::from(G2Affine::identity().to_compressed().to_vec()),
         }
     }
 
@@ -138,8 +83,8 @@ impl BlsSignature {
             DST,
         );
 
-        let gt1 = pairing(&G1Affine::from(pubkey.inner), &G2Affine::from(h));
-        let gt2 = pairing(&G1Affine::generator(), &G2Affine::from(self.inner));
+        let gt1 = pairing(&G1Affine::try_from(pubkey.clone())?, &G2Affine::from(h));
+        let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self.clone())?);
 
         Ok(gt1 == gt2)
     }
@@ -158,20 +103,18 @@ impl BlsSignature {
     where
         P: AsRef<[&'a PubKey]>,
     {
-        let agg_pks_point = pubkeys
-            .as_ref()
-            .iter()
-            .fold(G1Projective::identity(), |acc, pubkey| {
-                acc.add(&pubkey.inner)
-            });
+        let agg_pubkey = AggregatePubKey::aggregate(pubkeys.as_ref())?;
 
         let h = <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(
             [message],
             DST,
         );
 
-        let gt1 = pairing(&G1Affine::from(agg_pks_point), &G2Affine::from(h));
-        let gt2 = pairing(&G1Affine::generator(), &G2Affine::from(self.inner));
+        let gt1 = pairing(
+            &G1Affine::try_from(agg_pubkey.to_pubkey())?,
+            &G2Affine::from(h),
+        );
+        let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self.clone())?);
 
         Ok(gt1 == gt2)
     }

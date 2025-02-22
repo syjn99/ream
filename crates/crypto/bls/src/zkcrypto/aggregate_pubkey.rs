@@ -1,9 +1,10 @@
-use bls12_381::G1Projective;
+use bls12_381::{G1Affine, G1Projective};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use tree_hash_derive::TreeHash;
 
 use super::pubkey::PubKey;
+use crate::errors::BLSError;
 
 #[derive(Debug, PartialEq, Encode, Decode, Clone, Serialize, Deserialize, Default, TreeHash)]
 pub struct AggregatePubKey {
@@ -15,15 +16,16 @@ impl AggregatePubKey {
         self.inner
     }
 
-    pub fn aggregate(pubkeys: &[&PubKey]) -> anyhow::Result<Self> {
+    pub fn aggregate(pubkeys: &[&PubKey]) -> Result<Self, BLSError> {
+        let agg_point = pubkeys
+            .iter()
+            .try_fold(G1Projective::identity(), |acc, pubkey| {
+                let point: G1Affine = (*pubkey).clone().try_into()?;
+                Ok(acc.add(&G1Projective::from(point)))
+            })?;
+
         Ok(Self {
-            inner: PubKey {
-                inner: pubkeys
-                    .iter()
-                    .fold(G1Projective::identity(), |acc, pubkey| {
-                        acc.add(&pubkey.inner)
-                    }),
-            },
+            inner: PubKey::from(agg_point),
         })
     }
 }
