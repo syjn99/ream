@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+#[cfg(feature = "supranational")]
 use crate::supranational::errors::BlstError;
 
 #[derive(Error, Debug)]
