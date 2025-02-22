@@ -1,5 +1,5 @@
 use alloy_primitives::hex;
-use blst::min_pk::Signature;
+use blst::{min_pk::Signature as BlstSignature, BLST_ERROR};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz::{Decode, Encode};
 use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
@@ -84,8 +84,8 @@ impl TreeHash for BlsSignature {
 }
 
 impl BlsSignature {
-    fn to_blst_signature(&self) -> Result<Signature, BLSError> {
-        Signature::from_bytes(&self.inner).map_err(|e| BLSError::BlstError(e.into()))
+    fn to_blst_signature(&self) -> Result<BlstSignature, BLSError> {
+        BlstSignature::from_bytes(&self.inner).map_err(|e| BLSError::BlstError(e.into()))
     }
 
     /// Verifies a BLS signature against a public key and message.
@@ -101,7 +101,7 @@ impl BlsSignature {
         let sig = self.to_blst_signature()?;
         let pk = pubkey.to_blst_pubkey()?;
 
-        Ok(sig.verify(true, message, DST, &[], &pk, false) == blst::BLST_ERROR::BLST_SUCCESS)
+        Ok(sig.verify(true, message, DST, &[], &pk, false) == BLST_ERROR::BLST_SUCCESS)
     }
 
     /// Verifies the signature against a message using an aggregate of multiple public keys
@@ -127,7 +127,7 @@ impl BlsSignature {
 
         Ok(
             sig.fast_aggregate_verify(true, message, DST, &public_keys.iter().collect::<Vec<_>>())
-                == blst::BLST_ERROR::BLST_SUCCESS,
+                == BLST_ERROR::BLST_SUCCESS,
         )
     }
 }

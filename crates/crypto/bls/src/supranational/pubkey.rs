@@ -1,5 +1,5 @@
 use alloy_primitives::hex;
-use blst::min_pk::PublicKey;
+use blst::min_pk::PublicKey as BlstPublicKey;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz::Encode;
 use ssz_derive::{Decode, Encode};
@@ -13,8 +13,8 @@ pub struct PubKey {
     pub inner: FixedVector<u8, typenum::U48>,
 }
 
-impl From<PublicKey> for PubKey {
-    fn from(value: PublicKey) -> Self {
+impl From<BlstPublicKey> for PubKey {
+    fn from(value: BlstPublicKey) -> Self {
         PubKey {
             inner: FixedVector::from(value.to_bytes().to_vec()),
         }
@@ -44,7 +44,7 @@ impl<'de> Deserialize<'de> for PubKey {
 }
 
 impl PubKey {
-    pub fn to_blst_pubkey(&self) -> Result<PublicKey, BLSError> {
-        PublicKey::from_bytes(&self.inner).map_err(|err| BLSError::BlstError(err.into()))
+    pub fn to_blst_pubkey(&self) -> Result<BlstPublicKey, BLSError> {
+        BlstPublicKey::from_bytes(&self.inner).map_err(|err| BLSError::BlstError(err.into()))
     }
 }
