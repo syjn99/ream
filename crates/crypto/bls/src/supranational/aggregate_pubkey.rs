@@ -1,32 +1,13 @@
 use blst::min_pk::AggregatePublicKey as BlstAggregatePublicKey;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use tree_hash_derive::TreeHash;
 
 use crate::PubKey;
 
-#[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Default)]
+#[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Serialize, Deserialize, Default)]
 pub struct AggregatePubKey {
     pub inner: PubKey,
-}
-
-impl Serialize for AggregatePubKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.inner.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for AggregatePubKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let inner = PubKey::deserialize(deserializer)?;
-        Ok(Self { inner })
-    }
 }
 
 impl AggregatePubKey {
