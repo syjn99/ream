@@ -865,7 +865,7 @@ impl BeaconState {
         ensure!(&validator.withdrawal_credentials[..1] == BLS_WITHDRAWAL_PREFIX);
         ensure!(
             validator.withdrawal_credentials[1..]
-                == hash(&address_change.from_bls_pubkey.inner)[1..]
+                == hash(&address_change.from_bls_pubkey.to_bytes())[1..]
         );
 
         // Fork-agnostic domain since address changes are valid across forks
@@ -1315,7 +1315,7 @@ impl BeaconState {
             // Mix in RANDAO reveal
             let mix = xor(
                 self.get_randao_mix(epoch).as_slice(),
-                hash(&body.randao_reveal.inner).as_slice(),
+                hash(&body.randao_reveal.to_bytes()).as_slice(),
             );
             self.randao_mixes[(epoch % EPOCHS_PER_HISTORICAL_VECTOR) as usize] = mix;
         }
