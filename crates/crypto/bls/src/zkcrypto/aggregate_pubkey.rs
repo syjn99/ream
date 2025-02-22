@@ -1,22 +1,15 @@
 use bls12_381::{G1Affine, G1Projective};
-use serde::{Deserialize, Serialize};
-use ssz_derive::{Decode, Encode};
-use tree_hash_derive::TreeHash;
 
-use super::pubkey::PubKey;
-use crate::errors::BLSError;
+use crate::{
+    errors::BLSError,
+    traits::{Aggregatable, ZkcryptoAggregatable},
+    AggregatePubKey, PubKey,
+};
 
-#[derive(Debug, PartialEq, Encode, Decode, Clone, Serialize, Deserialize, Default, TreeHash)]
-pub struct AggregatePubKey {
-    pub inner: PubKey,
-}
+impl Aggregatable for AggregatePubKey {
+    type Error = BLSError;
 
-impl AggregatePubKey {
-    pub fn to_pubkey(self) -> PubKey {
-        self.inner
-    }
-
-    pub fn aggregate(pubkeys: &[&PubKey]) -> Result<Self, BLSError> {
+    fn aggregate(pubkeys: &[&PubKey]) -> Result<Self, Self::Error> {
         let agg_point = pubkeys
             .iter()
             .try_fold(G1Projective::identity(), |acc, pubkey| {
@@ -29,3 +22,5 @@ impl AggregatePubKey {
         })
     }
 }
+
+impl ZkcryptoAggregatable for AggregatePubKey {}

@@ -10,7 +10,10 @@ use anyhow::{anyhow, bail, ensure};
 use ethereum_hashing::{hash, hash_fixed};
 use itertools::Itertools;
 use kzg::eth::c_bindings::KZGCommitment;
-use ream_bls::{AggregatePubKey, BlsSignature, PubKey};
+use ream_bls::{
+    traits::{Aggregatable, Verifiable},
+    AggregatePubKey, BlsSignature, PubKey,
+};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{
