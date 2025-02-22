@@ -1,7 +1,7 @@
 use blst::BLST_ERROR;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum BlstError {
     #[error("Invalid BLS public key encoding")]
     BadEncoding,

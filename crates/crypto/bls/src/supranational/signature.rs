@@ -4,7 +4,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz::{Decode, Encode};
 use tree_hash::{merkle_root, Hash256, PackedEncoding, TreeHash, TreeHashType};
 
-use crate::{constants::DST, errors::BLSError, PubKey};
+use super::pubkey::PubKey;
+use crate::{constants::DST, errors::BLSError};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlsSignature {
@@ -84,6 +85,10 @@ impl TreeHash for BlsSignature {
 }
 
 impl BlsSignature {
+    pub fn to_bytes(&self) -> [u8; 96] {
+        self.inner
+    }
+
     pub fn infinity() -> Self {
         Self {
             inner: [

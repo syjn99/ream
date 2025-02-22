@@ -44,6 +44,10 @@ impl<'de> Deserialize<'de> for PubKey {
 }
 
 impl PubKey {
+    pub fn to_bytes(&self) -> &[u8] {
+        self.inner.iter().as_slice()
+    }
+
     pub fn to_blst_pubkey(&self) -> Result<BlstPublicKey, BLSError> {
         BlstPublicKey::from_bytes(&self.inner).map_err(|err| BLSError::BlstError(err.into()))
     }

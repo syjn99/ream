@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use tree_hash_derive::TreeHash;
 
-use crate::PubKey;
+use super::pubkey::PubKey;
 
 #[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Serialize, Deserialize, Default)]
 pub struct AggregatePubKey {
