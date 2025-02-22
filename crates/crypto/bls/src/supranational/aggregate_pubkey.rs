@@ -1,21 +1,15 @@
 use blst::min_pk::AggregatePublicKey as BlstAggregatePublicKey;
-use serde::{Deserialize, Serialize};
-use ssz_derive::{Decode, Encode};
-use tree_hash_derive::TreeHash;
 
-use super::pubkey::PubKey;
+use crate::{
+    aggregate_pubkey::AggregatePubKey,
+    pubkey::PubKey,
+    traits::{Aggregatable, SupranationalAggregatable},
+};
 
-#[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Serialize, Deserialize, Default)]
-pub struct AggregatePubKey {
-    pub inner: PubKey,
-}
+impl Aggregatable for AggregatePubKey {
+    type Error = anyhow::Error;
 
-impl AggregatePubKey {
-    pub fn to_pubkey(self) -> PubKey {
-        self.inner
-    }
-
-    pub fn aggregate(pubkeys: &[&PubKey]) -> anyhow::Result<Self> {
+    fn aggregate(pubkeys: &[&PubKey]) -> anyhow::Result<Self> {
         let blst_pubkeys = pubkeys
             .iter()
             .map(|pk| pk.to_blst_pubkey())
@@ -30,3 +24,5 @@ impl AggregatePubKey {
         })
     }
 }
+
+impl SupranationalAggregatable for AggregatePubKey {}

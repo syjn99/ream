@@ -35,4 +35,4 @@ clean: # Run `cargo clean`.
 .PHONY: lint
 lint: # Run `clippy` and `rustfmt`.
 	cargo +nightly fmt --all
-	cargo clippy --all --all-targets --all-features --no-deps -- --deny warnings
+	cargo clippy --all --all-targets --features "$(FEATURES)" --no-deps -- --deny warnings
