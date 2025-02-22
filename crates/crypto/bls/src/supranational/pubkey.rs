@@ -6,6 +6,8 @@ use ssz_derive::{Decode, Encode};
 use ssz_types::{typenum, FixedVector};
 use tree_hash_derive::TreeHash;
 
+use crate::errors::BLSError;
+
 #[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Default)]
 pub struct PubKey {
     pub inner: FixedVector<u8, typenum::U48>,
@@ -42,8 +44,7 @@ impl<'de> Deserialize<'de> for PubKey {
 }
 
 impl PubKey {
-    pub fn to_blst_pubkey(&self) -> anyhow::Result<PublicKey> {
-        PublicKey::from_bytes(&self.inner)
-            .map_err(|err| anyhow::anyhow!("Failed to decode public key {err:?}"))
+    pub fn to_blst_pubkey(&self) -> Result<PublicKey, BLSError> {
+        PublicKey::from_bytes(&self.inner).map_err(|err| BLSError::BlstError(err.into()))
     }
 }

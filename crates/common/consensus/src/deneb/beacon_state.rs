@@ -311,7 +311,10 @@ impl BeaconState {
 
     /// Check if ``indexed_attestation`` is not empty, has sorted and unique indices and has a valid
     /// aggregate signature.
-    pub fn is_valid_indexed_attestation(&self, indexed_attestation: &IndexedAttestation) -> bool {
+    pub fn is_valid_indexed_attestation(
+        &self,
+        indexed_attestation: &IndexedAttestation,
+    ) -> anyhow::Result<bool> {
         let indices: Vec<usize> = indexed_attestation
             .attesting_indices
             .iter()
@@ -320,7 +323,7 @@ impl BeaconState {
 
         // Verify indices are sorted and unique
         if indices.is_empty() || !is_sorted_and_unique(&indices) {
-            return false;
+            return Ok(false);
         }
 
         let domain = self.get_domain(
@@ -330,13 +333,16 @@ impl BeaconState {
         let signing_root: alloy_primitives::FixedBytes<32> =
             compute_signing_root(&indexed_attestation.data, domain);
 
-        indexed_attestation.signature.fast_aggregate_verify(
-            indices
-                .iter()
-                .filter_map(|&i| self.validators.get(i).map(|v| &v.pubkey))
-                .collect::<Vec<_>>(),
-            signing_root.as_ref(),
-        )
+        indexed_attestation
+            .signature
+            .fast_aggregate_verify(
+                indices
+                    .iter()
+                    .filter_map(|&i| self.validators.get(i).map(|v| &v.pubkey))
+                    .collect::<Vec<_>>(),
+                signing_root.as_ref(),
+            )
+            .map_err(|e| anyhow!("Invalid indexed attestation: {:?}", e))
     }
 
     /// Return the set of attesting indices corresponding to ``data`` and ``bits``.
@@ -808,8 +814,12 @@ impl BeaconState {
             let domain = compute_domain(DOMAIN_DEPOSIT, None, None); // # Fork-agnostic domain since deposits are valid across forks
             let signing_root = compute_signing_root(deposit_message, domain);
 
-            if signature.verify(&pubkey, signing_root.as_ref()) {
-                self.add_validator_to_registry(pubkey, withdrawal_credentials, amount)?;
+            match signature.verify(&pubkey, signing_root.as_ref()) {
+                Ok(true) => {
+                    self.add_validator_to_registry(pubkey, withdrawal_credentials, amount)?
+                }
+                _ => return Ok(()), /* Skip adding validator if either pubkey or signature is
+                                     * invalid */
             }
         } else {
             // Increase balance by deposit amount
@@ -870,7 +880,7 @@ impl BeaconState {
         ensure!(
             signed_address_change
                 .signature
-                .verify(&address_change.from_bls_pubkey, signing_root.as_ref()),
+                .verify(&address_change.from_bls_pubkey, signing_root.as_ref())?,
             "BLS Signature verification failed!"
         );
 
@@ -942,7 +952,7 @@ impl BeaconState {
         ensure!(
             signed_voluntary_exit
                 .signature
-                .verify(&validator.pubkey, signing_root.as_ref()),
+                .verify(&validator.pubkey, signing_root.as_ref())?,
             "BLS Signature verification failed!"
         );
 
@@ -1023,7 +1033,7 @@ impl BeaconState {
             ensure!(
                 signed_header
                     .signature
-                    .verify(&proposer.pubkey, signing_root.as_ref()),
+                    .verify(&proposer.pubkey, signing_root.as_ref())?,
                 "BLS Signature verification failed!"
             );
         }
@@ -1062,11 +1072,11 @@ impl BeaconState {
 
         // Validate both attestations
         ensure!(
-            self.is_valid_indexed_attestation(attestation_1),
+            self.is_valid_indexed_attestation(attestation_1)?,
             "First attestation is invalid"
         );
         ensure!(
-            self.is_valid_indexed_attestation(attestation_2),
+            self.is_valid_indexed_attestation(attestation_2)?,
             "Second attestation is invalid"
         );
 
@@ -1110,13 +1120,14 @@ impl BeaconState {
         let signing_root =
             compute_signing_root(self.get_block_root_at_slot(previous_slot)?, domain);
 
-        let is_valid = eth_fast_aggregate_verify(
-            &participant_pubkeys,
-            signing_root,
-            &sync_aggregate.sync_committee_signature,
+        ensure!(
+            eth_fast_aggregate_verify(
+                &participant_pubkeys,
+                signing_root,
+                &sync_aggregate.sync_committee_signature,
+            )?,
+            "Sync aggregate signature verification failed."
         );
-
-        ensure!(is_valid, "Sync aggregate signature verification failed.");
 
         // Compute participant and proposer rewards
         let total_active_increments = self.get_total_active_balance() / EFFECTIVE_BALANCE_INCREMENT;
@@ -1298,7 +1309,7 @@ impl BeaconState {
                 compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
             ensure!(
                 body.randao_reveal
-                    .verify(&proposer.pubkey, signing_root.as_ref()),
+                    .verify(&proposer.pubkey, signing_root.as_ref())?,
                 "BLS Signature verification failed!"
             );
 
@@ -1366,7 +1377,7 @@ impl BeaconState {
         )?;
 
         ensure!(
-            self.is_valid_indexed_attestation(&self.get_indexed_attestation(attestation)?),
+            self.is_valid_indexed_attestation(&self.get_indexed_attestation(attestation)?)?,
             "Attestation signature must be valid"
         );
 
@@ -1496,7 +1507,7 @@ impl BeaconState {
         Ok(())
     }
 
-    pub fn verify_block_signature(&self, signed_block: SignedBeaconBlock) -> bool {
+    pub fn verify_block_signature(&self, signed_block: SignedBeaconBlock) -> anyhow::Result<bool> {
         let proposer = &self.validators[signed_block.message.proposer_index as usize];
         let signing_root = compute_signing_root(
             signed_block.message,
@@ -1506,6 +1517,7 @@ impl BeaconState {
         signed_block
             .signature
             .verify(&proposer.pubkey, signing_root.as_ref())
+            .map_err(|e| anyhow!("Invalid block signature: {:?}", e))
     }
 
     /// Check if ``validator`` is eligible for activation.
@@ -1694,12 +1706,14 @@ pub fn eth_fast_aggregate_verify(
     pubkeys: &[&PubKey],
     message: B256,
     signature: &BlsSignature,
-) -> bool {
+) -> anyhow::Result<bool> {
     if pubkeys.is_empty() && *signature == G2_POINT_AT_INFINITY {
-        return true;
+        return Ok(true);
     }
 
-    signature.fast_aggregate_verify(pubkeys, message.as_ref())
+    signature
+        .fast_aggregate_verify(pubkeys, message.as_ref())
+        .map_err(|e| anyhow!("Failed to verify fast aggregate: {:?}", e))
 }
 
 /// Return the aggregate public key for the public keys in ``pubkeys``.

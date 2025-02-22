@@ -3786,6 +3786,7 @@ dependencies = [
  "ethereum_ssz_derive",
  "serde",
  "ssz_types",
+ "thiserror 2.0.11",
  "tree_hash",
  "tree_hash_derive",
 ]
