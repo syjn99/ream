@@ -32,7 +32,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Run Clippy
-      run: cargo clippy --all --all-targets --all-features --no-deps -- --deny warnings
+      run: |
+        cargo clippy --all --all-targets --no-deps -- --deny warnings # clippy for ream, default features
+        cargo clippy --package ream-bls --all-targets --features "supranational" --no-deps -- --deny warnings # clippy for ream-bls, supranational feature
 
   build:
     runs-on: ubuntu-latest

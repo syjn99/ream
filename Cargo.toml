@@ -61,7 +61,7 @@ tree_hash_derive = "0.9"
 
 
 # ream dependencies
-ream-bls = { path = "crates/crypto/bls" }
+ream-bls = { path = "crates/crypto/bls", features = ["zkcrypto"] } # Default feature is zkcrypto
 ream-discv5 = { path = "crates/networking/discv5"}
 ream-executor = { path = "crates/common/executor" }
 ream-p2p = { path = "crates/networking/p2p" }

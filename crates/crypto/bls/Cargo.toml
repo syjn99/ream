@@ -24,7 +24,5 @@ tree_hash.workspace = true
 tree_hash_derive.workspace = true
 
 [features]
-default = ["zkcrypto"]
-
 supranational = ["blst"]
 zkcrypto = ["bls12_381", "sha2"]

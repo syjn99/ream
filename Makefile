@@ -36,3 +36,6 @@ clean: # Run `cargo clean`.
 lint: # Run `clippy` and `rustfmt`.
 	cargo +nightly fmt --all
 	cargo clippy --all --all-targets --features "$(FEATURES)" --no-deps -- --deny warnings
+
+	# clippy for bls with supranational feature
+	cargo clippy --package ream-bls --all-targets --features "supranational" --no-deps -- --deny warnings
