@@ -79,8 +79,6 @@ use crate::{
     withdrawal::Withdrawal,
 };
 
-pub const DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
-
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct BeaconState {
     // Versioning
@@ -331,8 +329,7 @@ impl BeaconState {
             DOMAIN_BEACON_ATTESTER,
             Some(indexed_attestation.data.target.epoch),
         );
-        let signing_root: alloy_primitives::FixedBytes<32> =
-            compute_signing_root(&indexed_attestation.data, domain);
+        let signing_root = compute_signing_root(&indexed_attestation.data, domain);
 
         indexed_attestation
             .signature
