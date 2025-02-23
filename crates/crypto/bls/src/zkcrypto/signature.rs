@@ -10,10 +10,10 @@ use crate::{
     AggregatePubKey, BLSSignature, PubKey,
 };
 
-impl TryFrom<BLSSignature> for G2Affine {
+impl TryFrom<&BLSSignature> for G2Affine {
     type Error = BLSError;
 
-    fn try_from(value: BLSSignature) -> Result<Self, Self::Error> {
+    fn try_from(value: &BLSSignature) -> Result<Self, Self::Error> {
         match G2Affine::from_compressed(
             &value
                 .to_bytes()
@@ -37,8 +37,8 @@ impl Verifiable for BLSSignature {
             DST,
         );
 
-        let gt1 = pairing(&G1Affine::try_from(pubkey.clone())?, &G2Affine::from(h));
-        let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self.clone())?);
+        let gt1 = pairing(&G1Affine::try_from(pubkey)?, &G2Affine::from(h));
+        let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self)?);
 
         Ok(gt1 == gt2)
     }
@@ -55,10 +55,10 @@ impl Verifiable for BLSSignature {
         );
 
         let gt1 = pairing(
-            &G1Affine::try_from(agg_pubkey.to_pubkey())?,
+            &G1Affine::try_from(&agg_pubkey.to_pubkey())?,
             &G2Affine::from(h),
         );
-        let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self.clone())?);
+        let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self)?);
 
         Ok(gt1 == gt2)
     }

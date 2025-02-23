@@ -10,10 +10,10 @@ impl From<G1Projective> for PubKey {
     }
 }
 
-impl TryFrom<PubKey> for G1Affine {
+impl TryFrom<&PubKey> for G1Affine {
     type Error = BLSError;
 
-    fn try_from(value: PubKey) -> Result<Self, Self::Error> {
+    fn try_from(value: &PubKey) -> Result<Self, Self::Error> {
         match G1Affine::from_compressed(
             &value
                 .to_bytes()

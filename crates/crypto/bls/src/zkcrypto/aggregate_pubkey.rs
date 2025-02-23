@@ -13,8 +13,7 @@ impl Aggregatable for AggregatePubKey {
         let agg_point = pubkeys
             .iter()
             .try_fold(G1Projective::identity(), |acc, pubkey| {
-                let point: G1Affine = (*pubkey).clone().try_into()?;
-                Ok(acc.add(&G1Projective::from(point)))
+                Ok(acc.add(&G1Projective::from(G1Affine::try_from(*pubkey)?)))
             })?;
 
         Ok(Self {
