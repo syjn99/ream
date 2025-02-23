@@ -816,8 +816,8 @@ impl BeaconState {
                 Ok(true) => {
                     self.add_validator_to_registry(pubkey, withdrawal_credentials, amount)?
                 }
-                _ => return Ok(()), /* Skip adding validator if either pubkey or signature is
-                                     * invalid */
+                // Skip adding validator if either pubkey or signature is invalid
+                _ => return Ok(()),
             }
         } else {
             // Increase balance by deposit amount

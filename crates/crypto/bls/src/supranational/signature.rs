@@ -18,27 +18,32 @@ impl Verifiable for BLSSignature {
     type Error = BLSError;
 
     fn verify(&self, pubkey: &PubKey, message: &[u8]) -> Result<bool, BLSError> {
-        let sig = self.to_blst_signature()?;
-        let pk = pubkey.to_blst_pubkey()?;
+        let signature = self.to_blst_signature()?;
+        let public_key = pubkey.to_blst_pubkey()?;
 
-        Ok(sig.verify(true, message, DST, &[], &pk, false) == BLST_ERROR::BLST_SUCCESS)
+        Ok(
+            signature.verify(true, message, DST, &[], &public_key, false)
+                == BLST_ERROR::BLST_SUCCESS,
+        )
     }
 
     fn fast_aggregate_verify<'a, P>(&self, pubkeys: P, message: &[u8]) -> Result<bool, BLSError>
     where
         P: AsRef<[&'a PubKey]>,
     {
-        let sig = self.to_blst_signature()?;
+        let signature = self.to_blst_signature()?;
         let public_keys = pubkeys
             .as_ref()
             .iter()
             .map(|key| key.to_blst_pubkey())
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(
-            sig.fast_aggregate_verify(true, message, DST, &public_keys.iter().collect::<Vec<_>>())
-                == BLST_ERROR::BLST_SUCCESS,
-        )
+        Ok(signature.fast_aggregate_verify(
+            true,
+            message,
+            DST,
+            &public_keys.iter().collect::<Vec<_>>(),
+        ) == BLST_ERROR::BLST_SUCCESS)
     }
 }
 

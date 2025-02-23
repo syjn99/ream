@@ -47,15 +47,14 @@ impl Verifiable for BLSSignature {
     where
         P: AsRef<[&'a PubKey]>,
     {
-        let agg_pubkey = AggregatePubKey::aggregate(pubkeys.as_ref())?;
-
+        let aggregate_pubkey = AggregatePubKey::aggregate(pubkeys.as_ref())?;
         let h = <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(
             [message],
             DST,
         );
 
         let gt1 = pairing(
-            &G1Affine::try_from(&agg_pubkey.to_pubkey())?,
+            &G1Affine::try_from(&aggregate_pubkey.to_pubkey())?,
             &G2Affine::from(h),
         );
         let gt2 = pairing(&G1Affine::generator(), &G2Affine::try_from(self)?);
