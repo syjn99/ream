@@ -4,17 +4,17 @@ use crate::{
     constants::DST,
     errors::BLSError,
     pubkey::PubKey,
-    signature::BlsSignature,
+    signature::BLSSignature,
     traits::{SupranationalVerifiable, Verifiable},
 };
 
-impl BlsSignature {
+impl BLSSignature {
     pub fn to_blst_signature(&self) -> Result<BlstSignature, BLSError> {
         BlstSignature::from_bytes(&self.inner).map_err(|e| BLSError::BlstError(e.into()))
     }
 }
 
-impl Verifiable for BlsSignature {
+impl Verifiable for BLSSignature {
     type Error = BLSError;
 
     fn verify(&self, pubkey: &PubKey, message: &[u8]) -> Result<bool, BLSError> {
@@ -42,4 +42,4 @@ impl Verifiable for BlsSignature {
     }
 }
 
-impl SupranationalVerifiable for BlsSignature {}
+impl SupranationalVerifiable for BLSSignature {}

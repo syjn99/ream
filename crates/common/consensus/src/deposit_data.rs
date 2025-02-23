@@ -1,5 +1,5 @@
 use alloy_primitives::B256;
-use ream_bls::{BlsSignature, PubKey};
+use ream_bls::{BLSSignature, PubKey};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use tree_hash_derive::TreeHash;
@@ -11,5 +11,5 @@ pub struct DepositData {
     pub amount: u64,
 
     /// BLS aggregate signature
-    pub signature: BlsSignature,
+    pub signature: BLSSignature,
 }

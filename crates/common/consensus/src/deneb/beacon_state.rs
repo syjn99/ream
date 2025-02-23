@@ -12,7 +12,7 @@ use itertools::Itertools;
 use kzg::eth::c_bindings::KZGCommitment;
 use ream_bls::{
     traits::{Aggregatable, Verifiable},
-    AggregatePubKey, BlsSignature, PubKey,
+    AggregatePubKey, BLSSignature, PubKey,
 };
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
@@ -799,7 +799,7 @@ impl BeaconState {
         pubkey: PubKey,
         withdrawal_credentials: B256,
         amount: u64,
-        signature: BlsSignature,
+        signature: BLSSignature,
     ) -> anyhow::Result<()> {
         let mut validator_pubkeys = vec![];
         for validator in &self.validators {
@@ -1707,9 +1707,9 @@ pub fn get_validator_from_deposit(
 pub fn eth_fast_aggregate_verify(
     pubkeys: &[&PubKey],
     message: B256,
-    signature: &BlsSignature,
+    signature: &BLSSignature,
 ) -> anyhow::Result<bool> {
-    if pubkeys.is_empty() && *signature == BlsSignature::infinity() {
+    if pubkeys.is_empty() && *signature == BLSSignature::infinity() {
         return Ok(true);
     }
 

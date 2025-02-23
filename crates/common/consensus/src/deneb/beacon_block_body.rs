@@ -1,5 +1,5 @@
 use alloy_primitives::B256;
-use ream_bls::BlsSignature;
+use ream_bls::BLSSignature;
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{
@@ -18,7 +18,7 @@ use crate::{
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct BeaconBlockBody {
-    pub randao_reveal: BlsSignature,
+    pub randao_reveal: BLSSignature,
 
     /// Eth1 data vote
     pub eth1_data: Eth1Data,

@@ -6,11 +6,11 @@ use ssz_types::{typenum, FixedVector};
 use tree_hash_derive::TreeHash;
 
 #[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Default)]
-pub struct BlsSignature {
+pub struct BLSSignature {
     pub inner: FixedVector<u8, typenum::U96>,
 }
 
-impl Serialize for BlsSignature {
+impl Serialize for BLSSignature {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -20,7 +20,7 @@ impl Serialize for BlsSignature {
     }
 }
 
-impl<'de> Deserialize<'de> for BlsSignature {
+impl<'de> Deserialize<'de> for BLSSignature {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -32,7 +32,7 @@ impl<'de> Deserialize<'de> for BlsSignature {
     }
 }
 
-impl BlsSignature {
+impl BLSSignature {
     pub fn to_bytes(&self) -> &[u8] {
         self.inner.iter().as_slice()
     }

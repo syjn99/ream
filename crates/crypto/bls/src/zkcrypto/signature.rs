@@ -7,13 +7,13 @@ use crate::{
     constants::DST,
     errors::BLSError,
     traits::{Aggregatable, Verifiable, ZkcryptoVerifiable},
-    AggregatePubKey, BlsSignature, PubKey,
+    AggregatePubKey, BLSSignature, PubKey,
 };
 
-impl TryFrom<BlsSignature> for G2Affine {
+impl TryFrom<BLSSignature> for G2Affine {
     type Error = BLSError;
 
-    fn try_from(value: BlsSignature) -> Result<Self, Self::Error> {
+    fn try_from(value: BLSSignature) -> Result<Self, Self::Error> {
         match G2Affine::from_compressed(
             &value
                 .to_bytes()
@@ -28,7 +28,7 @@ impl TryFrom<BlsSignature> for G2Affine {
     }
 }
 
-impl Verifiable for BlsSignature {
+impl Verifiable for BLSSignature {
     type Error = BLSError;
 
     fn verify(&self, pubkey: &PubKey, message: &[u8]) -> Result<bool, BLSError> {
@@ -64,4 +64,4 @@ impl Verifiable for BlsSignature {
     }
 }
 
-impl ZkcryptoVerifiable for BlsSignature {}
+impl ZkcryptoVerifiable for BLSSignature {}

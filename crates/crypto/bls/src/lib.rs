@@ -7,7 +7,7 @@ pub mod traits;
 
 pub use aggregate_pubkey::AggregatePubKey;
 pub use pubkey::PubKey;
-pub use signature::BlsSignature;
+pub use signature::BLSSignature;
 
 #[cfg(feature = "supranational")]
 pub mod supranational;
