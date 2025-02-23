@@ -322,7 +322,6 @@ impl BeaconState {
             .iter()
             .map(|&i| i as usize)
             .collect();
-
         // Verify indices are sorted and unique
         if indices.is_empty() || !is_sorted_and_unique(&indices) {
             return Ok(false);
