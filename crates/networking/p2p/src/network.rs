@@ -27,8 +27,6 @@ use ream_discv5::{
 use ream_executor::ReamExecutor;
 use tracing::{error, info, warn};
 
-use crate::bootnodes::Bootnodes;
-
 #[derive(NetworkBehaviour)]
 pub(crate) struct ReamBehaviour {
     pub identify: identify::Behaviour,
@@ -135,7 +133,7 @@ impl Network {
         Ok(network)
     }
 
-    async fn start_network_worker(&mut self, _config: &NetworkConfig) -> anyhow::Result<()> {
+    async fn start_network_worker(&mut self, config: &NetworkConfig) -> anyhow::Result<()> {
         info!("Libp2p starting .... ");
 
         let mut multi_addr: Multiaddr = Ipv4Addr::UNSPECIFIED.into();
@@ -153,15 +151,11 @@ impl Network {
             }
         }
 
-        let bootnodes = Bootnodes::new();
-
-        for bootnode in bootnodes.bootnodes {
-            if let Some(ipv4) = bootnode.ip4() {
+        for bootnode in &config.bootnodes {
+            if let (Some(ipv4), Some(tcp_port)) = (bootnode.ip4(), bootnode.tcp4()) {
                 let mut multi_addr = Multiaddr::empty();
-                if let Some(tcp_port) = bootnode.tcp4() {
-                    multi_addr.push(ipv4.into());
-                    multi_addr.push(Protocol::Tcp(tcp_port));
-                }
+                multi_addr.push(ipv4.into());
+                multi_addr.push(Protocol::Tcp(tcp_port));
                 self.swarm.dial(multi_addr).unwrap();
             }
         }
