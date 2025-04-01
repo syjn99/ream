@@ -1,8 +1,9 @@
 [workspace]
+default-members = ["bin/ream"]
 members = [
-    "bin/ream",
-    "crates/common/consensus",
-    "crates/common/execution_engine",
+    "bin/ream", 
+    "crates/common/consensus", 
+    "crates/common/execution_engine", 
     "crates/common/executor", 
     "crates/common/network_spec", 
     "crates/common/node",
@@ -14,8 +15,6 @@ members = [
     "crates/storage",
     "testing/ef-tests",
 ]
-
-default-members = ["bin/ream"]
 resolver = "2"
 
 [workspace.package]
@@ -34,7 +33,6 @@ alloy-primitives = { version = "0.8", features = ['serde'] }
 alloy-rlp = { version = "0.3.8", default-features = false, features = ["derive"] }
 anyhow = "1.0"
 async-trait = "0.1.86"
-kzg = { git = "https://github.com/grandinetech/rust-kzg" }
 clap = "4"
 directories = { version = "6.0.0" } 
 discv5 = { version = "0.9.0", features = ["libp2p"] }
@@ -47,9 +45,10 @@ futures = "0.3"
 hex = "0.4"
 itertools = "0.14"
 jsonwebtoken = "9.3.1"
+kzg = { git = "https://github.com/grandinetech/rust-kzg" }
+libp2p = { version = "0.54", default-features = false, features = ["identify", "yamux", "noise", "dns", "tcp", "tokio", "plaintext", "secp256k1", "macros", "ecdsa", "metrics", "quic", "upnp", "gossipsub", "ping"] }
 libp2p-identity = "0.2"
 libp2p-mplex = "0.42"
-libp2p = { version = "0.54", default-features = false, features = ["identify", "yamux", "noise", "dns", "tcp", "tokio", "plaintext", "secp256k1", "macros", "ecdsa", "metrics", "quic", "upnp", "gossipsub", "ping"] }
 redb = { version = "2.4.0" }
 reqwest = { version = "0.12", features = ["json"] }
 rstest = "0.23"
@@ -67,18 +66,17 @@ tree_hash = "0.9"
 tree_hash_derive = "0.9"
 warp = { version = "0.3.7", features = ["tls"] }
 
-
 # ream dependencies
 ream-bls = { path = "crates/crypto/bls", features = ["zkcrypto"] } # Default feature is zkcrypto
 ream-consensus = { path = "crates/common/consensus" }
-ream-discv5 = { path = "crates/networking/discv5"}
-ream-execution-engine = { path = "crates/common/execution_engine"}
+ream-discv5 = { path = "crates/networking/discv5" }
+ream-execution-engine = { path = "crates/common/execution_engine" }
 ream-executor = { path = "crates/common/executor" }
 ream-network-spec = { path = "crates/common/network_spec" }
 ream-node = { path = "crates/common/node" }
 ream-p2p = { path = "crates/networking/p2p" }
 ream-rpc = { path = "crates/rpc" }
-ream-storage = { path = "crates/storage"}
+ream-storage = { path = "crates/storage" }
 
 [patch.crates-io]
 ethereum_hashing = { git = "https://github.com/ReamLabs/ethereum_hashing.git" }
