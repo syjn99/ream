@@ -1,5 +1,5 @@
 [package]
-name = "ream-consensus"
+name = "ream-fork-choice"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -21,6 +21,7 @@ ethereum_serde_utils.workspace = true
 ethereum_ssz.workspace = true
 ethereum_ssz_derive.workspace = true
 itertools.workspace = true
+rust-kzg-blst.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
@@ -31,3 +32,5 @@ tree_hash_derive.workspace = true
 
 # ream dependencies
 ream-bls.workspace = true
+ream-consensus.workspace = true
+ream-polynomial-commitments.workspace = true
