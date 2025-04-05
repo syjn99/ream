@@ -4196,11 +4196,16 @@ dependencies = [
 name = "ream-rpc"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
+ "ethereum_serde_utils",
+ "ream-bls",
  "ream-consensus",
  "ream-network-spec",
  "ream-node",
+ "ream-storage",
  "serde",
  "serde_json",
+ "ssz_types",
  "thiserror 2.0.12",
  "tracing",
  "warp",
