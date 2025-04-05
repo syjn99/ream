@@ -1,3 +1,4 @@
+pub mod config;
 pub mod genesis;
 pub mod randao;
 pub mod state;
