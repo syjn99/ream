@@ -12,7 +12,7 @@ use warp::{
 use super::with_db;
 use crate::{
     handlers::{
-        block::{get_block_attestations, get_block_rewards, get_block_root},
+        block::{get_block_attestations, get_block_from_id, get_block_rewards, get_block_root},
         checkpoint::get_finality_checkpoint,
         fork::get_fork,
         genesis::get_genesis,
@@ -134,7 +134,16 @@ pub fn get_beacon_routes_v2(
     let db_filter = with_db(db);
     let beacon_base = path("beacon");
 
-    beacon_base
+    let block = beacon_base
+        .and(path("blocks"))
+        .and(parsed_param::<ID>())
+        .and(end())
+        .and(get())
+        .and(db_filter.clone())
+        .and_then(get_block_from_id)
+        .with(log("block"));
+
+    let attestation = beacon_base
         .and(path("blocks"))
         .and(parsed_param::<ID>())
         .and(path("attestations"))
@@ -142,5 +151,7 @@ pub fn get_beacon_routes_v2(
         .and(get())
         .and(db_filter.clone())
         .and_then(move |block_id: ID, db: ReamDB| get_block_attestations(block_id, db))
-        .with(log("attestations"))
+        .with(log("attestations"));
+
+    block.or(attestation)
 }
