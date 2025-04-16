@@ -24,7 +24,10 @@ use libp2p::{
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-use crate::config::NetworkConfig;
+use crate::{
+    config::NetworkConfig,
+    eth2::{ENR_ETH2_KEY, ENRForkID},
+};
 
 #[derive(Debug)]
 pub struct DiscoveredPeers {
@@ -60,7 +63,10 @@ pub struct Discovery {
 impl Discovery {
     pub async fn new(local_key: Keypair, config: &NetworkConfig) -> anyhow::Result<Self> {
         let enr_local = convert_to_enr(local_key)?;
-        let enr = Enr::builder().build(&enr_local).unwrap();
+        let enr = Enr::builder()
+            .add_value(ENR_ETH2_KEY, &ENRForkID::pectra())
+            .build(&enr_local)
+            .map_err(|e| anyhow::anyhow!("Failed to build ENR: {}", e))?;
         let node_local_id = enr.node_id();
 
         let mut discv5 = Discv5::new(enr, enr_local, config.discv5_config.clone())

@@ -1079,7 +1079,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18e4fdb82bd54a12e42fb58a800dcae6b9e13982238ce2296dc3570b92148e1f"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -4065,10 +4065,15 @@ dependencies = [
 name = "ream-discv5"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
+ "alloy-rlp",
  "anyhow",
  "discv5",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
  "futures",
  "libp2p",
+ "ream-consensus",
  "tokio",
  "tracing",
 ]
