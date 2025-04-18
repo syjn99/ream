@@ -1,19 +1,23 @@
-use ream_consensus::deneb::beacon_state::BeaconState;
+use ream_consensus::{deneb::beacon_state::BeaconState, withdrawal::Withdrawal};
 use ream_storage::{
     db::ReamDB,
     tables::{Field, Table},
 };
+use serde::{Deserialize, Serialize};
 use tree_hash::TreeHash;
 use warp::{
     http::status::StatusCode,
     reject::Rejection,
-    reply::{Reply, with_status},
+    reply::{Reply, with_header, with_status},
 };
 
 use crate::types::{
     errors::ApiError,
     id::ID,
-    response::{BeaconResponse, RootResponse},
+    response::{
+        BeaconResponse, BeaconVersionedResponse, ELECTRA, ETH_CONSENSUS_VERSION_HEADER,
+        RootResponse,
+    },
 };
 
 pub async fn get_state_from_id(state_id: ID, db: &ReamDB) -> Result<BeaconState, ApiError> {
@@ -74,6 +78,50 @@ pub async fn get_state_root(state_id: ID, db: ReamDB) -> Result<impl Reply, Reje
 
     Ok(with_status(
         BeaconResponse::json(RootResponse::new(state_root)),
+        StatusCode::OK,
+    ))
+}
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct WithdrawalData {
+    #[serde(with = "serde_utils::quoted_u64")]
+    validator_index: u64,
+    #[serde(with = "serde_utils::quoted_u64")]
+    amount: u64,
+    #[serde(with = "serde_utils::quoted_u64")]
+    withdrawable_epoch: u64,
+}
+// Called by `/states/{state_id}/get_pending_partial_withdrawals` to get pending partial withdrawals
+// for state with given stateId
+pub async fn get_pending_partial_withdrawals(
+    state_id: ID,
+    db: ReamDB,
+) -> Result<impl Reply, Rejection> {
+    let state = get_state_from_id(state_id, &db).await?;
+
+    let withdrawals = state.get_expected_withdrawals();
+    let partial_withdrawals: Vec<Withdrawal> = withdrawals
+        .into_iter()
+        .filter(|withdrawal: &Withdrawal| {
+            let validator = &state.validators[withdrawal.validator_index as usize];
+            let balance = state.balances[withdrawal.validator_index as usize];
+            validator.is_partially_withdrawable_validator(balance)
+        })
+        .collect();
+
+    let withdrawal_data: Vec<WithdrawalData> = partial_withdrawals
+        .into_iter()
+        .map(|withdrawal: Withdrawal| WithdrawalData {
+            validator_index: withdrawal.validator_index,
+            amount: withdrawal.amount,
+            withdrawable_epoch: state.get_current_epoch(),
+        })
+        .collect();
+    Ok(with_status(
+        with_header(
+            BeaconVersionedResponse::json(withdrawal_data),
+            ETH_CONSENSUS_VERSION_HEADER,
+            ELECTRA,
+        ),
         StatusCode::OK,
     ))
 }
