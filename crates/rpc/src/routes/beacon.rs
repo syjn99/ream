@@ -3,9 +3,9 @@ use std::sync::Arc;
 use ream_network_spec::networks::NetworkSpec;
 use ream_storage::db::ReamDB;
 use warp::{
-    Filter, Rejection,
+    Filter, Rejection, body,
     filters::{path::end, query::query},
-    get, log, path,
+    get, log, path, post,
     reply::Reply,
 };
 
@@ -19,14 +19,20 @@ use crate::{
         header::get_headers,
         randao::get_randao_mix,
         state::{get_pending_partial_withdrawals, get_state_root},
-        validator::get_validator_from_state,
+        validator::{
+            get_validator_from_state, get_validators_from_state, post_validators_from_state,
+        },
     },
     types::{
+        errors::ApiError,
         id::{ID, ValidatorID},
-        query::{ParentRootQuery, RandaoQuery, SlotQuery},
+        query::{IdQuery, ParentRootQuery, RandaoQuery, SlotQuery, StatusQuery},
+        request::ValidatorsPostRequest,
     },
     utils::error::parsed_param,
 };
+
+const MAX_VALIDATOR_COUNT: usize = 100;
 
 /// Creates and returns all `/beacon` routes.
 pub fn get_beacon_routes(
@@ -84,7 +90,6 @@ pub fn get_beacon_routes(
         .and(get())
         .and(db_filter.clone())
         .and_then(move |state_id: ID, db: ReamDB| get_finality_checkpoint(state_id, db));
-
     let validator = beacon_base
         .and(path("states"))
         .and(parsed_param::<ID>())
@@ -104,7 +109,6 @@ pub fn get_beacon_routes(
         .and(path("headers"))
         .and(query::<SlotQuery>())
         .and(query::<ParentRootQuery>())
-        .and(end())
         .and(get())
         .and(db_filter.clone())
         .and_then({
@@ -114,10 +118,46 @@ pub fn get_beacon_routes(
         })
         .with(log("headers"));
 
+    let validators = beacon_base
+        .and(path("states"))
+        .and(parsed_param::<ID>())
+        .and(path("validators"))
+        .and(get())
+        .and(query::<IdQuery>())
+        .and(query::<StatusQuery>())
+        .and(db_filter.clone())
+        .and_then(
+            move |state_id: ID, id_query: IdQuery, status_query: StatusQuery, db: ReamDB| async move {
+                if let Some(validator_ids) = &id_query.id {
+                    if validator_ids.len() >= MAX_VALIDATOR_COUNT {
+                        return Err(warp::reject::custom(
+                            ApiError::TooManyValidatorsIds(),
+                        ));
+                    }
+                }
+                get_validators_from_state(state_id, id_query, status_query, db).await
+            },
+        )
+        .with(log("validators"));
+
+    let post_validators = beacon_base
+        .and(path("states"))
+        .and(parsed_param::<ID>())
+        .and(path("validators"))
+        .and(end())
+        .and(post())
+        .and(body::json::<ValidatorsPostRequest>())
+        .and(db_filter.clone())
+        .and_then(
+            move |state_id: ID, request: ValidatorsPostRequest, db: ReamDB| {
+                post_validators_from_state(state_id, request, db)
+            },
+        )
+        .with(log("post_validators"));
+
     let block_root = beacon_base
         .and(path("blocks"))
         .and(parsed_param::<ID>())
-        .and(path("root"))
         .and(end())
         .and(get())
         .and(db_filter.clone())
@@ -144,6 +184,8 @@ pub fn get_beacon_routes(
 
     genesis
         .or(validator)
+        .or(validators)
+        .or(post_validators)
         .or(randao)
         .or(fork)
         .or(checkpoint)
