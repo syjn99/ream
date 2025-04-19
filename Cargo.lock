@@ -4074,6 +4074,7 @@ dependencies = [
  "futures",
  "libp2p",
  "ream-consensus",
+ "ssz_types",
  "tokio",
  "tracing",
 ]
