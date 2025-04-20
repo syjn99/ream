@@ -1,20 +1,21 @@
+use actix_web::{
+    HttpResponse, Responder, get,
+    web::{Data, Path},
+};
 use alloy_primitives::B256;
 use ream_consensus::deneb::beacon_block::SignedBeaconBlock;
+use ream_network_spec::networks::NetworkSpec;
 use ream_storage::{
     db::ReamDB,
     tables::{Field, Table},
 };
 use serde::{Deserialize, Serialize};
-use warp::{
-    http::status::StatusCode,
-    reject::Rejection,
-    reply::{Reply, with_status},
-};
+use tracing::error;
 
 use crate::types::{
     errors::ApiError,
     id::ID,
-    response::{BeaconResponse, BeaconVersionedResponse, RootResponse},
+    response::{BeaconResponse, BeaconVersionedResponse, DataResponse, RootResponse},
 };
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -39,20 +40,23 @@ pub async fn get_block_root_from_id(block_id: ID, db: &ReamDB) -> Result<B256, A
             let finalized_checkpoint = db
                 .finalized_checkpoint_provider()
                 .get()
-                .map_err(|_| ApiError::InternalError)?
-                .ok_or_else(|| {
-                    ApiError::NotFound(String::from("Finalized checkpoint not found"))
-                })?;
+                .map_err(|err| {
+                    error!("Failed to get block by block_root, error: {err:?}");
+                    ApiError::InternalError
+                })?
+                .ok_or_else(|| ApiError::NotFound("Finalized checkpoint not found".to_string()))?;
+
             Ok(Some(finalized_checkpoint.root))
         }
         ID::Justified => {
             let justified_checkpoint = db
                 .justified_checkpoint_provider()
                 .get()
-                .map_err(|_| ApiError::InternalError)?
-                .ok_or_else(|| {
-                    ApiError::NotFound(String::from("Justified checkpoint not found"))
-                })?;
+                .map_err(|err| {
+                    error!("Failed to get block by block_root, error: {err:?}");
+                    ApiError::InternalError
+                })?
+                .ok_or_else(|| ApiError::NotFound("Justified checkpoint not found".to_string()))?;
 
             Ok(Some(justified_checkpoint.root))
         }
@@ -64,10 +68,11 @@ pub async fn get_block_root_from_id(block_id: ID, db: &ReamDB) -> Result<B256, A
         ID::Slot(slot) => db.slot_index_provider().get(slot),
         ID::Root(root) => Ok(Some(root)),
     }
-    .map_err(|_| ApiError::InternalError)?
-    .ok_or(ApiError::NotFound(format!(
-        "Failed to find `block_root` from {block_id:?}"
-    )))?;
+    .map_err(|err| {
+        error!("Failed to get block by block_root, error: {err:?}");
+        ApiError::InternalError
+    })?
+    .ok_or_else(|| ApiError::NotFound(format!("Failed to find `block_root` from {block_id:?}")))?;
 
     Ok(block_root)
 }
@@ -80,34 +85,53 @@ pub async fn get_beacon_block_from_id(
 
     db.beacon_block_provider()
         .get(block_root)
-        .map_err(|_| ApiError::InternalError)?
-        .ok_or(ApiError::NotFound(format!(
-            "Failed to find `beacon block` from {block_root:?}"
-        )))
+        .map_err(|err| {
+            error!("Failed to get block by block_root, error: {err:?}");
+            ApiError::InternalError
+        })?
+        .ok_or_else(|| {
+            ApiError::NotFound(format!("Failed to find `beacon block` from {block_root:?}"))
+        })
 }
 
-/// Called by `/eth/v2/beacon/{block_id}/attestations` to get block attestations
-pub async fn get_block_attestations(block_id: ID, db: ReamDB) -> Result<impl Reply, Rejection> {
-    let beacon_block = get_beacon_block_from_id(block_id, &db).await?;
+/// Called by `/genesis` to get the Genesis Config of Beacon Chain.
+#[get("/beacon/genesis")]
+pub async fn get_genesis(network_spec: Data<NetworkSpec>) -> Result<impl Responder, ApiError> {
+    Ok(HttpResponse::Ok().json(DataResponse::new(network_spec.genesis.clone())))
+}
 
-    Ok(with_status(
-        BeaconVersionedResponse::json(beacon_block.message.body.attestations),
-        StatusCode::OK,
-    ))
+/// Called by `/eth/v2/beacon/blocks/{block_id}/attestations` to get block attestations
+#[get("/beacon/blocks/{block_id}/attestations")]
+pub async fn get_block_attestations(
+    db: Data<ReamDB>,
+    block_id: Path<ID>,
+) -> Result<impl Responder, ApiError> {
+    let beacon_block = get_beacon_block_from_id(block_id.into_inner(), &db).await?;
+
+    Ok(HttpResponse::Ok().json(BeaconVersionedResponse::new(
+        beacon_block.message.body.attestations,
+    )))
 }
 
 /// Called by `/blocks/<block_id>/root` to get the Tree hash of the Block.
-pub async fn get_block_root(block_id: ID, db: ReamDB) -> Result<impl Reply, Rejection> {
-    let block_root = get_block_root_from_id(block_id, &db).await?;
-    Ok(with_status(
-        BeaconResponse::json(RootResponse { root: block_root }),
-        StatusCode::OK,
-    ))
+#[get("/beacon/blocks/{block_id}/root")]
+pub async fn get_block_root(
+    db: Data<ReamDB>,
+    block_id: Path<ID>,
+) -> Result<impl Responder, ApiError> {
+    let block_root = get_block_root_from_id(block_id.into_inner(), &db).await?;
+
+    Ok(HttpResponse::Ok().json(BeaconResponse::new(RootResponse::new(block_root))))
 }
 
-// Called by `/beacon/blocks/{block_id}/rewards` to get the block rewards response
-pub async fn get_block_rewards(block_id: ID, db: ReamDB) -> Result<impl Reply, Rejection> {
-    let beacon_block = get_beacon_block_from_id(block_id, &db).await?;
+/// Called by `/beacon/blocks/{block_id}/rewards` to get the block rewards response
+#[get("/beacon/blocks/{block_id}/rewards")]
+pub async fn get_block_rewards(
+    db: Data<ReamDB>,
+    block_id: Path<ID>,
+) -> Result<impl Responder, ApiError> {
+    let beacon_block = get_beacon_block_from_id(block_id.into_inner(), &db).await?;
+
     let response = BlockRewards {
         proposer_index: beacon_block.message.proposer_index,
         total: 0, // todo: implement the calculate block reward logic
@@ -122,15 +146,16 @@ pub async fn get_block_rewards(block_id: ID, db: ReamDB) -> Result<impl Reply, R
         attester_slashings: beacon_block.message.body.attester_slashings.len() as u64,
     };
 
-    Ok(with_status(BeaconResponse::json(response), StatusCode::OK))
+    Ok(HttpResponse::Ok().json(BeaconResponse::new(response)))
 }
 
 /// Called by `/blocks/<block_id>` to get the Beacon Block.
-pub async fn get_block_from_id(block_id: ID, db: ReamDB) -> Result<impl Reply, Rejection> {
-    let beacon_block = get_beacon_block_from_id(block_id, &db).await?;
+#[get("/beacon/blocks/{block_id}")]
+pub async fn get_block_from_id(
+    db: Data<ReamDB>,
+    block_id: Path<ID>,
+) -> Result<impl Responder, ApiError> {
+    let beacon_block = get_beacon_block_from_id(block_id.into_inner(), &db).await?;
 
-    Ok(with_status(
-        BeaconVersionedResponse::json(beacon_block),
-        StatusCode::OK,
-    ))
+    Ok(HttpResponse::Ok().json(BeaconVersionedResponse::new(beacon_block)))
 }
