@@ -1314,11 +1314,14 @@ dependencies = [
 name = "ef-tests"
 version = "0.1.0"
 dependencies = [
+ "alloy-consensus",
  "alloy-primitives",
+ "anyhow",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "paste",
  "ream-consensus",
+ "ream-fork-choice",
  "rstest",
  "serde",
  "serde_yaml",
@@ -4050,7 +4053,6 @@ dependencies = [
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "itertools 0.14.0",
- "kzg",
  "ream-bls",
  "serde",
  "serde_json",
