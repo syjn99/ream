@@ -2,6 +2,8 @@ use actix_web::{
     HttpResponse, Responder, get, post,
     web::{Data, Json, Path},
 };
+use alloy_primitives::map::HashSet;
+use ream_bls::PubKey;
 use ream_consensus::validator::Validator;
 use ream_storage::db::ReamDB;
 use serde::{Deserialize, Serialize};
@@ -260,4 +262,45 @@ pub async fn post_validators_from_state(
     }
 
     Ok(HttpResponse::Ok().json(BeaconResponse::new(validators_data)))
+}
+
+#[derive(Debug, Serialize)]
+struct ValidatorIdentity {
+    #[serde(with = "serde_utils::quoted_u64")]
+    index: u64,
+    pubkey: PubKey,
+    #[serde(with = "serde_utils::quoted_u64")]
+    activation_epoch: u64,
+}
+
+#[post("/beacon/states/{state_id}/validator_identities")]
+pub async fn post_validator_identities_from_state(
+    db: Data<ReamDB>,
+    state_id: Path<ID>,
+    validator_ids: Json<Vec<ValidatorID>>,
+) -> Result<impl Responder, ApiError> {
+    let state = get_state_from_id(state_id.into_inner(), &db).await?;
+
+    let validator_ids_set: HashSet<ValidatorID> = validator_ids.into_inner().into_iter().collect();
+
+    let validator_identities: Vec<ValidatorIdentity> = state
+        .validators
+        .iter()
+        .enumerate()
+        .filter_map(|(index, validator)| {
+            if validator_ids_set.contains(&ValidatorID::Index(index as u64))
+                || validator_ids_set.contains(&ValidatorID::Address(validator.pubkey.clone()))
+            {
+                Some(ValidatorIdentity {
+                    index: index as u64,
+                    pubkey: validator.pubkey.clone(),
+                    activation_epoch: validator.activation_epoch,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(BeaconResponse::new(validator_identities)))
 }
