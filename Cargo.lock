@@ -1566,6 +1566,7 @@ dependencies = [
  "paste",
  "ream-consensus",
  "ream-fork-choice",
+ "ream-merkle",
  "rstest",
  "serde",
  "serde_yaml",
@@ -4296,6 +4297,7 @@ dependencies = [
  "ethereum_ssz_derive",
  "itertools 0.14.0",
  "ream-bls",
+ "ream-merkle",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4378,6 +4380,15 @@ dependencies = [
  "thiserror 2.0.12",
  "tree_hash",
  "tree_hash_derive",
+]
+
+[[package]]
+name = "ream-merkle"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "anyhow",
+ "ethereum_hashing",
 ]
 
 [[package]]
