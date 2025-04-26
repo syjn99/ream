@@ -3,6 +3,11 @@ use std::sync::{Arc, LazyLock};
 use alloy_primitives::{Address, address, b256, fixed_bytes};
 use ream_consensus::genesis::Genesis;
 
+use crate::fork_schedule::{
+    DEV_FORK_SCHEDULE, ForkSchedule, HOLESKY_FORK_SCHEDULE, HOODI_FORK_SCHEDULE,
+    MAINNET_FORK_SCHEDULE, SEPOLIA_FORK_SCHEDULE,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Network {
     Mainnet,
@@ -29,6 +34,7 @@ pub struct NetworkSpec {
     pub network: Network,
     pub genesis: Genesis,
     pub deposit_contract_address: Address,
+    pub fork_schedule: ForkSchedule,
 }
 
 pub static MAINNET: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
@@ -42,6 +48,7 @@ pub static MAINNET: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
             genesis_fork_version: fixed_bytes!("0x00000000"),
         },
         deposit_contract_address: address!("0x00000000219ab540356cBB839Cbe05303d7705Fa"),
+        fork_schedule: MAINNET_FORK_SCHEDULE,
     }
     .into()
 });
@@ -57,6 +64,7 @@ pub static HOLESKY: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
             genesis_fork_version: fixed_bytes!("0x01017000"),
         },
         deposit_contract_address: address!("0x4242424242424242424242424242424242424242"),
+        fork_schedule: HOLESKY_FORK_SCHEDULE,
     }
     .into()
 });
@@ -72,6 +80,7 @@ pub static SEPOLIA: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
             genesis_fork_version: fixed_bytes!("0x90000069"),
         },
         deposit_contract_address: address!("0x7f02C3E3c98b133055B8B348B2Ac625669Ed295D"),
+        fork_schedule: SEPOLIA_FORK_SCHEDULE,
     }
     .into()
 });
@@ -87,6 +96,7 @@ pub static HOODI: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
             genesis_fork_version: fixed_bytes!("0x10000910"),
         },
         deposit_contract_address: address!("0x00000000219ab540356cBB839Cbe05303d7705Fa"),
+        fork_schedule: HOODI_FORK_SCHEDULE,
     }
     .into()
 });
@@ -102,6 +112,7 @@ pub static DEV: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
             genesis_fork_version: fixed_bytes!("0x00000000"),
         },
         deposit_contract_address: address!("0x00000000219ab540356cBB839Cbe05303d7705Fa"),
+        fork_schedule: DEV_FORK_SCHEDULE,
     }
     .into()
 });

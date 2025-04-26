@@ -65,3 +65,13 @@ pub async fn get_config_deposit_contract(
         ))),
     )
 }
+
+/// Called by `config/fork_schedule` to get fork schedule
+#[get("config/fork_schedule")]
+pub async fn get_fork_schedule(
+    network_spec: Data<NetworkSpec>,
+) -> Result<impl Responder, ApiError> {
+    Ok(HttpResponse::Ok().json(DataResponse::new(
+        network_spec.fork_schedule.scheduled().collect::<Vec<_>>(),
+    )))
+}
