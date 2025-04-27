@@ -119,6 +119,7 @@ ream-node = { path = "crates/common/node" }
 ream-polynomial-commitments = { path = "crates/common/polynomial_commitments" }
 ream-p2p = { path = "crates/networking/p2p" }
 ream-rpc = { path = "crates/rpc" }
+ream-state-executor = { path = "crates/state_executor" }
 ream-storage = { path = "crates/storage" }
 
 [patch.crates-io]

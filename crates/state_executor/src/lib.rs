@@ -2,30 +2,29 @@ use ream_consensus::{
     deneb::{beacon_block::SignedBeaconBlock, beacon_state::BeaconState},
     execution_engine::engine_trait::ExecutionApi,
 };
-use ream_fork_choice::store::Store;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tree_hash::TreeHash;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BeaconStateExecutor<E: ExecutionApi> {
-    /// The in-memory fork-choice store tracking blocks, checkpoints, etc.
-    pub store: Store,
-
     /// The canonical consensus state (a BeaconState).
     pub beacon_state: BeaconState,
 
     /// An Execution Engine client or trait object used for verifying or updating execution payloads.
     pub execution_api: E,
+
+    /// Blocks that should be processed in the next round.
+    pub pending_blocks: Vec<SignedBeaconBlock>,
 }
 
 impl<E: ExecutionApi> BeaconStateExecutor<E> {
-    /// Create a new Executor, associating a `Store``, a `BeaconState`, and
+    /// Create a new Executor, associating a `BeaconState`, and
     /// an implementation of the `ExecutionApi`.
-    pub fn new(store: Store, beacon_state: BeaconState, execution_api: E) -> Self {
+    pub fn new(beacon_state: BeaconState, execution_api: E) -> Self {
         Self {
-            store,
             beacon_state,
             execution_api,
+            pending_blocks: Vec::new(),
         }
     }
 
@@ -43,19 +42,13 @@ impl<E: ExecutionApi> BeaconStateExecutor<E> {
         Ok(())
     }
 
-    fn on_transition_end(&mut self, signed_block: &SignedBeaconBlock) -> anyhow::Result<()> {
-        let block_root = signed_block.message.tree_hash_root();
+    /// Process pending blocks in the executor.
+    pub async fn process_pending_blocks(&mut self) -> anyhow::Result<()> {
+        let pending_blocks = std::mem::take(&mut self.pending_blocks);
 
-        // Store the new block and its state in the fork-choice store
-        self.store
-            .blocks
-            .insert(block_root, signed_block.message.clone());
-        self.store
-            .block_states
-            .insert(block_root, self.beacon_state.clone());
-
-        // TODO: Store checkpoints, if needed
-
+        for block in pending_blocks {
+            self.process_new_block(&block).await?;
+        }
         Ok(())
     }
 
@@ -68,7 +61,6 @@ impl<E: ExecutionApi> BeaconStateExecutor<E> {
         while let Some(block) = incoming_blocks.recv().await {
             match self.process_new_block(&block).await {
                 Ok(()) => {
-                    self.on_transition_end(&block)?;
                     println!("Processed block at slot {}", block.message.slot);
                 }
                 Err(e) => {
