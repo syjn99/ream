@@ -1842,6 +1842,87 @@ impl BeaconState {
         }
         Ok(())
     }
+
+    // Synchronous version of state_transition
+
+    pub fn process_execution_payload_no_verify(
+        &mut self,
+        body: &BeaconBlockBody,
+    ) -> anyhow::Result<()> {
+        let payload = &body.execution_payload;
+
+        // Verify consistency of the parent hash with respect to the previous execution payload
+        // header
+        ensure!(payload.parent_hash == self.latest_execution_payload_header.block_hash);
+        // Verify prev_randao
+        ensure!(payload.prev_randao == self.get_randao_mix(self.get_current_epoch()));
+        // Verify timestamp
+        ensure!(payload.timestamp == self.compute_timestamp_at_slot(self.slot));
+        // Verify commitments are under limit
+        ensure!(body.blob_kzg_commitments.len() <= MAX_BLOBS_PER_BLOCK as usize);
+
+        // Skip execution payload verification
+
+        // Cache execution payload header
+        self.latest_execution_payload_header = ExecutionPayloadHeader {
+            parent_hash: payload.parent_hash,
+            fee_recipient: payload.fee_recipient,
+            state_root: payload.state_root,
+            receipts_root: payload.receipts_root,
+            logs_bloom: payload.logs_bloom.clone(),
+            prev_randao: payload.prev_randao,
+            block_number: payload.block_number,
+            gas_limit: payload.gas_limit,
+            gas_used: payload.gas_used,
+            timestamp: payload.timestamp,
+            extra_data: payload.extra_data.clone(),
+            base_fee_per_gas: payload.base_fee_per_gas,
+            block_hash: payload.block_hash,
+            transactions_root: payload.transactions.tree_hash_root(),
+            withdrawals_root: payload.withdrawals.tree_hash_root(),
+            blob_gas_used: payload.blob_gas_used,
+            excess_blob_gas: payload.excess_blob_gas,
+        };
+
+        Ok(())
+    }
+
+    pub fn process_block_sync(&mut self, block: &BeaconBlock) -> anyhow::Result<()> {
+        self.process_block_header(block)?;
+        self.process_withdrawals(&block.body.execution_payload)?;
+        self.process_execution_payload_no_verify(&block.body)?;
+        self.process_randao(&block.body)?;
+        self.process_eth1_data(&block.body)?;
+        self.process_operations(&block.body)?;
+        self.process_sync_aggregate(&block.body.sync_aggregate)?;
+        Ok(())
+    }
+
+    pub fn state_transition_sync(
+        &mut self,
+        signed_block: &SignedBeaconBlock,
+        validate_result: bool,
+    ) -> anyhow::Result<()> {
+        let block = &signed_block.message;
+
+        // Process slots (including those with no blocks) since block
+        self.process_slots(block.slot)?;
+
+        // Verify signature
+        if validate_result {
+            ensure!(self.verify_block_signature(signed_block)?)
+        }
+
+        // Process block
+        self.process_block_sync(block)?;
+
+        // Verify state root
+
+        if validate_result {
+            ensure!(block.state_root == self.tree_hash_root())
+        }
+        Ok(())
+    }
 }
 
 pub fn get_validator_from_deposit(
