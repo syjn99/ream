@@ -4479,6 +4479,17 @@ name = "ream-runtime"
 version = "0.1.0"
 
 [[package]]
+name = "ream-state-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ream-consensus",
+ "ream-fork-choice",
+ "tokio",
+ "tree_hash",
+]
+
+[[package]]
 name = "ream-storage"
 version = "0.1.0"
 dependencies = [

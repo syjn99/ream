@@ -1,0 +1,19 @@
+[package]
+name = "ream-state-executor"
+authors.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tree_hash.workspace = true
+
+# Ream dependencies
+ream-consensus.workspace = true
+ream-fork-choice.workspace = true

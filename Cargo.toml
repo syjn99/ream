@@ -2,11 +2,11 @@
 default-members = ["bin/ream"]
 members = [
     "bin/ream",
-    "crates/common/consensus", 
-    "crates/common/execution_engine", 
+    "crates/common/consensus",
+    "crates/common/execution_engine",
     "crates/common/executor",
-    "crates/common/fork_choice", 
-    "crates/common/network_spec", 
+    "crates/common/fork_choice",
+    "crates/common/network_spec",
     "crates/common/node",
     "crates/common/polynomial_commitments",
     "crates/crypto/bls",
@@ -15,6 +15,7 @@ members = [
     "crates/networking/p2p",
     "crates/rpc",
     "crates/runtime",
+    "crates/state_executor",
     "crates/storage",
     "testing/ef-tests",
 ]
@@ -24,7 +25,14 @@ exclude = ["book/cli", "book/sources"]
 [workspace.package]
 authors = ["https://github.com/ReamLabs/ream/graphs/contributors"]
 edition = "2024"
-keywords = ["ethereum", "beam-chain", "blockchain", "consensus", "protocol", "ream"]
+keywords = [
+    "ethereum",
+    "beam-chain",
+    "blockchain",
+    "consensus",
+    "protocol",
+    "ream",
+]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ReamLabs/ream"
@@ -35,11 +43,13 @@ version = "0.1.0"
 actix-web = "4.10.2"
 alloy-consensus = { version = "0.11.1", default-features = false }
 alloy-primitives = { version = "0.8", features = ['serde'] }
-alloy-rlp = { version = "0.3.8", default-features = false, features = ["derive"] }
+alloy-rlp = { version = "0.3.8", default-features = false, features = [
+    "derive",
+] }
 anyhow = "1.0"
 async-trait = "0.1.86"
 clap = "4"
-directories = { version = "6.0.0" } 
+directories = { version = "6.0.0" }
 discv5 = { version = "0.9.0", features = ["libp2p"] }
 enr = "0.13.0"
 ethereum_hashing = { git = "https://github.com/ReamLabs/ethereum_hashing.git" }
@@ -50,7 +60,23 @@ futures = "0.3"
 itertools = "0.14"
 jsonwebtoken = "9.3.1"
 kzg = { git = "https://github.com/grandinetech/rust-kzg" }
-libp2p = { version = "0.54", default-features = false, features = ["identify", "yamux", "noise", "dns", "tcp", "tokio", "plaintext", "secp256k1", "macros", "ecdsa", "metrics", "quic", "upnp", "gossipsub", "ping"] }
+libp2p = { version = "0.54", default-features = false, features = [
+    "identify",
+    "yamux",
+    "noise",
+    "dns",
+    "tcp",
+    "tokio",
+    "plaintext",
+    "secp256k1",
+    "macros",
+    "ecdsa",
+    "metrics",
+    "quic",
+    "upnp",
+    "gossipsub",
+    "ping",
+] }
 libp2p-identity = "0.2"
 libp2p-mplex = "0.42"
 parking_lot = "0.12"
@@ -65,14 +91,23 @@ snap = "1.1"
 ssz_types = "0.10"
 tempfile = "3.19"
 thiserror = "2.0.11"
-tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "sync", "signal", "time", "macros"] }
+tokio = { version = "1.42", features = [
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "signal",
+    "time",
+    "macros",
+] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tree_hash = "0.9"
 tree_hash_derive = "0.9"
 
 # ream dependencies
-ream-bls = { path = "crates/crypto/bls", features = ["zkcrypto"] } # Default feature is zkcrypto
+ream-bls = { path = "crates/crypto/bls", features = [
+    "zkcrypto",
+] } # Default feature is zkcrypto
 ream-consensus = { path = "crates/common/consensus" }
 ream-discv5 = { path = "crates/networking/discv5" }
 ream-execution-engine = { path = "crates/common/execution_engine" }
