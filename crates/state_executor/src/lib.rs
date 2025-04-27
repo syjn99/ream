@@ -2,19 +2,17 @@ use ream_consensus::{
     deneb::{beacon_block::SignedBeaconBlock, beacon_state::BeaconState},
     execution_engine::engine_trait::ExecutionApi,
 };
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-#[derive(Debug, Serialize, Deserialize)]
 pub struct BeaconStateExecutor<E: ExecutionApi> {
     /// The canonical consensus state (a BeaconState).
     pub beacon_state: BeaconState,
 
-    /// An Execution Engine client or trait object used for verifying or updating execution payloads.
-    pub execution_api: E,
-
     /// Blocks that should be processed in the next round.
     pub pending_blocks: Vec<SignedBeaconBlock>,
+
+    /// An Execution Engine client or trait object used for verifying or updating execution payloads.
+    pub execution_api: E,
 }
 
 impl<E: ExecutionApi> BeaconStateExecutor<E> {
@@ -49,6 +47,19 @@ impl<E: ExecutionApi> BeaconStateExecutor<E> {
         for block in pending_blocks {
             self.process_new_block(&block).await?;
         }
+        Ok(())
+    }
+
+    pub fn process_new_block_sync(
+        &mut self,
+        signed_block: &SignedBeaconBlock,
+    ) -> anyhow::Result<()> {
+        // Run the state transition logic (slot processing, block processing, signature checks, etc.)
+        let validate_signature = true;
+        self.beacon_state
+            .state_transition_sync(signed_block, validate_signature)
+            .unwrap();
+
         Ok(())
     }
 
