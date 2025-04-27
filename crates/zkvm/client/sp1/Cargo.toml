@@ -1,0 +1,19 @@
+[package]
+name = "ream-zkvm-client-sp1"
+authors.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+ethereum_ssz.workspace = true
+sp1-sdk = "4.2.0"
+sp1-zkvm = "4.0.0"
+
+# Ream dependencies
+ream-consensus.workspace = true
+ream-state-executor.workspace = true

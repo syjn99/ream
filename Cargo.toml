@@ -17,6 +17,7 @@ members = [
     "crates/runtime",
     "crates/state_executor",
     "crates/storage",
+    "crates/zkvm/client/sp1",
     "testing/ef-tests",
 ]
 resolver = "2"
