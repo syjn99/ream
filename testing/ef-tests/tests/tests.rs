@@ -11,33 +11,41 @@ use ream_consensus::{
     beacon_block_header::BeaconBlockHeader,
     bls_to_execution_change::{BLSToExecutionChange, SignedBLSToExecutionChange},
     checkpoint::Checkpoint,
-    deneb::{
+    consolidation_request::ConsolidationRequest,
+    deposit::Deposit,
+    deposit_data::DepositData,
+    deposit_request::DepositRequest,
+    electra::{
         beacon_block::{BeaconBlock, SignedBeaconBlock},
         beacon_block_body::BeaconBlockBody,
         beacon_state::BeaconState,
         execution_payload::ExecutionPayload,
         execution_payload_header::ExecutionPayloadHeader,
     },
-    deposit::Deposit,
-    deposit_data::DepositData,
     eth_1_data::Eth1Data,
+    execution_requests::ExecutionRequests,
     fork::Fork,
     fork_data::ForkData,
     historical_batch::HistoricalBatch,
     historical_summary::HistoricalSummary,
     indexed_attestation::IndexedAttestation,
     misc::compute_shuffled_index,
+    pending_consolidation::PendingConsolidation,
+    pending_deposit::PendingDeposit,
+    pending_partial_withdrawal::PendingPartialWithdrawal,
     proposer_slashing::ProposerSlashing,
     signing_data::SigningData,
+    single_attestation::SingleAttestation,
     sync_aggregate::SyncAggregate,
     sync_committee::SyncCommittee,
     validator::Validator,
     voluntary_exit::{SignedVoluntaryExit, VoluntaryExit},
     withdrawal::Withdrawal,
+    withdrawal_request::WithdrawalRequest,
 };
 use ream_merkle::is_valid_normalized_merkle_branch;
 
-// Testing consensus types
+// General consensus types
 test_consensus_type!(Attestation);
 test_consensus_type!(AttestationData);
 test_consensus_type!(AttesterSlashing);
@@ -68,7 +76,17 @@ test_consensus_type!(Validator);
 test_consensus_type!(VoluntaryExit);
 test_consensus_type!(Withdrawal);
 
-// Testing operations for block processing
+// Electra consensus types
+test_consensus_type!(ConsolidationRequest);
+test_consensus_type!(DepositRequest);
+test_consensus_type!(ExecutionRequests);
+test_consensus_type!(PendingConsolidation);
+test_consensus_type!(PendingDeposit);
+test_consensus_type!(PendingPartialWithdrawal);
+test_consensus_type!(SingleAttestation);
+test_consensus_type!(WithdrawalRequest);
+
+// Testing operations
 test_operation!(attestation, Attestation, "attestation", process_attestation);
 test_operation!(
     attester_slashing,
@@ -77,6 +95,18 @@ test_operation!(
     process_attester_slashing
 );
 test_operation!(block_header, BeaconBlock, "block", process_block_header);
+test_operation!(
+    consolidation_request,
+    ConsolidationRequest,
+    "consolidation_request",
+    process_consolidation_request
+);
+test_operation!(
+    deposit_request,
+    DepositRequest,
+    "deposit_request",
+    process_deposit_request
+);
 test_operation!(
     bls_to_execution_change,
     SignedBLSToExecutionChange,
@@ -103,6 +133,12 @@ test_operation!(
     "execution_payload",
     process_withdrawals
 );
+test_operation!(
+    withdrawal_request,
+    WithdrawalRequest,
+    "withdrawal_request",
+    process_withdrawal_request
+);
 
 // Testing shuffling
 test_shuffling!();
@@ -123,6 +159,8 @@ test_epoch_processing!(
     participation_flag_updates,
     process_participation_flag_updates
 );
+test_epoch_processing!(pending_consolidations, process_pending_consolidations);
+test_epoch_processing!(pending_deposits, process_pending_deposits);
 test_epoch_processing!(randao_mixes_reset, process_randao_mixes_reset);
 test_epoch_processing!(registry_updates, process_registry_updates);
 test_epoch_processing!(rewards_and_penalties, process_rewards_and_penalties);
@@ -134,10 +172,8 @@ test_rewards!(basic, get_inactivity_penalty_deltas);
 test_rewards!(leak, get_inactivity_penalty_deltas);
 test_rewards!(random, get_inactivity_penalty_deltas);
 
-// Testing sanity_blocks
+// Testing sanity
 test_sanity_blocks!();
-
-// Testing sanity_slots
 test_sanity_slots!();
 
 // Testing fork_choice
