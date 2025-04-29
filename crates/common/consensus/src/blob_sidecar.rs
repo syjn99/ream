@@ -1,16 +1,17 @@
-use alloy_consensus::Blob;
 use alloy_primitives::B256;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, typenum::U17};
 
 use crate::{
     beacon_block_header::SignedBeaconBlockHeader,
+    execution_engine::rpc_types::get_blobs::Blob,
     polynomial_commitments::{kzg_commitment::KZGCommitment, kzg_proof::KZGProof},
 };
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct BlobSidecar {
+    #[serde(with = "serde_utils::quoted_u64")]
     pub index: u64,
     pub blob: Blob,
     pub kzg_commitment: KZGCommitment,
