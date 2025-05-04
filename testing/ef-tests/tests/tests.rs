@@ -180,7 +180,7 @@ test_rewards!(leak, get_inactivity_penalty_deltas);
 test_rewards!(random, get_inactivity_penalty_deltas);
 
 // Testing sanity
-test_sanity_blocks!();
+test_sanity_blocks!(test_sanity_blocks, "sanity/blocks");
 test_sanity_slots!();
 
 // Testing fork_choice
@@ -222,3 +222,6 @@ test_merkle_proof!(
     blob_kzg_commitment_inclusion_proof,
     0
 );
+
+// Testing random
+test_sanity_blocks!(test_random, "random/random");
