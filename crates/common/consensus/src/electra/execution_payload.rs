@@ -16,7 +16,7 @@ use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
 use super::execution_payload_header::ExecutionPayloadHeader;
-use crate::{misc::checksummed_address, withdrawal::Withdrawal};
+use crate::withdrawal::Withdrawal;
 
 const EMPTY_UNCLE_ROOT_HASH: B256 =
     b256!("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347");
@@ -27,20 +27,15 @@ pub type Transactions = VariableList<VariableList<u8, U1073741824>, U1048576>;
 pub struct ExecutionPayload {
     // Execution block header fields
     pub parent_hash: B256,
-    #[serde(with = "checksummed_address")]
     pub fee_recipient: Address,
     pub state_root: B256,
     pub receipts_root: B256,
     #[serde(with = "hex_fixed_vec")]
     pub logs_bloom: FixedVector<u8, typenum::U256>,
     pub prev_randao: B256,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub block_number: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub gas_limit: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub gas_used: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub timestamp: u64,
     #[serde(with = "hex_var_list")]
     pub extra_data: VariableList<u8, U32>,
@@ -52,9 +47,7 @@ pub struct ExecutionPayload {
     #[serde(with = "list_of_hex_var_list")]
     pub transactions: Transactions,
     pub withdrawals: VariableList<Withdrawal, U16>,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub blob_gas_used: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub excess_blob_gas: u64,
 }
 

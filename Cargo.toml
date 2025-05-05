@@ -17,7 +17,6 @@ members = [
     "crates/rpc",
     "crates/runtime",
     "crates/storage",
-    "testing/beacon-api",
     "testing/ef-tests",
 ]
 resolver = "2"

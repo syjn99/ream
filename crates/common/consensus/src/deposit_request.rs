@@ -8,9 +8,7 @@ use tree_hash_derive::TreeHash;
 pub struct DepositRequest {
     pub pubkey: PubKey,
     pub withdrawal_credentials: B256,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub amount: u64,
     pub signature: BLSSignature,
-    #[serde(with = "serde_utils::quoted_u64")]
     pub index: u64,
 }

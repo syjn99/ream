@@ -13,7 +13,7 @@ const FINALIZED: bool = false;
 /// {
 ///  "data": json!(T)
 /// }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct DataResponse<T> {
     pub data: T,
 }
@@ -46,7 +46,7 @@ impl RootResponse {
 ///     "data" : T
 /// })
 /// }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct BeaconResponse<T> {
     pub execution_optimistic: bool,
     pub finalized: bool,
@@ -75,7 +75,7 @@ impl<T: Serialize> BeaconResponse<T> {
 ///     "data" : T
 /// })
 /// }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct BeaconVersionedResponse<T> {
     pub version: String,
     pub execution_optimistic: bool,
