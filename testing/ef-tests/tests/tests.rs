@@ -225,3 +225,6 @@ test_merkle_proof!(
 
 // Testing random
 test_sanity_blocks!(test_random, "random/random");
+
+// Testing finality
+test_sanity_blocks!(test_finality, "finality/finality");
