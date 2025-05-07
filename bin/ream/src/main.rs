@@ -2,10 +2,17 @@ use std::env;
 
 use clap::Parser;
 use ream::cli::{Cli, Commands};
-use ream_discv5::{config::NetworkConfig, subnet::Subnets};
+use ream_discv5::{config::DiscoveryConfig, eth2::EnrForkId, subnet::Subnets};
 use ream_executor::ReamExecutor;
 use ream_network_spec::networks::{network_spec, set_network_spec};
-use ream_p2p::network::Network;
+use ream_p2p::{
+    config::NetworkConfig,
+    gossipsub::{
+        configurations::GossipsubConfig,
+        topics::{GossipTopic, GossipTopicKind},
+    },
+    network::Network,
+};
 use ream_rpc::{config::ServerConfig, start_server};
 use ream_storage::db::ReamDB;
 use tracing::{error, info};
@@ -47,13 +54,27 @@ async fn main() {
             .build();
 
             let bootnodes = config.bootnodes.to_enrs(network_spec().network);
-            let binding = NetworkConfig {
+            let discv5_config = DiscoveryConfig {
                 discv5_config,
                 bootnodes,
-                socket_address: Some(config.socket_address),
-                socket_port: Some(config.socket_port),
+                socket_address: config.socket_address,
+                socket_port: config.socket_port,
+                discovery_port: config.discovery_port,
                 disable_discovery: config.disable_discovery,
                 subnets: Subnets::new(),
+            };
+
+            let mut gossipsub_config = GossipsubConfig::default();
+            gossipsub_config.set_topics(vec![GossipTopic {
+                fork: EnrForkId::electra().fork_digest,
+                kind: GossipTopicKind::BeaconBlock,
+            }]);
+
+            let network_config = NetworkConfig {
+                socket_address: config.socket_address,
+                socket_port: config.socket_port,
+                discv5_config,
+                gossipsub_config,
             };
 
             let ream_db = ReamDB::new(config.data_dir, config.ephemeral)
@@ -64,7 +85,7 @@ async fn main() {
             let http_future = start_server(server_config, ream_db);
 
             let network_future = async {
-                match Network::init(async_executor, &binding).await {
+                match Network::init(async_executor, &network_config).await {
                     Ok(mut network) => {
                         main_executor.spawn(async move {
                             network.polling_events().await;
