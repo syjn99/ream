@@ -72,7 +72,7 @@ pub fn calculate_multi_merkle_root(
                     .into();
 
             let parent = objects.entry(parent_index).or_default();
-            parent.copy_from_slice(&value.as_slice());
+            parent.copy_from_slice(value.as_slice());
             keys.push(parent_index);
         }
         pos += 1;
@@ -150,15 +150,14 @@ fn get_helper_indices(indices: &[u64]) -> Vec<u64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::merkle_tree;
-
     use super::*;
+    use crate::merkle_tree;
 
     const DEPTH: u64 = 3;
 
     #[test]
     fn test_get_generalized_index() {
-        let indices = vec![0, 5];
+        let indices = [0, 5];
         let generalized_indices = indices
             .iter()
             .map(|&index| get_generalized_index(index, DEPTH))
@@ -170,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_get_helper_indices() {
-        let indices = vec![0, 5];
+        let indices = [0, 5];
         let generalized_indices = indices
             .iter()
             .map(|&index| get_generalized_index(index, DEPTH))

@@ -18,16 +18,13 @@ pub struct PartialBeaconState {
 
 impl BeaconStateView for PartialBeaconState {
     fn slot(&self) -> anyhow::Result<u64> {
-        self.slot
-            .ok_or(anyhow::anyhow!("Slot is not set"))
-            .map(|slot| slot)
+        self.slot.ok_or(anyhow::anyhow!("Slot is not set"))
     }
 
     fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>> {
         self.slashings
             .as_mut()
             .ok_or(anyhow::anyhow!("Slashings are not set"))
-            .map(|slashings| slashings)
     }
 }
 
