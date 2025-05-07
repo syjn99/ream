@@ -1,5 +1,7 @@
 //! https://ethereum.github.io/consensus-specs/ssz/merkle-proofs
 
+pub mod multiproof;
+
 use alloy_primitives::B256;
 use anyhow::ensure;
 
@@ -118,7 +120,7 @@ mod tests {
             B256::from_slice(&[0xDD; 32]),
         ];
 
-        let depth = (leaves.len() as f64).log2().floor() as u64;
+        let depth = (leaves.len() as f64).log2().ceil() as u64;
 
         let node_2: B256 =
             ethereum_hashing::hash32_concat(leaves[0].as_slice(), leaves[1].as_slice()).into();
