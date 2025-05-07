@@ -1,4 +1,4 @@
-#![cfg(feature = "ef-tests")]
+// #![cfg(feature = "ef-tests")]
 
 use ef_tests::{
     test_consensus_type, test_epoch_processing, test_fork_choice, test_merkle_proof,
@@ -228,3 +228,81 @@ test_sanity_blocks!(test_random, "random/random");
 
 // Testing finality
 test_sanity_blocks!(test_finality, "finality/finality");
+
+// Testing PartialBeaconState
+#[cfg(test)]
+mod tests {
+
+    use ream_consensus::{
+        constants::BEACON_STATE_MERKLE_DEPTH,
+        view::{BeaconStateView, PartialBeaconStateBuilder},
+    };
+    use ream_merkle::{merkle_tree, multiproof::generate_multiproof};
+    use tree_hash::TreeHash;
+
+    use super::*;
+
+    #[test]
+    fn test_process_slashing_resets_partially() {
+        let base_path = format!(
+            "mainnet/tests/mainnet/electra/epoch_processing/{}/pyspec_tests",
+            "slashings_reset"
+        );
+
+        for entry in std::fs::read_dir(base_path).unwrap() {
+            let entry = entry.unwrap();
+            let case_dir = entry.path();
+
+            if !case_dir.is_dir() {
+                continue;
+            }
+
+            let case_name = case_dir.file_name().unwrap().to_str().unwrap();
+            println!("Testing case: {}", case_name);
+
+            let state: BeaconState = utils::read_ssz_snappy(&case_dir.join("pre.ssz_snappy"))
+                .expect("cannot find test asset(pre.ssz_snappy)");
+            let expected_post =
+                utils::read_ssz_snappy::<BeaconState>(&case_dir.join("post.ssz_snappy"))
+                    .expect("cannot find test asset(post.ssz_snappy)");
+
+            let pre_state_root = state.tree_hash_root();
+
+            let all_leaves = state.merkle_leaves();
+            let tree = merkle_tree(&all_leaves, BEACON_STATE_MERKLE_DEPTH)
+                .expect("Failed to create merkle tree");
+            let indices = vec![2, 14];
+            let multiproof = generate_multiproof(&tree, &indices, BEACON_STATE_MERKLE_DEPTH)
+                .expect("Failed to generate multiproof");
+
+            let mut partial_beacon_state = PartialBeaconStateBuilder::from_root(pre_state_root)
+                .with_multiproof(
+                    vec![all_leaves[2], all_leaves[14]],
+                    multiproof.iter().map(|(node, _)| *node).collect::<Vec<_>>(),
+                    indices
+                        .iter()
+                        .map(|index| {
+                            ream_merkle::multiproof::get_generalized_index(
+                                *index,
+                                BEACON_STATE_MERKLE_DEPTH,
+                            )
+                        })
+                        .collect(),
+                )
+                .with_slot(state.slot)
+                .with_slashings(state.slashings)
+                .build()
+                .expect("Failed to build PartialBeaconState");
+
+            partial_beacon_state.process_slashings_reset().unwrap();
+
+            assert_eq!(
+                expected_post.slashings.tree_hash_root(),
+                partial_beacon_state
+                    .slashings_mut()
+                    .expect("WTF")
+                    .tree_hash_root()
+            )
+        }
+    }
+}
