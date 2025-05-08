@@ -7,7 +7,8 @@ pub(crate) fn get_generalized_index_bit(index: u64, position: u64) -> bool {
     (index & (1 << position)) > 0
 }
 
-pub(crate) fn get_generalized_index_sibling(index: u64) -> u64 {
+#[inline(always)]
+pub(crate) const fn get_generalized_index_sibling(index: u64) -> u64 {
     index ^ 1
 }
 
@@ -15,7 +16,8 @@ pub(crate) fn get_generalized_index_child(index: u64, right_side: bool) -> u64 {
     index * 2 + right_side as u64
 }
 
-pub(crate) fn get_generalized_index_parent(index: u64) -> u64 {
+#[inline(always)]
+pub(crate) const fn get_generalized_index_parent(index: u64) -> u64 {
     index / 2
 }
 
