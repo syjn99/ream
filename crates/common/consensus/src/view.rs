@@ -8,9 +8,13 @@ use tree_hash::TreeHash;
 
 use crate::{constants::EPOCHS_PER_SLASHINGS_VECTOR, misc::compute_epoch_at_slot};
 
+pub const SLOT_GENERALIZED_INDEX: u64 = 66;
+pub const SLASHINGS_GENERALIZED_INDEX: u64 = 78;
+
 pub trait BeaconStateView {
     fn slot(&self) -> anyhow::Result<u64>;
 
+    fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>>;
     fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>>;
 }
 
@@ -19,11 +23,20 @@ pub struct PartialBeaconState {
     // BeaconState fields
     pub slot: Option<u64>,
     pub slashings: Option<FixedVector<u64, U8192>>,
+
+    // dirty fields with generalized indices
+    pub dirty: Vec<u64>,
 }
 
 impl BeaconStateView for PartialBeaconState {
     fn slot(&self) -> anyhow::Result<u64> {
         self.slot.ok_or(anyhow::anyhow!("Slot is not set"))
+    }
+
+    fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>> {
+        self.slashings
+            .as_ref()
+            .ok_or(anyhow::anyhow!("Slashings are not set"))
     }
 
     fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>> {
@@ -46,19 +59,21 @@ impl PartialBeaconState {
         let slashings = self.slashings_mut()?;
         slashings[(next_epoch % EPOCHS_PER_SLASHINGS_VECTOR) as usize] = 0;
 
+        // Mark dirty
+        self.dirty.push(SLASHINGS_GENERALIZED_INDEX);
+
         Ok(())
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BeaconStateMultiproof {
     pub leaves: Vec<B256>,
     pub proof: Vec<B256>,
     pub generalized_indices: Vec<u64>,
 }
 
-pub const SLOT_GENERALIZED_INDEX: u64 = 66;
-pub const SLASHINGS_GENERALIZED_INDEX: u64 = 78;
-
+#[derive(Debug, Clone)]
 pub struct PartialBeaconStateBuilder {
     pub root: B256,
     pub multiproof: BeaconStateMultiproof,
@@ -105,9 +120,9 @@ impl PartialBeaconStateBuilder {
         }
     }
 
-    pub fn with_slashings(self, slashings: FixedVector<u64, U8192>) -> Self {
+    pub fn with_slashings(self, slashings: &FixedVector<u64, U8192>) -> Self {
         Self {
-            slashings: Some(slashings),
+            slashings: Some(slashings.clone()),
             ..self
         }
     }
@@ -158,6 +173,8 @@ impl PartialBeaconStateBuilder {
         Ok(PartialBeaconState {
             slot: self.slot,
             slashings: self.slashings,
+
+            dirty: vec![],
         })
     }
 }

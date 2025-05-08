@@ -235,7 +235,7 @@ mod tests {
 
     use ream_consensus::{
         constants::BEACON_STATE_MERKLE_DEPTH,
-        view::{BeaconStateView, PartialBeaconStateBuilder},
+        view::{BeaconStateView, PartialBeaconStateBuilder, SLASHINGS_GENERALIZED_INDEX},
     };
     use ream_merkle::{merkle_tree, multiproof::generate_multiproof};
     use tree_hash::TreeHash;
@@ -260,7 +260,7 @@ mod tests {
             let case_name = case_dir.file_name().unwrap().to_str().unwrap();
             println!("Testing case: {}", case_name);
 
-            let state: BeaconState = utils::read_ssz_snappy(&case_dir.join("pre.ssz_snappy"))
+            let mut state: BeaconState = utils::read_ssz_snappy(&case_dir.join("pre.ssz_snappy"))
                 .expect("cannot find test asset(pre.ssz_snappy)");
             let expected_post =
                 utils::read_ssz_snappy::<BeaconState>(&case_dir.join("post.ssz_snappy"))
@@ -290,19 +290,24 @@ mod tests {
                         .collect(),
                 )
                 .with_slot(state.slot)
-                .with_slashings(state.slashings)
+                .with_slashings(&state.slashings)
                 .build()
                 .expect("Failed to build PartialBeaconState");
 
             partial_beacon_state.process_slashings_reset().unwrap();
 
-            assert_eq!(
-                expected_post.slashings.tree_hash_root(),
-                partial_beacon_state
-                    .slashings_mut()
-                    .expect("WTF")
-                    .tree_hash_root()
-            )
+            for &mutated in partial_beacon_state.dirty.iter() {
+                match mutated {
+                    SLASHINGS_GENERALIZED_INDEX => {
+                        state.slashings = partial_beacon_state.slashings().unwrap().clone();
+                    }
+                    _ => {
+                        panic!("Unexpected mutated index: {}", mutated);
+                    }
+                }
+            }
+
+            assert_eq!(expected_post.tree_hash_root(), state.tree_hash_root())
         }
     }
 }

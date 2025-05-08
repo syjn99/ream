@@ -216,6 +216,10 @@ impl BeaconStateView for BeaconState {
         Ok(self.slot)
     }
 
+    fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>> {
+        Ok(&self.slashings)
+    }
+
     fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>> {
         Ok(&mut self.slashings)
     }
