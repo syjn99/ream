@@ -1,14 +1,23 @@
+//! https://ethereum.github.io/consensus-specs/ssz/merkle-proofs/#merkle-multiproofs
+
 use std::collections::{BTreeMap, HashMap};
 
 use alloy_primitives::B256;
 use anyhow::ensure;
 
 use crate::helper::{
-    get_generalized_index, get_helper_indices, get_parent_index, get_sibling_index, hash,
+    get_generalized_index, get_generalized_index_parent, get_generalized_index_sibling,
+    get_helper_indices, hash,
 };
 
+/// ``Index`` is the index of a leaf in the **bottom** layer of the ``tree``.
+type Index = u64;
+
+/// ``GeneralizedIndex`` is the index of a node in the ``tree``.
 type GeneralizedIndex = u64;
 
+/// Multiproof is a structure that contains the leaves to be verified with
+/// their corresponding proofs.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Multiproof {
     /// The leaves to be verified.
@@ -21,7 +30,8 @@ pub struct Multiproof {
 }
 
 impl Multiproof {
-    pub fn generate(tree: &[B256], indices: &[u64]) -> anyhow::Result<Self> {
+    /// Generate a multiproof for the given tree and indices.
+    pub fn generate(tree: &[B256], indices: &[Index]) -> anyhow::Result<Self> {
         let depth = ((tree.len() as f64).log2().floor() as u64) - 1;
         let bottom_length: u64 = 1 << depth;
 
@@ -48,6 +58,10 @@ impl Multiproof {
         Ok(Self { leaves, proofs })
     }
 
+    /// Return the root of the multiproof.
+    ///
+    /// Most code in this function is borrowed from ssz_rs crate.
+    /// https://github.com/ralexstokes/ssz-rs/blob/main/ssz-rs/src/merkleization/multiproofs.rs
     pub fn calculate_root(&self) -> anyhow::Result<B256> {
         let leaves_indices = self.leaves.keys().cloned().collect::<Vec<_>>();
         let helper_indices = get_helper_indices(&leaves_indices);
@@ -70,13 +84,13 @@ impl Multiproof {
         while pos < keys.len() {
             let key = keys.get(pos).unwrap();
             let key_present = objects.contains_key(key);
-            let sibling_present = objects.contains_key(&get_sibling_index(*key));
-            let parent_index = get_parent_index(*key);
+            let sibling_present = objects.contains_key(&get_generalized_index_sibling(*key));
+            let parent_index = get_generalized_index_parent(*key);
             let parent_missing = !objects.contains_key(&parent_index);
             let should_compute = key_present && sibling_present && parent_missing;
             if should_compute {
                 let right_index = key | 1;
-                let left_index = get_sibling_index(right_index);
+                let left_index = get_generalized_index_sibling(right_index);
                 let left_input = objects.get(&left_index).expect("contains index");
                 let right_input = objects.get(&right_index).expect("contains index");
 
@@ -93,6 +107,7 @@ impl Multiproof {
         Ok(root)
     }
 
+    /// Verify the multiproof against the given root.
     pub fn verify(&self, root: B256) -> anyhow::Result<()> {
         if self.calculate_root()? == root {
             Ok(())

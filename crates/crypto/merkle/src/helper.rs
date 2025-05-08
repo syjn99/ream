@@ -2,48 +2,58 @@ use std::collections::HashSet;
 
 use alloy_primitives::B256;
 
-pub const fn get_sibling_index(index: u64) -> u64 {
-    index ^ 1
-}
-
-pub const fn get_parent_index(index: u64) -> u64 {
-    index / 2
-}
-
+/// Return the given bit of a generalized index.
 pub(crate) fn get_generalized_index_bit(index: u64, position: u64) -> bool {
     (index & (1 << position)) > 0
+}
+
+pub(crate) fn get_generalized_index_sibling(index: u64) -> u64 {
+    index ^ 1
 }
 
 pub(crate) fn get_generalized_index_child(index: u64, right_side: bool) -> u64 {
     index * 2 + right_side as u64
 }
 
+pub(crate) fn get_generalized_index_parent(index: u64) -> u64 {
+    index / 2
+}
+
 pub(crate) fn get_subtree_index(generalized_index: u64) -> u64 {
     generalized_index % (1 << (generalized_index as f64).log2().floor() as u64)
 }
 
+/// Get the generalized indices of the sister chunks along the
+/// path from the chunk with the given tree index to the root.
 fn get_branch_indices(tree_index: u64) -> Vec<u64> {
-    let mut focus = get_sibling_index(tree_index);
+    let mut focus = get_generalized_index_sibling(tree_index);
     let mut result = vec![focus];
     while focus > 1 {
-        focus = get_sibling_index(get_parent_index(focus));
+        focus = get_generalized_index_sibling(get_generalized_index_parent(focus));
         result.push(focus);
     }
     result.truncate(result.len() - 1);
     result
 }
 
+/// Get the generalized indices of the chunks along
+/// the path from the chunk with the given tree index to the root.
 fn get_path_indices(tree_index: u64) -> Vec<u64> {
     let mut focus = tree_index;
     let mut result = vec![focus];
     while focus > 1 {
-        focus = get_parent_index(focus);
+        focus = get_generalized_index_parent(focus);
         result.push(focus);
     }
     result.truncate(result.len() - 1);
     result
 }
 
+/// Get the generalized indices of all "extra" chunks in the tree needed to
+/// prove the chunks with the given generalized indices.
+/// Note that the decreasing order is chosen deliberately
+/// to ensure equivalence to the order of hashes in a regular
+/// single-item Merkle proof in the single-item case.
 pub(crate) fn get_helper_indices(indices: &[u64]) -> Vec<u64> {
     let mut all_helper_indices = HashSet::new();
     let mut all_path_indices = HashSet::new();
@@ -62,6 +72,10 @@ pub(crate) fn get_helper_indices(indices: &[u64]) -> Vec<u64> {
     all_branch_indices
 }
 
+/// Return generalized index of ``index`` in the tree of depth ``depth``.
+///
+/// Note: This function is only available for the merkle tree that depth doesn't vary.
+/// For more generalization, see [spec](https://github.com/ethereum/consensus-specs/blob/dev/ssz/merkle-proofs.md#merkle-multiproofs).
 pub(crate) fn get_generalized_index(index: u64, depth: u64) -> u64 {
     let bottom_length = 1 << depth;
     index + bottom_length
