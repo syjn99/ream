@@ -38,6 +38,7 @@ pub mod single_attestation;
 pub mod sync_aggregate;
 pub mod sync_committee;
 pub mod validator;
+pub mod view;
 pub mod voluntary_exit;
 pub mod withdrawal;
 pub mod withdrawal_request;

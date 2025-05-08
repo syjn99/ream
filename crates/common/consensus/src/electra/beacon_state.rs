@@ -89,6 +89,7 @@ use crate::{
     sync_aggregate::SyncAggregate,
     sync_committee::SyncCommittee,
     validator::Validator,
+    view::{CoreView, SlashingsView},
     voluntary_exit::SignedVoluntaryExit,
     withdrawal::Withdrawal,
     withdrawal_request::WithdrawalRequest,
@@ -208,6 +209,22 @@ pub struct BeaconState {
     pub pending_deposits: VariableList<PendingDeposit, U134217728>,
     pub pending_partial_withdrawals: VariableList<PendingPartialWithdrawal, U134217728>,
     pub pending_consolidations: VariableList<PendingConsolidation, U262144>,
+}
+
+impl CoreView for BeaconState {
+    fn slot(&self) -> anyhow::Result<u64> {
+        Ok(self.slot)
+    }
+}
+
+impl SlashingsView for BeaconState {
+    fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>> {
+        Ok(&self.slashings)
+    }
+
+    fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>> {
+        Ok(&mut self.slashings)
+    }
 }
 
 impl BeaconState {
@@ -1896,7 +1913,8 @@ impl BeaconState {
     pub fn process_slashings_reset(&mut self) -> anyhow::Result<()> {
         let next_epoch = self.get_current_epoch() + 1;
         // Reset slashings
-        self.slashings[(next_epoch % EPOCHS_PER_SLASHINGS_VECTOR) as usize] = 0;
+        let slashings = self.slashings_mut()?;
+        slashings[(next_epoch % EPOCHS_PER_SLASHINGS_VECTOR) as usize] = 0;
 
         Ok(())
     }
