@@ -237,7 +237,7 @@ mod tests {
         constants::BEACON_STATE_MERKLE_DEPTH,
         view::{BeaconStateView, PartialBeaconStateBuilder, SLASHINGS_GENERALIZED_INDEX},
     };
-    use ream_merkle::{merkle_tree, multiproof::generate_multiproof};
+    use ream_merkle::{merkle_tree, multiproof::Multiproof};
     use tree_hash::TreeHash;
 
     use super::*;
@@ -271,24 +271,14 @@ mod tests {
             let all_leaves = state.merkle_leaves();
             let tree = merkle_tree(&all_leaves, BEACON_STATE_MERKLE_DEPTH)
                 .expect("Failed to create merkle tree");
-            let indices = vec![2, 14];
-            let multiproof = generate_multiproof(&tree, &indices, BEACON_STATE_MERKLE_DEPTH)
+
+            // 2 for Slot, 14 for Slashings
+            let target_indices = vec![2, 14];
+            let multiproof = Multiproof::generate(&tree, &target_indices)
                 .expect("Failed to generate multiproof");
 
             let mut partial_beacon_state = PartialBeaconStateBuilder::from_root(pre_state_root)
-                .with_multiproof(
-                    vec![all_leaves[2], all_leaves[14]],
-                    multiproof.iter().map(|(node, _)| *node).collect::<Vec<_>>(),
-                    indices
-                        .iter()
-                        .map(|index| {
-                            ream_merkle::multiproof::get_generalized_index(
-                                *index,
-                                BEACON_STATE_MERKLE_DEPTH,
-                            )
-                        })
-                        .collect(),
-                )
+                .with_multiproof(multiproof.clone())
                 .with_slot(state.slot)
                 .with_slashings(&state.slashings)
                 .build()

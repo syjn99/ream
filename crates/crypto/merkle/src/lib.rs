@@ -5,17 +5,8 @@ pub mod multiproof;
 use alloy_primitives::B256;
 use anyhow::ensure;
 
-fn get_generalized_index_bit(index: u64, position: u64) -> bool {
-    (index & (1 << position)) > 0
-}
-
-fn get_generalized_index_child(index: u64, right_side: bool) -> u64 {
-    index * 2 + right_side as u64
-}
-
-fn get_subtree_index(generalized_index: u64) -> u64 {
-    generalized_index % (1 << (generalized_index as f64).log2().floor() as u64)
-}
+mod helper;
+use helper::{get_generalized_index_bit, get_generalized_index_child, get_subtree_index, hash};
 
 pub fn merkle_tree(leaves: &[B256], depth: u64) -> anyhow::Result<Vec<B256>> {
     let num_of_leaves = leaves.len();
@@ -32,7 +23,7 @@ pub fn merkle_tree(leaves: &[B256], depth: u64) -> anyhow::Result<Vec<B256>> {
     for i in (1..bottom_length).rev() {
         let left = tree[i * 2].as_slice();
         let right = tree[i * 2 + 1].as_slice();
-        tree[i] = ethereum_hashing::hash32_concat(left, right).into();
+        tree[i] = hash(left, right);
     }
 
     Ok(tree)
@@ -78,13 +69,9 @@ pub fn is_valid_merkle_branch(
     let mut value = leaf;
     for i in 0..depth {
         if get_generalized_index_bit(index, i) {
-            value =
-                ethereum_hashing::hash32_concat(branch[i as usize].as_slice(), value.as_slice())
-                    .into();
+            value = hash(branch[i as usize].as_slice(), value.as_slice());
         } else {
-            value =
-                ethereum_hashing::hash32_concat(value.as_slice(), branch[i as usize].as_slice())
-                    .into();
+            value = hash(value.as_slice(), branch[i as usize].as_slice());
         }
     }
     value == root
@@ -122,13 +109,10 @@ mod tests {
 
         let depth = (leaves.len() as f64).log2().ceil() as u64;
 
-        let node_2: B256 =
-            ethereum_hashing::hash32_concat(leaves[0].as_slice(), leaves[1].as_slice()).into();
-        let node_3: B256 =
-            ethereum_hashing::hash32_concat(leaves[2].as_slice(), leaves[3].as_slice()).into();
+        let node_2 = hash(leaves[0].as_slice(), leaves[1].as_slice());
+        let node_3 = hash(leaves[2].as_slice(), leaves[3].as_slice());
 
-        let root: B256 =
-            ethereum_hashing::hash32_concat(node_2.as_slice(), node_3.as_slice()).into();
+        let root = hash(node_2.as_slice(), node_3.as_slice());
 
         let tree = merkle_tree(&leaves, depth).unwrap();
 
