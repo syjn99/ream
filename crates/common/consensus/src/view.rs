@@ -19,7 +19,7 @@ pub trait BeaconStateView {
     fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartialBeaconState {
     // BeaconState fields
     pub slot: Option<u64>,
