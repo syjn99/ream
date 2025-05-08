@@ -234,7 +234,9 @@ test_sanity_blocks!(test_finality, "finality/finality");
 mod tests {
 
     use ream_consensus::{
-        constants::BEACON_STATE_MERKLE_DEPTH,
+        constants::{
+            BEACON_STATE_MERKLE_DEPTH, BEACON_STATE_SLASHINGS_INDEX, BEACON_STATE_SLOT_INDEX,
+        },
         view::{BeaconStateView, PartialBeaconStateBuilder, SLASHINGS_GENERALIZED_INDEX},
     };
     use ream_merkle::{merkle_tree, multiproof::Multiproof};
@@ -272,8 +274,7 @@ mod tests {
             let tree = merkle_tree(&all_leaves, BEACON_STATE_MERKLE_DEPTH)
                 .expect("Failed to create merkle tree");
 
-            // 2 for Slot, 14 for Slashings
-            let target_indices = vec![2, 14];
+            let target_indices = vec![BEACON_STATE_SLOT_INDEX, BEACON_STATE_SLASHINGS_INDEX];
             let multiproof =
                 Multiproof::generate::<BEACON_STATE_MERKLE_DEPTH>(&tree, &target_indices)
                     .expect("Failed to generate multiproof");
