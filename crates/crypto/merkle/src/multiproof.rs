@@ -31,9 +31,8 @@ pub struct Multiproof {
 
 impl Multiproof {
     /// Generate a multiproof for the given tree and indices.
-    pub fn generate(tree: &[B256], indices: &[Index]) -> anyhow::Result<Self> {
-        let depth = ((tree.len() as f64).log2().floor() as u64) - 1;
-        let bottom_length: u64 = 1 << depth;
+    pub fn generate<const DEPTH: u64>(tree: &[B256], indices: &[Index]) -> anyhow::Result<Self> {
+        let bottom_length: u64 = 1 << DEPTH;
 
         ensure!(!indices.is_empty(), "Indices cannot be empty");
         for &index in indices {
@@ -42,7 +41,7 @@ impl Multiproof {
 
         let generalized_indices: Vec<GeneralizedIndex> = indices
             .iter()
-            .map(|&index| get_generalized_index(index, depth))
+            .map(|&index| get_generalized_index(index, DEPTH))
             .collect();
         let helper_indices: Vec<GeneralizedIndex> = get_helper_indices(&generalized_indices);
 
@@ -122,6 +121,8 @@ mod tests {
     use super::*;
     use crate::merkle_tree;
 
+    const DEPTH: u64 = 3;
+
     #[test]
     fn test_generate_multiproof() {
         let leaves = vec![
@@ -139,7 +140,7 @@ mod tests {
         let tree = merkle_tree(&leaves, depth).unwrap();
 
         let target_indices = vec![0, 5];
-        let multiproof = Multiproof::generate(&tree, &target_indices).unwrap();
+        let multiproof = Multiproof::generate::<DEPTH>(&tree, &target_indices).unwrap();
 
         assert_eq!(multiproof.leaves.len(), 2);
         assert_eq!(multiproof.proofs.len(), 4);
@@ -162,7 +163,7 @@ mod tests {
         let tree = merkle_tree(&leaves, depth).unwrap();
 
         let target_indices = vec![0, 5];
-        let multiproof = Multiproof::generate(&tree, &target_indices).unwrap();
+        let multiproof = Multiproof::generate::<DEPTH>(&tree, &target_indices).unwrap();
 
         let root = tree[1];
 

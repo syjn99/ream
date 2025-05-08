@@ -274,8 +274,9 @@ mod tests {
 
             // 2 for Slot, 14 for Slashings
             let target_indices = vec![2, 14];
-            let multiproof = Multiproof::generate(&tree, &target_indices)
-                .expect("Failed to generate multiproof");
+            let multiproof =
+                Multiproof::generate::<BEACON_STATE_MERKLE_DEPTH>(&tree, &target_indices)
+                    .expect("Failed to generate multiproof");
 
             let mut partial_beacon_state = PartialBeaconStateBuilder::from_root(pre_state_root)
                 .with_multiproof(multiproof.clone())
