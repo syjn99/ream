@@ -1,6 +1,5 @@
 use alloy_primitives::B256;
 use anyhow::ensure;
-
 use ream_merkle::multiproof::Multiproof;
 use serde::{Deserialize, Serialize};
 use ssz_types::{FixedVector, typenum::U8192};
