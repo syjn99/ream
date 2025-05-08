@@ -235,9 +235,10 @@ mod tests {
 
     use ream_consensus::{
         constants::{
-            BEACON_STATE_MERKLE_DEPTH, BEACON_STATE_SLASHINGS_INDEX, BEACON_STATE_SLOT_INDEX,
+            BEACON_STATE_MERKLE_DEPTH, BEACON_STATE_SLASHINGS_GENERALIZED_INDEX,
+            BEACON_STATE_SLASHINGS_INDEX, BEACON_STATE_SLOT_INDEX,
         },
-        view::{BeaconStateView, PartialBeaconStateBuilder, SLASHINGS_GENERALIZED_INDEX},
+        view::{PartialBeaconStateBuilder, SlashingsView},
     };
     use ream_merkle::{merkle_tree, multiproof::Multiproof};
     use tree_hash::TreeHash;
@@ -290,7 +291,7 @@ mod tests {
 
             for &mutated in partial_beacon_state.dirty.iter() {
                 match mutated {
-                    SLASHINGS_GENERALIZED_INDEX => {
+                    BEACON_STATE_SLASHINGS_GENERALIZED_INDEX => {
                         state.slashings = partial_beacon_state.slashings().unwrap().clone();
                     }
                     _ => {

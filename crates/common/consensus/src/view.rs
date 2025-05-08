@@ -6,14 +6,19 @@ use serde::{Deserialize, Serialize};
 use ssz_types::{FixedVector, typenum::U8192};
 use tree_hash::TreeHash;
 
-use crate::{constants::EPOCHS_PER_SLASHINGS_VECTOR, misc::compute_epoch_at_slot};
+use crate::{
+    constants::{
+        BEACON_STATE_SLASHINGS_GENERALIZED_INDEX, BEACON_STATE_SLOT_GENERALIZED_INDEX,
+        EPOCHS_PER_SLASHINGS_VECTOR,
+    },
+    misc::compute_epoch_at_slot,
+};
 
-pub const SLOT_GENERALIZED_INDEX: u64 = 66;
-pub const SLASHINGS_GENERALIZED_INDEX: u64 = 78;
-
-pub trait BeaconStateView {
+pub trait CoreView {
     fn slot(&self) -> anyhow::Result<u64>;
+}
 
+pub trait SlashingsView: CoreView {
     fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>>;
     fn slashings_mut(&mut self) -> anyhow::Result<&mut FixedVector<u64, U8192>>;
 }
@@ -28,11 +33,13 @@ pub struct PartialBeaconState {
     pub dirty: Vec<u64>,
 }
 
-impl BeaconStateView for PartialBeaconState {
+impl CoreView for PartialBeaconState {
     fn slot(&self) -> anyhow::Result<u64> {
         self.slot.ok_or(anyhow::anyhow!("Slot is not set"))
     }
+}
 
+impl SlashingsView for PartialBeaconState {
     fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>> {
         self.slashings
             .as_ref()
@@ -60,7 +67,7 @@ impl PartialBeaconState {
         slashings[(next_epoch % EPOCHS_PER_SLASHINGS_VECTOR) as usize] = 0;
 
         // Mark dirty
-        self.dirty.push(SLASHINGS_GENERALIZED_INDEX);
+        self.dirty.push(BEACON_STATE_SLASHINGS_GENERALIZED_INDEX);
 
         Ok(())
     }
@@ -110,7 +117,7 @@ impl PartialBeaconStateBuilder {
                 slot.to_le_bytes().tree_hash_root()
                     == multiproof
                         .leaves
-                        .get(&SLOT_GENERALIZED_INDEX)
+                        .get(&BEACON_STATE_SLOT_GENERALIZED_INDEX)
                         .expect("Index not found")
                         .tree_hash_root(),
                 "Slot does not match multiproof"
@@ -127,7 +134,7 @@ impl PartialBeaconStateBuilder {
                 slashings_root
                     == multiproof
                         .leaves
-                        .get(&SLASHINGS_GENERALIZED_INDEX)
+                        .get(&BEACON_STATE_SLASHINGS_GENERALIZED_INDEX)
                         .expect("Index not found")
                         .tree_hash_root(),
                 "Slashings do not match multiproof"

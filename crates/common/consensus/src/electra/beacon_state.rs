@@ -89,7 +89,7 @@ use crate::{
     sync_aggregate::SyncAggregate,
     sync_committee::SyncCommittee,
     validator::Validator,
-    view::BeaconStateView,
+    view::{CoreView, SlashingsView},
     voluntary_exit::SignedVoluntaryExit,
     withdrawal::Withdrawal,
     withdrawal_request::WithdrawalRequest,
@@ -211,11 +211,13 @@ pub struct BeaconState {
     pub pending_consolidations: VariableList<PendingConsolidation, U262144>,
 }
 
-impl BeaconStateView for BeaconState {
+impl CoreView for BeaconState {
     fn slot(&self) -> anyhow::Result<u64> {
         Ok(self.slot)
     }
+}
 
+impl SlashingsView for BeaconState {
     fn slashings(&self) -> anyhow::Result<&FixedVector<u64, U8192>> {
         Ok(&self.slashings)
     }
