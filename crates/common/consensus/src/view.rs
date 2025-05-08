@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use alloy_primitives::B256;
+use anyhow::ensure;
 use ream_merkle::multiproof::verify_merkle_multiproof;
 use ssz_types::{FixedVector, typenum::U8192};
+use tree_hash::TreeHash;
 
 use crate::{constants::EPOCHS_PER_SLASHINGS_VECTOR, misc::compute_epoch_at_slot};
 
@@ -12,6 +16,7 @@ pub trait BeaconStateView {
 
 #[derive(Debug, Clone)]
 pub struct PartialBeaconState {
+    // BeaconState fields
     pub slot: Option<u64>,
     pub slashings: Option<FixedVector<u64, U8192>>,
 }
@@ -50,6 +55,9 @@ pub struct BeaconStateMultiproof {
     pub proof: Vec<B256>,
     pub generalized_indices: Vec<u64>,
 }
+
+pub const SLOT_GENERALIZED_INDEX: u64 = 66;
+pub const SLASHINGS_GENERALIZED_INDEX: u64 = 78;
 
 pub struct PartialBeaconStateBuilder {
     pub root: B256,
@@ -106,6 +114,40 @@ impl PartialBeaconStateBuilder {
 
     pub fn build(self) -> anyhow::Result<PartialBeaconState> {
         let multiproof = self.multiproof;
+
+        let generalized_index_to_leave: HashMap<u64, B256> = multiproof
+            .generalized_indices
+            .iter()
+            .zip(multiproof.leaves.iter())
+            .map(|(index, leaf)| (*index, *leaf))
+            .collect();
+
+        if self.slot.is_some() {
+            let slot = self.slot.expect("Slot is not set");
+            ensure!(
+                slot.to_le_bytes().tree_hash_root()
+                    == *generalized_index_to_leave
+                        .get(&SLOT_GENERALIZED_INDEX)
+                        .expect("Slot not found in multiproof"),
+                "Slot does not match multiproof"
+            );
+        }
+
+        if self.slashings.is_some() {
+            let slashings_root = self
+                .slashings
+                .as_ref()
+                .expect("Slashings are not set")
+                .tree_hash_root();
+            ensure!(
+                slashings_root
+                    == *generalized_index_to_leave
+                        .get(&SLASHINGS_GENERALIZED_INDEX)
+                        .expect("Slashings not found in multiproof"),
+                "Slashings do not match multiproof"
+            );
+        }
+
         verify_merkle_multiproof(
             multiproof.leaves.as_slice(),
             multiproof.proof.as_slice(),
