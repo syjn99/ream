@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use anyhow::ensure;
 use ream_merkle::multiproof::verify_merkle_multiproof;
+use serde::{Deserialize, Serialize};
 use ssz_types::{FixedVector, typenum::U8192};
 use tree_hash::TreeHash;
 
@@ -66,14 +67,14 @@ impl PartialBeaconState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BeaconStateMultiproof {
     pub leaves: Vec<B256>,
     pub proof: Vec<B256>,
     pub generalized_indices: Vec<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartialBeaconStateBuilder {
     pub root: B256,
     pub multiproof: BeaconStateMultiproof,
