@@ -317,6 +317,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_initial_subnet_setup() -> anyhow::Result<()> {
+        set_network_spec(DEV.clone());
         let key = Keypair::generate_secp256k1();
         let mut config = DiscoveryConfig::default();
         config.subnets.enable_subnet(Subnet::Attestation(0))?; // Set subnet 0
@@ -337,8 +338,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_subnet_predicate() -> anyhow::Result<()> {
-        set_network_spec(DEV.clone());
-
         let key = Keypair::generate_secp256k1();
         let mut config = DiscoveryConfig::default();
         config.subnets.enable_subnet(Subnet::Attestation(0))?; // Local node on subnet 0

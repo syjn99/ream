@@ -2,6 +2,7 @@ use std::env;
 
 use clap::Parser;
 use ream::cli::{Cli, Commands};
+use ream_checkpoint_sync::initialize_db_from_checkpoint;
 use ream_discv5::{config::DiscoveryConfig, eth2::EnrForkId, subnet::Subnets};
 use ream_executor::ReamExecutor;
 use ream_network_spec::networks::{network_spec, set_network_spec};
@@ -14,9 +15,14 @@ use ream_p2p::{
     network::Network,
 };
 use ream_rpc::{config::ServerConfig, start_server};
-use ream_storage::db::ReamDB;
+use ream_storage::{
+    db::{ReamDB, reset_db},
+    dir::setup_data_dir,
+};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
+
+pub const APP_NAME: &str = "ream";
 
 #[tokio::main]
 async fn main() {
@@ -77,10 +83,22 @@ async fn main() {
                 gossipsub_config,
             };
 
-            let ream_db = ReamDB::new(config.data_dir, config.ephemeral)
-                .expect("unable to init Ream Database");
+            let ream_dir = setup_data_dir(APP_NAME, config.data_dir.clone(), config.ephemeral)
+                .expect("Unable to initialize database directory");
+
+            if config.purge_db {
+                reset_db(ream_dir.clone()).expect("Unable to delete database");
+            }
+
+            let ream_db = ReamDB::new(ream_dir).expect("unable to init Ream Database");
 
             info!("ream database initialized ");
+
+            initialize_db_from_checkpoint(ream_db.clone(), config.checkpoint_sync_url)
+                .await
+                .expect("Unable to initialize database from checkpoint");
+
+            info!("Database Initialization completed");
 
             let http_future = start_server(server_config, ream_db);
 
