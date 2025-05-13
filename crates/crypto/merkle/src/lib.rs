@@ -1,5 +1,8 @@
 //! https://ethereum.github.io/consensus-specs/ssz/merkle-proofs
 
+#[cfg(feature = "multiproof")]
+pub mod multiproof;
+
 use alloy_primitives::B256;
 use anyhow::ensure;
 
@@ -132,7 +135,7 @@ mod tests {
         assert!(is_valid_normalized_merkle_branch(
             leaves[0],
             &proof_0,
-            0 + (1 << depth),
+            1 << depth,
             root
         ));
         assert!(is_valid_normalized_merkle_branch(

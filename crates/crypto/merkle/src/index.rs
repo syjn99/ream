@@ -115,5 +115,6 @@ mod multiproof_helpers {
 
 #[cfg(feature = "multiproof")]
 pub use multiproof_helpers::{
-    generalized_index_parent, generalized_index_sibling, get_helper_indices,
+    generalized_index_from_leaf_index, generalized_index_parent, generalized_index_sibling,
+    get_helper_indices,
 };
