@@ -13,3 +13,7 @@ version.workspace = true
 alloy-primitives.workspace = true
 anyhow.workspace = true
 ethereum_hashing.workspace = true
+
+[features]
+default = []
+multiproof = []

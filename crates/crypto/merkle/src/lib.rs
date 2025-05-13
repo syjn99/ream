@@ -97,8 +97,6 @@ pub fn is_valid_normalized_merkle_branch(
 
 #[cfg(test)]
 mod tests {
-    use crate::index::generalized_index_from_leaf_index;
-
     use super::*;
 
     #[test]
@@ -134,25 +132,25 @@ mod tests {
         assert!(is_valid_normalized_merkle_branch(
             leaves[0],
             &proof_0,
-            generalized_index_from_leaf_index(0, depth),
+            0 + (1 << depth),
             root
         ));
         assert!(is_valid_normalized_merkle_branch(
             leaves[1],
             &proof_1,
-            generalized_index_from_leaf_index(1, depth),
+            1 + (1 << depth),
             root
         ));
         assert!(is_valid_normalized_merkle_branch(
             leaves[2],
             &proof_2,
-            generalized_index_from_leaf_index(2, depth),
+            2 + (1 << depth),
             root
         ));
         assert!(is_valid_normalized_merkle_branch(
             leaves[3],
             &proof_3,
-            generalized_index_from_leaf_index(3, depth),
+            3 + (1 << depth),
             root
         ));
     }

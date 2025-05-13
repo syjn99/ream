@@ -1,6 +1,3 @@
-/// ``LeafIndex`` is the index of a leaf in the **bottom** layer of the ``tree``.
-pub(crate) type LeafIndex = u64;
-
 /// ``GeneralizedIndex`` is the index of a node in the ``tree``.
 pub(crate) type GeneralizedIndex = u64;
 
@@ -18,14 +15,105 @@ pub(crate) fn generalized_index_child(
     index * 2 + right_side as GeneralizedIndex
 }
 
-pub(crate) fn get_subtree_index(generalized_index: GeneralizedIndex) -> LeafIndex {
+pub(crate) fn get_subtree_index(generalized_index: GeneralizedIndex) -> GeneralizedIndex {
     generalized_index % (1 << (generalized_index as f64).log2().floor() as u64)
 }
 
-/// Return the generalized index of the leaf index with ``depth``.
-pub(crate) fn generalized_index_from_leaf_index(
-    leaf_index: LeafIndex,
-    depth: u64,
-) -> GeneralizedIndex {
-    leaf_index + (1 << depth)
+#[cfg(feature = "multiproof")]
+mod multiproof_helpers {
+    //! https://ethereum.github.io/consensus-specs/ssz/merkle-proofs/#merkle-multiproofs
+
+    use std::collections::HashSet;
+
+    use super::GeneralizedIndex;
+
+    pub const fn generalized_index_sibling(index: GeneralizedIndex) -> GeneralizedIndex {
+        index ^ 1
+    }
+
+    pub const fn generalized_index_parent(index: GeneralizedIndex) -> GeneralizedIndex {
+        index / 2
+    }
+
+    /// Return the generalized index of the leaf index with ``depth``.
+    pub fn generalized_index_from_leaf_index(leaf_index: u64, depth: u64) -> GeneralizedIndex {
+        leaf_index + (1 << depth)
+    }
+
+    /// Get the generalized indices of the sister chunks along the
+    /// path from the chunk with the given tree index to the root.
+    fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+        let mut focus = generalized_index_sibling(tree_index);
+        let mut result = vec![focus];
+        while focus > 1 {
+            focus = generalized_index_sibling(generalized_index_parent(focus));
+            result.push(focus);
+        }
+        result.pop();
+        result
+    }
+
+    /// Get the generalized indices of the chunks along
+    /// the path from the chunk with the given tree index to the root.
+    fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+        let mut focus = tree_index;
+        let mut result = vec![focus];
+        while focus > 1 {
+            focus = generalized_index_parent(focus);
+            result.push(focus);
+        }
+        result.pop();
+        result
+    }
+
+    /// Get the generalized indices of all "extra" chunks in the tree needed to
+    /// prove the chunks with the given generalized indices.
+    /// Note that the decreasing order is chosen deliberately
+    /// to ensure equivalence to the order of hashes in a regular
+    /// single-item Merkle proof in the single-item case.
+    pub fn get_helper_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+        let mut all_helper_indices = HashSet::new();
+        let mut all_path_indices = HashSet::new();
+
+        for index in indices {
+            all_helper_indices.extend(get_branch_indices(*index).iter());
+            all_path_indices.extend(get_path_indices(*index).iter());
+        }
+
+        let mut all_branch_indices: Vec<GeneralizedIndex> = all_helper_indices
+            .difference(&all_path_indices)
+            .cloned()
+            .collect();
+
+        all_branch_indices.sort_by(|a: &u64, b: &u64| b.cmp(a)); // descending order
+        all_branch_indices
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        const DEPTH: u64 = 3;
+
+        #[test]
+        /// See this [illustration](https://hackmd.io/_uploads/H1ZVOVille.png).
+        fn test_get_helper_indices() {
+            let leaf_indices = vec![2, 7];
+            let generalized_indices = leaf_indices
+                .iter()
+                .map(|&index| generalized_index_from_leaf_index(index, DEPTH))
+                .collect::<Vec<_>>();
+            let helper_indices = get_helper_indices(&generalized_indices);
+            assert_eq!(helper_indices.len(), 4);
+            assert_eq!(helper_indices[0], 14);
+            assert_eq!(helper_indices[1], 11);
+            assert_eq!(helper_indices[2], 6);
+            assert_eq!(helper_indices[3], 4);
+        }
+    }
 }
+
+#[cfg(feature = "multiproof")]
+pub use multiproof_helpers::{
+    generalized_index_parent, generalized_index_sibling, get_helper_indices,
+};
