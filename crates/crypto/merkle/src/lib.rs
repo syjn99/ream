@@ -140,19 +140,19 @@ mod tests {
         assert!(is_valid_normalized_merkle_branch(
             leaves[1],
             &proof_1,
-            1 + (1 << depth),
+            (1 << depth) + 1,
             root
         ));
         assert!(is_valid_normalized_merkle_branch(
             leaves[2],
             &proof_2,
-            2 + (1 << depth),
+            (1 << depth) + 2,
             root
         ));
         assert!(is_valid_normalized_merkle_branch(
             leaves[3],
             &proof_3,
-            3 + (1 << depth),
+            (1 << depth) + 3,
             root
         ));
     }

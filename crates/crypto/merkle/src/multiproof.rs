@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     hash_concat,
     index::{
-        GeneralizedIndex, generalized_index_from_leaf_index, generalized_index_parent,
-        generalized_index_sibling, get_helper_indices,
+        generalized_index_from_leaf_index, generalized_index_parent, generalized_index_sibling,
+        get_helper_indices,
     },
 };
 
@@ -20,12 +20,12 @@ use crate::{
 pub struct Multiproof {
     /// The leaves to be verified.
     /// Keyed by their generalized indices.
-    pub leaves: HashMap<GeneralizedIndex, B256>,
+    pub leaves: HashMap<u64, B256>,
 
     /// The proof nodes.
     /// Keyed by their generalized indices.
     /// Keys of ``proofs`` will be sorted in descending order when generating a single proof.
-    pub proofs: BTreeMap<GeneralizedIndex, B256>,
+    pub proofs: BTreeMap<u64, B256>,
 }
 
 impl Multiproof {
@@ -38,35 +38,37 @@ impl Multiproof {
             ensure!(index < bottom_length, "Index out of bounds");
         }
 
-        let generalized_indices: Vec<GeneralizedIndex> = indices
+        let generalized_indices = indices
             .iter()
             .map(|&index| generalized_index_from_leaf_index(index, DEPTH))
-            .collect();
-        let helper_indices: Vec<GeneralizedIndex> = get_helper_indices(&generalized_indices);
+            .collect::<Vec<_>>();
+        let helper_indices = get_helper_indices(&generalized_indices);
 
-        let leaves: HashMap<GeneralizedIndex, B256> = generalized_indices
+        let leaves = generalized_indices
             .iter()
             .map(|&g| (g, tree[g as usize]))
-            .collect::<HashMap<_, _>>();
-        let proofs: BTreeMap<GeneralizedIndex, B256> = helper_indices
+            .collect::<HashMap<u64, B256>>();
+        let proofs = helper_indices
             .iter()
             .map(|&g| (g, tree[g as usize]))
-            .collect();
+            .collect::<BTreeMap<u64, B256>>();
 
         Ok(Self { leaves, proofs })
     }
 
     /// Return the root of the multiproof.
     ///
-    /// Most code in this function is borrowed from ssz_rs crate.
-    /// https://github.com/ralexstokes/ssz-rs/blob/main/ssz-rs/src/merkleization/multiproofs.rs
+    /// Note: This function is a Rust port of the original function
+    /// (``calculate_multi_merkle_root()``) at spec code: https://github.com/ethereum/consensus-specs/blob/c27589872ac2dbafb566dcf7896c3fa975f00fe9/ssz/merkle-proofs.md?plain=1#L318-L341
     pub fn calculate_root(&self) -> anyhow::Result<B256> {
         let leaf_indices = self.leaves.keys().cloned().collect::<Vec<_>>();
         let helper_indices = get_helper_indices(&leaf_indices);
 
         ensure!(
             self.proofs.len() == helper_indices.len(),
-            "Invalid proof: proof and helper indices length mismatch"
+            "Invalid proof: proof length ({}) does not match helper indices length ({})",
+            self.proofs.len(),
+            helper_indices.len(),
         );
 
         // ``objects`` is a map of all the indices to their corresponding nodes (hash values).
@@ -80,15 +82,16 @@ impl Multiproof {
 
         let mut pos = 0;
         while pos < keys.len() {
-            let key = keys.get(pos).unwrap();
+            let key = keys
+                .get(pos)
+                .ok_or_else(|| anyhow::anyhow!("Missing key at position {}", pos))?;
+            let parent_index = generalized_index_parent(*key);
 
             let key_present = objects.contains_key(key);
             let sibling_present = objects.contains_key(&generalized_index_sibling(*key));
-            let parent_index = generalized_index_parent(*key);
             let parent_missing = !objects.contains_key(&parent_index);
 
-            let should_compute = key_present && sibling_present && parent_missing;
-            if should_compute {
+            if key_present && sibling_present && parent_missing {
                 let right_index = key | 1;
                 let left_index = generalized_index_sibling(right_index);
                 let left_input = objects
@@ -105,7 +108,9 @@ impl Multiproof {
             pos += 1;
         }
 
-        let root = *objects.get(&1).expect("contains index");
+        let root = *objects
+            .get(&1)
+            .ok_or_else(|| anyhow::anyhow!("Missing root node at index 1"))?;
         Ok(root)
     }
 
