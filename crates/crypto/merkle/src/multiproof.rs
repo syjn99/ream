@@ -1,7 +1,5 @@
 //! https://ethereum.github.io/consensus-specs/ssz/merkle-proofs/#merkle-multiproofs
 
-#![cfg(feature = "multiproof")]
-
 use std::collections::{BTreeMap, HashMap};
 
 use alloy_primitives::B256;

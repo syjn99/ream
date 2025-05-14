@@ -1,6 +1,5 @@
 //! https://ethereum.github.io/consensus-specs/ssz/merkle-proofs
 
-#[cfg(feature = "multiproof")]
 pub mod multiproof;
 
 use alloy_primitives::B256;
@@ -113,10 +112,10 @@ mod tests {
 
         let depth = (leaves.len() as f64).log2().ceil() as u64;
 
-        let node_2: B256 = hash_concat(leaves[0].as_slice(), leaves[1].as_slice());
-        let node_3: B256 = hash_concat(leaves[2].as_slice(), leaves[3].as_slice());
+        let node_2 = hash_concat(leaves[0].as_slice(), leaves[1].as_slice());
+        let node_3 = hash_concat(leaves[2].as_slice(), leaves[3].as_slice());
 
-        let root: B256 = hash_concat(node_2.as_slice(), node_3.as_slice());
+        let root = hash_concat(node_2.as_slice(), node_3.as_slice());
 
         let tree = merkle_tree(&leaves, depth).unwrap();
 
