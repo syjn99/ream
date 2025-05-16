@@ -4,16 +4,16 @@ pub fn get_generalized_index_bit(index: u64, position: u64) -> bool {
     (index & (1 << position)) > 0
 }
 
-pub const fn generalized_index_sibling(index: u64) -> u64 {
-    index ^ 1
+pub const fn generalized_index_sibling(generalized_index: u64) -> u64 {
+    generalized_index ^ 1
 }
 
-pub fn generalized_index_child(index: u64, right_side: bool) -> u64 {
-    index * 2 + right_side as u64
+pub fn generalized_index_child(generalized_index: u64, right_side: bool) -> u64 {
+    generalized_index * 2 + right_side as u64
 }
 
-pub const fn generalized_index_parent(index: u64) -> u64 {
-    index / 2
+pub const fn generalized_index_parent(generalized_index: u64) -> u64 {
+    generalized_index / 2
 }
 
 pub fn get_subtree_index(generalized_index: u64) -> u64 {
@@ -27,8 +27,8 @@ pub fn generalized_index_from_leaf_index(leaf_index: u64, depth: u64) -> u64 {
 
 /// Get the generalized indices of the sister chunks along the
 /// path from the chunk with the given tree index to the root.
-fn get_branch_indices(tree_index: u64) -> Vec<u64> {
-    let mut focus = generalized_index_sibling(tree_index);
+fn get_branch_indices(generalized_index: u64) -> Vec<u64> {
+    let mut focus = generalized_index_sibling(generalized_index);
     let mut result = vec![focus];
     while focus > 1 {
         focus = generalized_index_sibling(generalized_index_parent(focus));
@@ -40,8 +40,8 @@ fn get_branch_indices(tree_index: u64) -> Vec<u64> {
 
 /// Get the generalized indices of the chunks along
 /// the path from the chunk with the given tree index to the root.
-fn get_path_indices(tree_index: u64) -> Vec<u64> {
-    let mut focus = tree_index;
+fn get_path_indices(generalized_index: u64) -> Vec<u64> {
+    let mut focus = generalized_index;
     let mut result = vec![focus];
     while focus > 1 {
         focus = generalized_index_parent(focus);
@@ -56,11 +56,11 @@ fn get_path_indices(tree_index: u64) -> Vec<u64> {
 /// Note that the decreasing order is chosen deliberately
 /// to ensure equivalence to the order of hashes in a regular
 /// single-item Merkle proof in the single-item case.
-pub fn get_helper_indices(indices: &[u64]) -> Vec<u64> {
+pub fn get_helper_indices(generalized_indices: &[u64]) -> Vec<u64> {
     let mut all_helper_indices = HashSet::new();
     let mut all_path_indices = HashSet::new();
 
-    for index in indices {
+    for index in generalized_indices {
         all_helper_indices.extend(get_branch_indices(*index).iter());
         all_path_indices.extend(get_path_indices(*index).iter());
     }
