@@ -4497,6 +4497,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "ethereum_hashing",
+ "serde",
 ]
 
 [[package]]
