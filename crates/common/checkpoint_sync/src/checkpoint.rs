@@ -22,7 +22,7 @@ pub fn get_checkpoint_sync_sources(checkpoint_sync_url: Option<Url>) -> Vec<Url>
             "../resources/checkpoint_sync_sources/hoodi.yaml"
         ))
         .expect("should deserialize checkpoint sync sources"),
-        Network::Dev => vec![],
+        Network::Dev | Network::Custom(_) => vec![],
     };
 
     raw_urls

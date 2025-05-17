@@ -41,7 +41,7 @@ pub struct NodeConfig {
 
     #[arg(
         long,
-        help = "Choose mainnet, holesky, sepolia, hoodi or dev",
+        help = "Choose mainnet, holesky, sepolia, hoodi, dev or provide a path to a YAML config file",
         default_value = DEFAULT_NETWORK,
         value_parser = network_parser
     )]
