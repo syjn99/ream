@@ -237,10 +237,12 @@ mod tests {
 
     use ream_consensus::{
         constants::{
-            BEACON_STATE_MERKLE_DEPTH, BEACON_STATE_SLASHINGS_GENERALIZED_INDEX,
-            BEACON_STATE_SLASHINGS_INDEX, BEACON_STATE_SLOT_INDEX,
+            BEACON_STATE_LATEST_BLOCK_HEADER_GENERALIZED_INDEX,
+            BEACON_STATE_LATEST_BLOCK_HEADER_INDEX, BEACON_STATE_MERKLE_DEPTH,
+            BEACON_STATE_RANDAO_MIXES_INDEX, BEACON_STATE_SLASHINGS_GENERALIZED_INDEX,
+            BEACON_STATE_SLASHINGS_INDEX, BEACON_STATE_SLOT_INDEX, BEACON_STATE_VALIDATORS_INDEX,
         },
-        view::{PartialBeaconStateBuilder, SlashingsView},
+        view::{LatestBlockHeaderView, PartialBeaconStateBuilder, SlashingsView},
     };
     use ream_merkle::{merkle_tree, multiproof::Multiproof};
     use tree_hash::TreeHash;
@@ -310,6 +312,100 @@ mod tests {
             }
 
             assert_eq!(expected_post.tree_hash_root(), state.tree_hash_root())
+        }
+    }
+
+    #[test]
+    fn test_process_block_header_partially() {
+        let base_path = format!(
+            "mainnet/tests/mainnet/electra/operations/{}/pyspec_tests",
+            "block_header"
+        );
+
+        for entry in std::fs::read_dir(base_path).unwrap() {
+            let entry = entry.unwrap();
+
+            let case_dir = entry.path();
+
+            if !case_dir.is_dir() {
+                continue;
+            }
+
+            let case_name = case_dir.file_name().unwrap().to_str().unwrap();
+
+            println!("Testing case: {}", case_name);
+
+            let mut state: BeaconState = utils::read_ssz_snappy(&case_dir.join("pre.ssz_snappy"))
+                .expect("cannot find test asset(pre.ssz_snappy)");
+            let input: BeaconBlock =
+                utils::read_ssz_snappy(&case_dir.join(format!("{}.ssz_snappy", "block")))
+                    .expect("cannot find test asset(<input>.ssz_snappy)");
+            let expected_post =
+                utils::read_ssz_snappy::<BeaconState>(&case_dir.join("post.ssz_snappy"));
+
+            let pre_state_root = state.tree_hash_root();
+
+            let all_leaves = state.merkle_leaves();
+
+            let tree = merkle_tree(&all_leaves, BEACON_STATE_MERKLE_DEPTH)
+                .expect("Failed to create merkle tree");
+
+            let target_indices = vec![
+                BEACON_STATE_SLOT_INDEX,
+                BEACON_STATE_LATEST_BLOCK_HEADER_INDEX,
+                BEACON_STATE_VALIDATORS_INDEX,
+                BEACON_STATE_RANDAO_MIXES_INDEX,
+            ];
+
+            let multiproof =
+                Multiproof::generate::<BEACON_STATE_MERKLE_DEPTH>(&tree, &target_indices)
+                    .expect("Failed to generate multiproof");
+
+            let mut partial_beacon_state = PartialBeaconStateBuilder::from_root(pre_state_root)
+                .with_multiproof(multiproof.clone())
+                .with_slot(state.slot)
+                .with_latest_block_header(&state.latest_block_header)
+                .with_validators(&state.validators)
+                .with_randao_mixes(&state.randao_mixes)
+                .build()
+                .expect("Failed to build PartialBeaconState");
+
+            let result = partial_beacon_state.process_block_header(&input);
+
+            match (result, expected_post) {
+                (Ok(_), Ok(expected)) => {
+                    for &mutated in partial_beacon_state.dirty.iter() {
+                        match mutated {
+                            BEACON_STATE_LATEST_BLOCK_HEADER_GENERALIZED_INDEX => {
+                                state.latest_block_header =
+                                    partial_beacon_state.latest_block_header().unwrap().clone();
+                            }
+
+                            _ => {
+                                panic!("Unexpected mutated index: {}", mutated);
+                            }
+                        }
+                    }
+                    assert_eq!(
+                        state.tree_hash_root(),
+                        expected.tree_hash_root(),
+                        "Post state mismatch in case {}",
+                        case_name
+                    );
+                }
+                (Ok(_), Err(_)) => {
+                    panic!("Test case {} should have failed but succeeded", case_name);
+                }
+                (Err(err), Ok(_)) => {
+                    panic!(
+                        "Test case {} should have succeeded but failed, err={:?}",
+                        case_name, err
+                    );
+                }
+                (Err(_), Err(_)) => {
+                    // Expected: invalid operations result in an error and no post state.
+                }
+            }
         }
     }
 }
