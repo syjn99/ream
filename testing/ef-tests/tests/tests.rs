@@ -228,3 +228,88 @@ test_sanity_blocks!(test_random, "random/random");
 
 // Testing finality
 test_sanity_blocks!(test_finality, "finality/finality");
+
+// Testing PartialBeaconState
+
+#[cfg(test)]
+
+mod tests {
+
+    use ream_consensus::{
+        constants::{
+            BEACON_STATE_MERKLE_DEPTH, BEACON_STATE_SLASHINGS_GENERALIZED_INDEX,
+            BEACON_STATE_SLASHINGS_INDEX, BEACON_STATE_SLOT_INDEX,
+        },
+        view::{PartialBeaconStateBuilder, SlashingsView},
+    };
+    use ream_merkle::{merkle_tree, multiproof::Multiproof};
+    use tree_hash::TreeHash;
+
+    use super::*;
+
+    #[test]
+
+    fn test_process_slashing_resets_partially() {
+        let base_path = format!(
+            "mainnet/tests/mainnet/electra/epoch_processing/{}/pyspec_tests",
+            "slashings_reset"
+        );
+
+        for entry in std::fs::read_dir(base_path).unwrap() {
+            let entry = entry.unwrap();
+
+            let case_dir = entry.path();
+
+            if !case_dir.is_dir() {
+                continue;
+            }
+
+            let case_name = case_dir.file_name().unwrap().to_str().unwrap();
+
+            println!("Testing case: {}", case_name);
+
+            let mut state: BeaconState = utils::read_ssz_snappy(&case_dir.join("pre.ssz_snappy"))
+                .expect("cannot find test asset(pre.ssz_snappy)");
+
+            let expected_post =
+                utils::read_ssz_snappy::<BeaconState>(&case_dir.join("post.ssz_snappy"))
+                    .expect("cannot find test asset(post.ssz_snappy)");
+
+            let pre_state_root = state.tree_hash_root();
+
+            let all_leaves = state.merkle_leaves();
+
+            let tree = merkle_tree(&all_leaves, BEACON_STATE_MERKLE_DEPTH)
+                .expect("Failed to create merkle tree");
+
+            let target_indices = vec![BEACON_STATE_SLOT_INDEX, BEACON_STATE_SLASHINGS_INDEX];
+
+            let multiproof =
+                Multiproof::generate::<BEACON_STATE_MERKLE_DEPTH>(&tree, &target_indices)
+                    .expect("Failed to generate multiproof");
+
+            let mut partial_beacon_state = PartialBeaconStateBuilder::from_root(pre_state_root)
+                .with_multiproof(multiproof.clone())
+                .with_slot(state.slot)
+                .with_slashings(&state.slashings)
+                .build()
+                .expect("Failed to build PartialBeaconState");
+
+            partial_beacon_state.process_slashings_reset().unwrap();
+
+            for &mutated in partial_beacon_state.dirty.iter() {
+                match mutated {
+                    BEACON_STATE_SLASHINGS_GENERALIZED_INDEX => {
+                        state.slashings = partial_beacon_state.slashings().unwrap().clone();
+                    }
+
+                    _ => {
+                        panic!("Unexpected mutated index: {}", mutated);
+                    }
+                }
+            }
+
+            assert_eq!(expected_post.tree_hash_root(), state.tree_hash_root())
+        }
+    }
+}
