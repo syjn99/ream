@@ -31,7 +31,7 @@ use libp2p::{
 use libp2p_identity::{Keypair, PublicKey, secp256k1};
 use libp2p_mplex::{MaxBufferBehaviour, MplexConfig};
 use parking_lot::Mutex;
-use ream_discv5::discovery::{DiscoveredPeers, Discovery};
+use ream_discv5::discovery::{DiscoveredPeers, Discovery, QueryType};
 use ream_executor::ReamExecutor;
 use tracing::{error, info, trace, warn};
 use yamux::Config as YamuxConfig;
@@ -92,7 +92,7 @@ impl Network {
         let discovery = {
             let mut discovery =
                 Discovery::new(Keypair::from(local_key.clone()), &config.discv5_config).await?;
-            discovery.discover_peers(16, None);
+            discovery.discover_peers(QueryType::Peers, 16);
             discovery
         };
 
@@ -359,7 +359,10 @@ mod tests {
 
     use alloy_primitives::{B256, aliases::B32};
     use ream_consensus::constants::GENESIS_VALIDATORS_ROOT;
-    use ream_discv5::{config::DiscoveryConfig, subnet::Subnets};
+    use ream_discv5::{
+        config::DiscoveryConfig,
+        subnet::{AttestationSubnets, SyncCommitteeSubnets},
+    };
     use ream_executor::ReamExecutor;
     use ream_network_spec::networks::{DEV, set_network_spec};
     use tokio::runtime::Runtime;
@@ -396,7 +399,8 @@ mod tests {
                 socket_port,
                 discovery_port,
                 disable_discovery,
-                subnets: Subnets::new(),
+                attestation_subnets: AttestationSubnets::new(),
+                sync_committee_subnets: SyncCommitteeSubnets::new(),
             },
             gossipsub_config: GossipsubConfig {
                 topics,
