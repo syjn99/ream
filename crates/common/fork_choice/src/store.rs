@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use alloy_primitives::{B256, map::HashMap};
 use anyhow::{anyhow, bail, ensure};
 use ream_bls::BLSSignature;
@@ -132,6 +134,55 @@ impl Store {
 
         // Otherwise, branch not viable
         Ok(false)
+    }
+
+    /// Retrieve a filtered block tree from ``store``, only returning branches
+    /// whose leaf state's justified/finalized info agrees with that in ``store``.
+    pub fn get_filtered_block_tree(&self) -> anyhow::Result<HashMap<B256, BeaconBlock>> {
+        let base = self.db.justified_checkpoint_provider().get()?.root;
+        let mut blocks = HashMap::default();
+        self.filter_block_tree(base, &mut blocks)?;
+        Ok(blocks)
+    }
+
+    pub fn get_head(&self) -> anyhow::Result<B256> {
+        // Get filtered block tree that only includes viable branches
+        let blocks = self.get_filtered_block_tree()?;
+        // Execute the LMD-GHOST fork choice
+        let mut head = self.db.justified_checkpoint_provider().get()?.root;
+
+        loop {
+            let mut children = vec![];
+            for root in blocks.keys() {
+                if blocks[root].parent_root == head {
+                    children.push(root);
+                }
+            }
+
+            if children.is_empty() {
+                return Ok(head);
+            }
+
+            let mut weighted_children = children
+                .into_iter()
+                .map(|child| Ok((*child, self.get_weight(*child)?)))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+
+            // Sort by latest attesting balance with ties broken lexicographically
+            // Ties broken by favoring block with lexicographically higher root
+            weighted_children.sort_by(|(a, weight_a), (b, weight_b)| {
+                match weight_a.cmp(weight_b) {
+                    Ordering::Equal => a.cmp(b),
+                    other => other,
+                }
+            });
+
+            let Some((best_child, _)) = weighted_children.last() else {
+                bail!("Children should always be present");
+            };
+
+            head = *best_child;
+        }
     }
 
     /// Update checkpoints in store if necessary
