@@ -1,28 +1,28 @@
-use crate::{AggregatePubKey, BLSSignature, PubKey, errors::BLSError};
+use crate::{BLSSignature, PubKey, errors::BLSError};
 
 /// Trait for aggregating BLS public keys.
 ///
 /// This trait provides functionality to combine multiple BLS public keys into a single
 /// aggregate public key. This is useful for signature verification of messages signed
 /// by multiple parties.
-pub trait Aggregatable {
+pub trait Aggregatable<T> {
     type Error;
 
-    /// Aggregates multiple BLS public keys into a single aggregate public key.
+    /// Aggregates multiple BLS items into a single aggregate item.
     ///
     /// # Arguments
-    /// * `pubkeys` - Slice of public key references to aggregate
+    /// * `items` - Slice of references to the items to aggregate
     ///
     /// # Returns
-    /// * `Result<AggregatePubKey, Self::Error>` - The aggregated public key or an error
-    fn aggregate(pubkeys: &[&PubKey]) -> Result<AggregatePubKey, Self::Error>;
+    /// * `Result<Self::Output, Self::Error>` - The aggregated item or an error
+    fn aggregate(items: &[&T]) -> Result<T, Self::Error>;
 }
 
-/// Marker trait for zkcrypto/bls12_381 BLS public key aggregation implementation
-pub trait ZkcryptoAggregatable: Aggregatable<Error = BLSError> {}
+/// Marker trait for zkcrypto/bls12_381 BLS aggregation implementation
+pub trait ZkcryptoAggregatable<T>: Aggregatable<T, Error = BLSError> {}
 
-/// Marker trait for supranational/blst BLS public key aggregation implementation
-pub trait SupranationalAggregatable: Aggregatable<Error = anyhow::Error> {}
+/// Marker trait for supranational/blst BLS aggregation implementation
+pub trait SupranationalAggregatable<T>: Aggregatable<T, Error = anyhow::Error> {}
 
 /// Trait for BLS message signing.
 ///
