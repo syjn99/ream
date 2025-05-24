@@ -40,7 +40,9 @@ use yamux::Config as YamuxConfig;
 use crate::{
     channel::{P2PMessages, P2PResponse},
     config::NetworkConfig,
-    gossipsub::{GossipsubBehaviour, snappy::SnappyTransform, topics::GossipTopic},
+    gossipsub::{
+        GossipsubBehaviour, message::GossipsubMessage, snappy::SnappyTransform, topics::GossipTopic,
+    },
     req_resp::{
         ReqResp, ReqRespMessage,
         handler::ReqRespMessageReceived,
@@ -379,12 +381,23 @@ impl Network {
         info!("Gossipsub event: {:?}", event);
         match event {
             GossipsubEvent::Message {
-                propagation_source,
+                propagation_source: _,
                 message_id: _,
                 message,
-            } => {
-                trace!("Peer {propagation_source} sent gossipsub message: {message:?}");
-            }
+            } => match GossipsubMessage::decode(&message.topic, &message.data) {
+                Ok(gossip_message) => match gossip_message {
+                    GossipsubMessage::BeaconBlock(signed_block) => {
+                        info!(
+                            "Beacon block received over gossipsub: slot: {}, root: {}",
+                            signed_block.message.slot,
+                            signed_block.message.block_root()
+                        );
+                    }
+                },
+                Err(err) => {
+                    trace!("Failed to decode gossip message: {err:?}");
+                }
+            },
             GossipsubEvent::Subscribed { peer_id, topic } => {
                 trace!("Peer {peer_id} subscribed to topic: {topic:?}");
             }
