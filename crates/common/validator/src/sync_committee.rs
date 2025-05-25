@@ -1,13 +1,18 @@
 use std::collections::HashSet;
 
-use anyhow::{bail, ensure};
+use anyhow::{anyhow, bail, ensure};
+use ream_bls::{BLSSignature, traits::Aggregatable};
 use ream_consensus::{
     constants::{EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SYNC_COMMITTEE_SIZE},
-    electra::beacon_state::BeaconState,
+    electra::{beacon_block::BeaconBlock, beacon_state::BeaconState},
     misc::compute_epoch_at_slot,
+    sync_aggregate::SyncAggregate,
 };
+use ssz_types::{BitVector, typenum::U512};
 
-use crate::constants::SYNC_COMMITTEE_SUBNET_COUNT;
+use crate::{
+    constants::SYNC_COMMITTEE_SUBNET_COUNT, contribution_and_proof::SyncCommitteeContribution,
+};
 
 pub fn compute_sync_committee_period(epoch: u64) -> u64 {
     epoch / EPOCHS_PER_SYNC_COMMITTEE_PERIOD
@@ -74,4 +79,34 @@ pub fn compute_subnets_for_sync_committee(
         .into_iter()
         .map(|index| index as u64 / (SYNC_COMMITTEE_SIZE / SYNC_COMMITTEE_SUBNET_COUNT))
         .collect())
+}
+
+pub fn process_sync_committee_contributions(
+    block: &mut BeaconBlock,
+    contributions: HashSet<SyncCommitteeContribution>,
+) -> anyhow::Result<()> {
+    let mut sync_committee_bits = BitVector::<U512>::new();
+    let mut signatures = vec![];
+    let sync_subcommittee_size = SYNC_COMMITTEE_SIZE / SYNC_COMMITTEE_SUBNET_COUNT;
+
+    for contribution in contributions {
+        for (index, participated) in contribution.aggregation_bits.iter().enumerate() {
+            if participated {
+                let participant_index =
+                    sync_subcommittee_size * contribution.subcommittee_index + index as u64;
+                sync_committee_bits
+                    .set(participant_index as usize, true)
+                    .map_err(|err| anyhow!("Failed to set sync committee bit: {err:?}"))?;
+            }
+        }
+        signatures.push(contribution.signature);
+    }
+
+    block.body.sync_aggregate = SyncAggregate {
+        sync_committee_bits,
+        sync_committee_signature: BLSSignature::aggregate(
+            &signatures.iter().collect::<Vec<&BLSSignature>>(),
+        )?,
+    };
+    Ok(())
 }
