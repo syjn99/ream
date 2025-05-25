@@ -4577,10 +4577,14 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "anyhow",
+ "ethereum_serde_utils",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
  "ream-consensus",
  "serde",
  "ssz_types",
  "tree_hash",
+ "tree_hash_derive",
 ]
 
 [[package]]
@@ -4652,6 +4656,7 @@ dependencies = [
  "ream-consensus",
  "ream-discv5",
  "ream-executor",
+ "ream-light-client",
  "ream-network-spec",
  "ream-validator",
  "serde",
