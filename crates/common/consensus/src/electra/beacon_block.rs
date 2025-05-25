@@ -10,7 +10,8 @@ use super::beacon_block_body::BeaconBlockBody;
 use crate::{
     beacon_block_header::{BeaconBlockHeader, SignedBeaconBlockHeader},
     blob_sidecar::BlobSidecar,
-    execution_engine::rpc_types::get_blobs::BlobAndProofV1,
+    execution_engine::rpc_types::get_blobs::{Blob, BlobAndProofV1},
+    polynomial_commitments::kzg_proof::KZGProof,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
@@ -54,6 +55,21 @@ impl SignedBeaconBlock {
                 .blob_kzg_commitment_inclusion_proof(index)?
                 .into(),
         })
+    }
+
+    pub fn get_blob_sidecars(
+        &self,
+        blobs: Vec<Blob>,
+        blob_kzg_proofs: Vec<KZGProof>,
+    ) -> anyhow::Result<Vec<BlobSidecar>> {
+        blobs
+            .into_iter()
+            .zip(blob_kzg_proofs)
+            .enumerate()
+            .map(|(index, (blob, proof))| {
+                self.blob_sidecar(BlobAndProofV1 { blob, proof }, index as u64)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
     }
 }
 
