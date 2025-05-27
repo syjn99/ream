@@ -366,6 +366,18 @@ impl PartialBeaconStateBuilder {
                 "Validators list must not be empty"
             );
 
+            let expected_root = multiproof
+                .leaves
+                .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
+                .expect("Index not found")
+                .tree_hash_root();
+
+            println!("expected root: {:?}", expected_root);
+            println!(
+                "validator_variable_list root: {:?}",
+                validator_variable_list.tree_hash_root()
+            );
+
             ensure!(
                 validator_variable_list.tree_hash_root()
                     == multiproof
