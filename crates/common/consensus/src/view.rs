@@ -353,6 +353,17 @@ impl PartialBeaconStateBuilder {
         }
 
         let validators = if let Some(validators) = self.validators {
+            let s = U1099511627776::to_usize();
+            ensure!(
+                validators.len() <= s,
+                "Validators list exceeds maximum length (for vec) U1099511627776::to_usize(): {s}"
+            );
+
+            ensure!(
+                validators.len() > 0,
+                "Validators list must not be empty (for vec)"
+            );
+
             let validator_variable_list: VariableList<Validator, U1099511627776> =
                 VariableList::from(validators);
 
@@ -361,10 +372,10 @@ impl PartialBeaconStateBuilder {
                 "Validators list exceeds maximum length"
             );
 
-            ensure!(
-                validator_variable_list.len() > 0,
-                "Validators list must not be empty"
-            );
+            // ensure!(
+            //     validator_variable_list.len() > 0,
+            //     "Validators list must not be empty"
+            // );
 
             ensure!(
                 validator_variable_list.tree_hash_root()
