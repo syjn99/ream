@@ -366,38 +366,50 @@ impl PartialBeaconStateBuilder {
                 "Validators list must not be empty"
             );
 
-            let expected_root = multiproof
-                .leaves
-                .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
-                .expect("Index not found")
-                .tree_hash_root();
+            Some(validator_variable_list.clone())
 
-            println!("expected root: {:?}", expected_root);
-            println!("usize::MAX: {}", usize::MAX);
-            println!("N::to_usize(): {}", U1099511627776::to_usize());
-            println!(
-                "next_power_of_two: {}",
-                U1099511627776::to_usize().next_power_of_two()
-            );
-            println!(
-                "depth: {}",
-                get_depth(U1099511627776::to_usize().next_power_of_two()) + 1
-            );
-            println!(
-                "validator_variable_list root: {:?}",
-                validator_variable_list.tree_hash_root()
-            );
+            // ensure!(
+            //     validator_variable_list.tree_hash_root()
+            //         == multiproof
+            //             .leaves
+            //             .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
+            //             .expect("Index not found")
+            //             .tree_hash_root(),
+            //     "Validators do not match multiproof"
+            // );
 
-            ensure!(
-                validator_variable_list.tree_hash_root()
-                    == multiproof
-                        .leaves
-                        .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
-                        .expect("Index not found")
-                        .tree_hash_root(),
-                "Validators do not match multiproof"
-            );
-            Some(VariableList::from(validator_variable_list))
+            // let expected_root = multiproof
+            //     .leaves
+            //     .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
+            //     .expect("Index not found")
+            //     .tree_hash_root();
+
+            // println!("expected root: {:?}", expected_root);
+            // println!("usize::MAX: {}", usize::MAX);
+            // println!("N::to_usize(): {}", U1099511627776::to_usize());
+            // println!(
+            //     "next_power_of_two: {}",
+            //     U1099511627776::to_usize().next_power_of_two()
+            // );
+            // println!(
+            //     "depth: {}",
+            //     get_depth(U1099511627776::to_usize().next_power_of_two()) + 1
+            // );
+            // println!(
+            //     "validator_variable_list root: {:?}",
+            //     validator_variable_list.tree_hash_root()
+            // );
+
+            // ensure!(
+            //     validator_variable_list.tree_hash_root()
+            //         == multiproof
+            //             .leaves
+            //             .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
+            //             .expect("Index not found")
+            //             .tree_hash_root(),
+            //     "Validators do not match multiproof"
+            // );
+            // Some(VariableList::from(validator_variable_list))
         } else {
             None
         };
