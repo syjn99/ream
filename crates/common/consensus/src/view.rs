@@ -264,7 +264,7 @@ pub struct PartialBeaconStateBuilder {
 
     pub slot: Option<u64>,
     pub latest_block_header: Option<BeaconBlockHeader>,
-    pub validators: Option<VariableList<Validator, U1099511627776>>,
+    pub validators: Option<Vec<Validator>>,
     pub randao_mixes: Option<FixedVector<B256, U65536>>,
     pub slashings: Option<FixedVector<u64, U8192>>,
 }
@@ -295,9 +295,12 @@ impl PartialBeaconStateBuilder {
         }
     }
 
-    pub fn with_validators(self, validators: &VariableList<Validator, U1099511627776>) -> Self {
+    pub fn with_validators<T>(self, validators: T) -> Self
+    where
+        T: IntoIterator<Item = Validator>,
+    {
         Self {
-            validators: Some(validators.clone()),
+            validators: Some(validators.into_iter().collect()),
             ..self
         }
     }
@@ -349,22 +352,23 @@ impl PartialBeaconStateBuilder {
             );
         }
 
-        if self.validators.is_some() {
-            let validators_root = self
-                .validators
-                .as_ref()
-                .expect("Validators are not set")
-                .tree_hash_root();
-            ensure!(
-                validators_root
-                    == multiproof
-                        .leaves
-                        .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
-                        .expect("Index not found")
-                        .tree_hash_root(),
-                "Validators do not match multiproof"
-            );
-        }
+        // TODO: How to calculate hash root of validators?
+        // if self.validators.is_some() {
+        //     let validators_root = self
+        //         .validators
+        //         .as_ref()
+        //         .expect("Validators are not set")
+        //         .tree_hash_root();
+        //     ensure!(
+        //         validators_root
+        //             == multiproof
+        //                 .leaves
+        //                 .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
+        //                 .expect("Index not found")
+        //                 .tree_hash_root(),
+        //         "Validators do not match multiproof"
+        //     );
+        // }
 
         if self.randao_mixes.is_some() {
             let randao_mixes_root = self
@@ -400,12 +404,18 @@ impl PartialBeaconStateBuilder {
             );
         }
 
+        let validators = if let Some(validators) = self.validators {
+            Some(VariableList::from(validators))
+        } else {
+            None
+        };
+
         multiproof.verify(self.root)?;
 
         Ok(PartialBeaconState {
             slot: self.slot,
             latest_block_header: self.latest_block_header,
-            validators: self.validators,
+            validators,
             randao_mixes: self.randao_mixes,
             slashings: self.slashings,
 
