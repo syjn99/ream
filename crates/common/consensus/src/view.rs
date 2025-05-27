@@ -373,6 +373,7 @@ impl PartialBeaconStateBuilder {
                 .tree_hash_root();
 
             println!("expected root: {:?}", expected_root);
+            println!("usize::MAX: {}", usize::MAX);
             println!("N::to_usize(): {}", U1099511627776::to_usize());
             println!(
                 "next_power_of_two: {}",
