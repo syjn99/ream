@@ -373,6 +373,15 @@ impl PartialBeaconStateBuilder {
                 .tree_hash_root();
 
             println!("expected root: {:?}", expected_root);
+            println!("N::to_usize(): {}", U1099511627776::to_usize());
+            println!(
+                "next_power_of_two: {}",
+                U1099511627776::to_usize().next_power_of_two()
+            );
+            println!(
+                "depth: {}",
+                get_depth(U1099511627776::to_usize().next_power_of_two()) + 1;
+            );
             println!(
                 "validator_variable_list root: {:?}",
                 validator_variable_list.tree_hash_root()
@@ -438,4 +447,9 @@ impl PartialBeaconStateBuilder {
             dirty: vec![],
         })
     }
+}
+
+fn get_depth(i: usize) -> usize {
+    let total_bits = std::mem::size_of::<usize>() * 8;
+    total_bits - i.leading_zeros() as usize - 1
 }
