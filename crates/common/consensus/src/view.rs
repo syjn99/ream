@@ -354,9 +354,11 @@ impl PartialBeaconStateBuilder {
 
         let validators = if let Some(validators) = self.validators {
             let s = U1099511627776::to_usize();
+            let b = U1099511627776::to_u64();
+
             ensure!(
                 validators.len() <= s,
-                "Validators list exceeds maximum length (for vec) U1099511627776::to_usize(): {s}"
+                "Validators list exceeds maximum length (for vec) U1099511627776::to_usize(): {s} {b}"
             );
 
             ensure!(
