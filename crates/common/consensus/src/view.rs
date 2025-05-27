@@ -380,7 +380,7 @@ impl PartialBeaconStateBuilder {
             );
             println!(
                 "depth: {}",
-                get_depth(U1099511627776::to_usize().next_power_of_two()) + 1;
+                get_depth(U1099511627776::to_usize().next_power_of_two()) + 1
             );
             println!(
                 "validator_variable_list root: {:?}",
