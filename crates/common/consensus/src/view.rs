@@ -5,7 +5,7 @@ use ream_merkle::multiproof::Multiproof;
 use serde::{Deserialize, Serialize};
 use ssz_types::{
     FixedVector, VariableList,
-    typenum::{U8192, U65536, U1099511627776},
+    typenum::{U8192, U65536, U1099511627776, Unsigned},
 };
 use tree_hash::TreeHash;
 
@@ -352,23 +352,33 @@ impl PartialBeaconStateBuilder {
             );
         }
 
-        // TODO: How to calculate hash root of validators?
-        // if self.validators.is_some() {
-        //     let validators_root = self
-        //         .validators
-        //         .as_ref()
-        //         .expect("Validators are not set")
-        //         .tree_hash_root();
-        //     ensure!(
-        //         validators_root
-        //             == multiproof
-        //                 .leaves
-        //                 .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
-        //                 .expect("Index not found")
-        //                 .tree_hash_root(),
-        //         "Validators do not match multiproof"
-        //     );
-        // }
+        let validators = if let Some(validators) = self.validators {
+            let validator_variable_list: VariableList<Validator, U1099511627776> =
+                VariableList::from(validators);
+
+            ensure!(
+                validator_variable_list.len() <= U1099511627776::USIZE,
+                "Validators list exceeds maximum length"
+            );
+
+            ensure!(
+                validator_variable_list.len() > 0,
+                "Validators list must not be empty"
+            );
+
+            ensure!(
+                validator_variable_list.tree_hash_root()
+                    == multiproof
+                        .leaves
+                        .get(&BEACON_STATE_VALIDATORS_GENERALIZED_INDEX)
+                        .expect("Index not found")
+                        .tree_hash_root(),
+                "Validators do not match multiproof"
+            );
+            Some(VariableList::from(validator_variable_list))
+        } else {
+            None
+        };
 
         if self.randao_mixes.is_some() {
             let randao_mixes_root = self
@@ -403,12 +413,6 @@ impl PartialBeaconStateBuilder {
                 "Slashings do not match multiproof"
             );
         }
-
-        let validators = if let Some(validators) = self.validators {
-            Some(VariableList::from(validators))
-        } else {
-            None
-        };
 
         multiproof.verify(self.root)?;
 
