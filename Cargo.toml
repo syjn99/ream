@@ -31,7 +31,14 @@ exclude = ["book/cli", "book/sources"]
 [workspace.package]
 authors = ["https://github.com/ReamLabs/ream/graphs/contributors"]
 edition = "2024"
-keywords = ["ethereum", "beam-chain", "blockchain", "consensus", "protocol", "ream"]
+keywords = [
+    "ethereum",
+    "beam-chain",
+    "blockchain",
+    "consensus",
+    "protocol",
+    "ream",
+]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ReamLabs/ream"
@@ -48,7 +55,7 @@ alloy-rpc-types-eth = "1.0.7"
 anyhow = "1.0"
 async-trait = "0.1.86"
 clap = "4"
-directories = { version = "6.0.0" } 
+directories = { version = "6.0.0" }
 discv5 = { version = "0.9.0", features = ["libp2p"] }
 enr = "0.13.0"
 ethereum_hashing = { git = "https://github.com/ReamLabs/ethereum_hashing.git" }
@@ -60,7 +67,7 @@ hashbrown = "0.15.3"
 itertools = "0.14"
 jsonwebtoken = "9.3.1"
 kzg = { git = "https://github.com/grandinetech/rust-kzg" }
-libp2p = { version = "0.55", default-features = false, features = ["identify", "yamux", "noise", "dns", "tcp", "tokio", "plaintext", "secp256k1", "macros", "ecdsa", "metrics", "quic", "upnp", "gossipsub", "ping"] }
+libp2p = { version = "0.55", default-features = false, features = ["identify", "yamux", "noise", "dns", "serde", "tcp", "tokio", "plaintext", "secp256k1", "macros", "ecdsa", "metrics", "quic", "upnp", "gossipsub", "ping"] }
 libp2p-identity = "0.2"
 libp2p-mplex = "0.43"
 parking_lot = "0.12.3"
@@ -77,7 +84,7 @@ ssz_types = "0.11"
 tempfile = "3.19"
 thiserror = "2.0.11"
 tokio = { version = "1.42", features = ["rt", "rt-multi-thread", "sync", "signal", "time", "macros"] }
-tokio-util = { version = "0.7", features = ["compat"] } 
+tokio-util = { version = "0.7", features = ["compat"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tree_hash = "0.10"
@@ -85,7 +92,7 @@ tree_hash_derive = "0.10"
 url = "2.5"
 
 # ream dependencies
-ream-beacon-chain = { path = "crates/common/beacon_chain" } 
+ream-beacon-chain = { path = "crates/common/beacon_chain" }
 ream-bls = { path = "crates/crypto/bls", features = ["zkcrypto"] } # Default feature is zkcrypto
 ream-checkpoint-sync = { path = "crates/common/checkpoint_sync" }
 ream-consensus = { path = "crates/common/consensus" }

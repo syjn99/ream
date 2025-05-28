@@ -9,11 +9,12 @@ use std::{
 };
 
 use anyhow::anyhow;
-use discv5::Enr;
+use discv5::{Enr, enr::CombinedPublicKey};
 use libp2p::{
     Multiaddr, PeerId, Swarm, SwarmBuilder, Transport,
     connection_limits::{self, ConnectionLimits},
     core::{
+        ConnectedPoint,
         muxing::StreamMuxerBox,
         transport::Boxed,
         upgrade::{SelectUpgrade, Version},
@@ -28,11 +29,12 @@ use libp2p::{
     tcp::{Config as TcpConfig, tokio::Transport as TcpTransport},
     yamux,
 };
-use libp2p_identity::{Keypair, PublicKey, secp256k1};
+use libp2p_identity::{Keypair, PublicKey, secp256k1, secp256k1::PublicKey as Secp256k1PublicKey};
 use libp2p_mplex::{MaxBufferBehaviour, MplexConfig};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use ream_discv5::discovery::{DiscoveredPeers, Discovery, QueryType};
 use ream_executor::ReamExecutor;
+use serde::Serialize;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tracing::{error, info, trace, warn};
 use tree_hash::TreeHash;
@@ -50,6 +52,45 @@ use crate::{
         messages::{RequestMessage, beacon_blocks::BeaconBlocksByRangeV2Request},
     },
 };
+
+pub type PeerTable = Arc<RwLock<HashMap<PeerId, CachedPeer>>>;
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectionState {
+    Connected,
+    Connecting,
+    Disconnected,
+    Disconnecting,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Direction {
+    Inbound,
+    Outbound,
+    Unknown,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CachedPeer {
+    /// libp2p peer ID
+    pub peer_id: PeerId,
+
+    /// Last known multiaddress observed for the peer
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_p2p_address: Option<Multiaddr>,
+
+    /// Current known connection state
+    pub state: ConnectionState,
+
+    /// Direction of the most recent connection (inbound/outbound)
+    pub direction: Direction,
+
+    /// Ethereum Node Record (ENR), if known
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enr: Option<Enr>,
+}
 
 #[derive(NetworkBehaviour)]
 pub(crate) struct ReamBehaviour {
@@ -92,6 +133,7 @@ pub struct Network {
     subscribed_topics: Arc<Mutex<HashSet<GossipTopic>>>,
     callbacks: HashMap<u64, mpsc::Sender<anyhow::Result<P2PResponse>>>,
     request_id: u64,
+    peer_table: PeerTable,
 }
 
 struct Executor(ReamExecutor);
@@ -185,6 +227,7 @@ impl Network {
             subscribed_topics: Arc::new(Mutex::new(HashSet::new())),
             callbacks: HashMap::new(),
             request_id: 0,
+            peer_table: Arc::new(RwLock::new(HashMap::new())),
         };
 
         network.start_network_worker(config).await?;
@@ -244,6 +287,57 @@ impl Network {
         request_id
     }
 
+    pub fn peer_table(&self) -> PeerTable {
+        Arc::clone(&self.peer_table)
+    }
+
+    pub fn cached_peer(&self, id: &PeerId) -> Option<CachedPeer> {
+        self.peer_table.read().get(id).cloned()
+    }
+
+    fn peer_id_from_enr(enr: &Enr) -> Option<PeerId> {
+        match enr.public_key() {
+            CombinedPublicKey::Secp256k1(public_key) => {
+                let encoded_public_key = public_key.to_encoded_point(true);
+                let public_key = Secp256k1PublicKey::try_from_bytes(encoded_public_key.as_bytes())
+                    .ok()?
+                    .into();
+                Some(PeerId::from_public_key(&public_key))
+            }
+            _ => None,
+        }
+    }
+
+    fn upsert_peer(
+        &mut self,
+        peer_id: PeerId,
+        address: Option<Multiaddr>,
+        state: ConnectionState,
+        direction: Direction,
+        enr: Option<Enr>,
+    ) {
+        let mut peer_table = self.peer_table.write();
+        peer_table
+            .entry(peer_id)
+            .and_modify(|cached_peer| {
+                if let Some(address_ref) = &address {
+                    cached_peer.last_seen_p2p_address = Some(address_ref.clone());
+                }
+                cached_peer.state = state;
+                cached_peer.direction = direction;
+                if let Some(enr_ref) = &enr {
+                    cached_peer.enr = Some(enr_ref.clone());
+                }
+            })
+            .or_insert(CachedPeer {
+                peer_id,
+                last_seen_p2p_address: address,
+                state,
+                direction,
+                enr,
+            });
+    }
+
     /// Starts the service
     pub async fn start(
         mut self,
@@ -279,6 +373,57 @@ impl Network {
         // currently no-op for any network events
         info!("Event: {:?}", event);
         match event {
+            SwarmEvent::OutgoingConnectionError {
+                peer_id: Some(peer_id),
+                ..
+            } => {
+                self.upsert_peer(
+                    peer_id,
+                    None,
+                    ConnectionState::Disconnected,
+                    Direction::Outbound,
+                    None,
+                );
+                None
+            }
+            SwarmEvent::ConnectionClosed {
+                peer_id, endpoint, ..
+            } => {
+                let direction = match endpoint {
+                    ConnectedPoint::Dialer { .. } => Direction::Outbound,
+                    ConnectedPoint::Listener { .. } => Direction::Inbound,
+                };
+
+                self.upsert_peer(
+                    peer_id,
+                    None,
+                    ConnectionState::Disconnected,
+                    direction,
+                    None,
+                );
+                None
+            }
+            SwarmEvent::ConnectionEstablished {
+                peer_id, endpoint, ..
+            } => {
+                let (direction, address) = match &endpoint {
+                    ConnectedPoint::Dialer { address, .. } => {
+                        (Direction::Outbound, Some(address.clone()))
+                    }
+                    ConnectedPoint::Listener { send_back_addr, .. } => {
+                        (Direction::Inbound, Some(send_back_addr.clone()))
+                    }
+                };
+
+                self.upsert_peer(
+                    peer_id,
+                    address,
+                    ConnectionState::Connected,
+                    direction,
+                    None,
+                );
+                None
+            }
             SwarmEvent::Behaviour(behaviour_event) => match behaviour_event {
                 ReamBehaviourEvent::Identify(_) => None,
                 ReamBehaviourEvent::Discovery(DiscoveredPeers { peers }) => {
@@ -355,6 +500,16 @@ impl Network {
     fn handle_discovered_peers(&mut self, peers: HashMap<Enr, Option<Instant>>) {
         info!("Discovered peers: {:?}", peers);
         for (enr, _) in peers {
+            if let Some(peer_id) = Network::peer_id_from_enr(&enr) {
+                self.upsert_peer(
+                    peer_id,
+                    None,
+                    ConnectionState::Disconnected,
+                    Direction::Unknown,
+                    Some(enr.clone()),
+                );
+            }
+
             let mut multiaddrs: Vec<Multiaddr> = Vec::new();
             if let Some(ip) = enr.ip4() {
                 if let Some(tcp) = enr.tcp4() {
@@ -517,9 +672,12 @@ pub fn build_transport(local_private_key: Keypair) -> io::Result<Boxed<(PeerId, 
 
 #[cfg(test)]
 mod tests {
-    use std::net::IpAddr;
+    use std::{net::IpAddr, sync::Once};
 
     use alloy_primitives::{B256, aliases::B32};
+    use discv5::enr::CombinedKey;
+    use k256::ecdsa::SigningKey;
+    use libp2p_identity::{Keypair, PeerId};
     use ream_consensus::constants::GENESIS_VALIDATORS_ROOT;
     use ream_discv5::{
         config::DiscoveryConfig,
@@ -534,6 +692,15 @@ mod tests {
         config::NetworkConfig,
         gossipsub::{configurations::GossipsubConfig, topics::GossipTopicKind},
     };
+
+    static HAS_NETWORK_SPEC_BEEN_INITIALIZED: Once = Once::new();
+
+    fn initialize_network_spec() {
+        let _ = GENESIS_VALIDATORS_ROOT.set(B256::ZERO);
+        HAS_NETWORK_SPEC_BEEN_INITIALIZED.call_once(|| {
+            set_network_spec(DEV.clone());
+        });
+    }
 
     async fn create_network(
         socket_address: IpAddr,
@@ -574,9 +741,113 @@ mod tests {
     }
 
     #[test]
+    fn peer_id_derived_from_enr_matches_libp2p() {
+        let libp2p_keypair = Keypair::generate_secp256k1();
+        let secret = libp2p_keypair
+            .clone()
+            .try_into_secp256k1()
+            .unwrap()
+            .secret()
+            .to_bytes();
+        let signing = SigningKey::from_slice(&secret).unwrap();
+
+        let enr_key = CombinedKey::Secp256k1(signing);
+        let enr = Enr::builder().build(&enr_key).unwrap();
+
+        let expected = PeerId::from_public_key(&libp2p_keypair.public());
+        let actual = Network::peer_id_from_enr(&enr).expect("peer id");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn insert_then_read_returns_snapshot() {
+        initialize_network_spec();
+
+        let tokio_runtime = Runtime::new().unwrap();
+
+        let mut network = tokio_runtime.block_on(async {
+            create_network("127.0.0.1".parse().unwrap(), 0, 0, vec![], true, vec![])
+                .await
+                .unwrap()
+        });
+
+        let peer_id = PeerId::random();
+        let address: Multiaddr = "/ip4/1.2.3.4/tcp/9000".parse().unwrap();
+
+        network.upsert_peer(
+            peer_id,
+            Some(address.clone()),
+            ConnectionState::Connecting,
+            Direction::Outbound,
+            None,
+        );
+
+        let cached_peer_snapshot = network.cached_peer(&peer_id).expect("peer should exist");
+
+        assert_eq!(cached_peer_snapshot.peer_id, peer_id);
+        assert_eq!(cached_peer_snapshot.state, ConnectionState::Connecting);
+        assert_eq!(cached_peer_snapshot.direction, Direction::Outbound);
+        assert_eq!(cached_peer_snapshot.last_seen_p2p_address, Some(address));
+        assert!(cached_peer_snapshot.enr.is_none());
+    }
+
+    #[test]
+    fn update_existing_peer() {
+        initialize_network_spec();
+
+        let tokio_runtime = Runtime::new().unwrap();
+
+        let mut network = tokio_runtime.block_on(async {
+            create_network("127.0.0.1".parse().unwrap(), 0, 0, vec![], true, vec![])
+                .await
+                .unwrap()
+        });
+
+        let peer_id = PeerId::random();
+
+        network.upsert_peer(
+            peer_id,
+            None,
+            ConnectionState::Connecting,
+            Direction::Outbound,
+            None,
+        );
+
+        network.upsert_peer(
+            peer_id,
+            None,
+            ConnectionState::Connected,
+            Direction::Outbound,
+            None,
+        );
+
+        let cached_peer_snapshot = network.cached_peer(&peer_id).expect("peer exists in cache");
+
+        assert_eq!(cached_peer_snapshot.state, ConnectionState::Connected);
+        assert_eq!(cached_peer_snapshot.direction, Direction::Outbound);
+    }
+
+    #[test]
+    fn cached_peer_unknown_returns_none() {
+        initialize_network_spec();
+
+        let tokio_runtime = Runtime::new().unwrap();
+
+        let network = tokio_runtime.block_on(async {
+            create_network("127.0.0.1".parse().unwrap(), 0, 0, vec![], true, vec![])
+                .await
+                .unwrap()
+        });
+
+        let peer_id = PeerId::random();
+
+        assert!(network.cached_peer(&peer_id).is_none());
+    }
+
+    #[test]
     fn test_p2p_gossipsub() {
-        let _ = GENESIS_VALIDATORS_ROOT.set(B256::ZERO);
-        set_network_spec(DEV.clone());
+        initialize_network_spec();
 
         let runtime = Runtime::new().unwrap();
 
@@ -585,7 +856,7 @@ mod tests {
             kind: GossipTopicKind::BeaconBlock,
         }];
 
-        let mut network1 = runtime
+        let mut network_1 = runtime
             .block_on(create_network(
                 "127.0.0.1".parse::<IpAddr>().unwrap(),
                 9000,
@@ -595,51 +866,131 @@ mod tests {
                 gossip_topics.clone(),
             ))
             .unwrap();
-        let network1_enr = network1.enr();
-        let mut network2 = runtime
+        let network_1_enr = network_1.enr();
+        let mut network_2 = runtime
             .block_on(create_network(
                 "127.0.0.1".parse::<IpAddr>().unwrap(),
                 9002,
                 9003,
-                vec![network1_enr],
+                vec![network_1_enr],
                 false,
                 gossip_topics.clone(),
             ))
             .unwrap();
 
         runtime.block_on(async {
-            let network1_future = async {
-                while let Some(event) = network1.swarm.next().await {
+            let network_1_future = async {
+                while let Some(event) = network_1.swarm.next().await {
                     if let SwarmEvent::Behaviour(ReamBehaviourEvent::Gossipsub(
                         GossipsubEvent::Subscribed { peer_id: _, topic },
                     )) = &event
                     {
-                        let _ = network1
+                        let _ = network_1
                             .swarm
                             .behaviour_mut()
                             .gossipsub
                             .publish(topic.clone(), vec![]);
                     }
-                    let _ = network1.parse_swarm_event(event).await;
+                    let _ = network_1.parse_swarm_event(event).await;
                 }
             };
 
-            let network2_future = async {
-                while let Some(event) = network2.swarm.next().await {
+            let network_2_future = async {
+                while let Some(event) = network_2.swarm.next().await {
                     if let SwarmEvent::Behaviour(ReamBehaviourEvent::Gossipsub(
                         GossipsubEvent::Message { .. },
                     )) = &event
                     {
                         break;
                     }
-                    let _ = network2.parse_swarm_event(event).await;
+                    let _ = network_2.parse_swarm_event(event).await;
                 }
             };
 
             tokio::select! {
-                _ = network1_future => {}
-                _ = network2_future => {}
+                _ = network_1_future => {}
+                _ = network_2_future => {}
             }
         });
+    }
+
+    #[test]
+    fn test_peer_table_lifecycle() {
+        initialize_network_spec();
+
+        let tokio_runtime = Runtime::new().unwrap();
+        let mut network_1 = tokio_runtime
+            .block_on(create_network(
+                "127.0.0.1".parse().unwrap(),
+                9300,
+                9301,
+                vec![],
+                true,
+                vec![],
+            ))
+            .unwrap();
+
+        let mut network_2 = tokio_runtime
+            .block_on(create_network(
+                "127.0.0.1".parse().unwrap(),
+                9302,
+                9303,
+                vec![],
+                true,
+                vec![],
+            ))
+            .unwrap();
+
+        let address: Multiaddr = "/ip4/127.0.0.1/tcp/9300".parse().unwrap();
+        network_2.swarm.dial(address).unwrap();
+
+        let peer_id_network_1 = network_1.peer_id();
+        let peer_id_network_2 = network_2.peer_id();
+
+        tokio_runtime.block_on(async {
+            let network_1_poll_task = async {
+                while let Some(event) = network_1.swarm.next().await {
+                    network_1.parse_swarm_event(event).await;
+                    if matches!(
+                        network_1.cached_peer(&peer_id_network_2),
+                        Some(peer) if peer.state == ConnectionState::Connected && peer.direction == Direction::Inbound
+                    ) {
+                        break;
+                    }
+                }
+            };
+
+            let network_2_poll_task = async {
+                while let Some(event) = network_2.swarm.next().await {
+                    network_2.parse_swarm_event(event).await;
+                    if matches!(
+                        network_2.cached_peer(&peer_id_network_1),
+                        Some(peer) if peer.state == ConnectionState::Connected && peer.direction == Direction::Outbound
+                    ) {
+                        break;
+                    }
+                }
+            };
+
+            tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                futures::future::join(network_1_poll_task, network_2_poll_task),
+            )
+            .await
+            .expect("peer-table not updated in time");
+        });
+
+        let peer_from_network_1 = network_1
+            .cached_peer(&peer_id_network_2)
+            .expect("network_1 peer exists");
+        let peer_from_network_2 = network_2
+            .cached_peer(&peer_id_network_1)
+            .expect("network_2 peer exists");
+
+        assert_eq!(peer_from_network_1.state, ConnectionState::Connected);
+        assert_eq!(peer_from_network_1.direction, Direction::Inbound);
+
+        assert_eq!(peer_from_network_2.state, ConnectionState::Connected);
+        assert_eq!(peer_from_network_2.direction, Direction::Outbound);
     }
 }

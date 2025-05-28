@@ -1,5 +1,6 @@
 use actix_web::{App, HttpServer, dev::ServerHandle, middleware, web::Data};
 use config::RpcServerConfig;
+use ream_p2p::network::PeerTable;
 use ream_storage::db::ReamDB;
 use tracing::info;
 
@@ -11,7 +12,11 @@ pub mod routes;
 pub mod types;
 
 /// Start the Beacon API server.
-pub async fn start_server(server_config: RpcServerConfig, db: ReamDB) -> std::io::Result<()> {
+pub async fn start_server(
+    server_config: RpcServerConfig,
+    db: ReamDB,
+    peer_table: PeerTable,
+) -> std::io::Result<()> {
     info!(
         "starting HTTP server on {:?}",
         server_config.http_socket_address
@@ -25,6 +30,7 @@ pub async fn start_server(server_config: RpcServerConfig, db: ReamDB) -> std::io
             .wrap(middleware::Logger::default())
             .app_data(stop_handle)
             .app_data(Data::new(db.clone()))
+            .app_data(Data::new(peer_table.clone()))
             .configure(register_routers)
     })
     .bind(server_config.http_socket_address)?
