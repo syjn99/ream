@@ -370,13 +370,19 @@ impl BeaconState {
         }
     }
 
-    /// Return the beacon proposer index at the current slot.
-    pub fn get_beacon_proposer_index(&self) -> anyhow::Result<u64> {
-        let epoch = self.get_current_epoch();
+    /// Return the beacon proposer index at the current slot or a given slot.
+    ///
+    /// Use `None` when requesting for current slot and `Some(slot)` when requesting for a given
+    /// slot.
+    pub fn get_beacon_proposer_index(&self, slot: Option<u64>) -> anyhow::Result<u64> {
+        let (epoch, slot) = match slot {
+            Some(slot) => (compute_epoch_at_slot(slot), slot),
+            None => (self.get_current_epoch(), self.slot),
+        };
         let seed = B256::from(hash_fixed(
             &[
                 self.get_seed(epoch, DOMAIN_BEACON_PROPOSER).as_slice(),
-                &self.slot.to_le_bytes(),
+                &slot.to_le_bytes(),
             ]
             .concat(),
         ));
@@ -599,7 +605,7 @@ impl BeaconState {
         )?;
 
         // Apply proposer and whistleblower rewards
-        let proposer_index = self.get_beacon_proposer_index()?;
+        let proposer_index = self.get_beacon_proposer_index(None)?;
         let whistleblower_index = whistleblower_index.unwrap_or(proposer_index);
 
         let whistleblower_reward =
@@ -806,7 +812,7 @@ impl BeaconState {
         );
         // Verify that proposer index is the correct index
         ensure!(
-            block.proposer_index == self.get_beacon_proposer_index()?,
+            block.proposer_index == self.get_beacon_proposer_index(None)?,
             "Block proposer index must be equal to beacon proposer index"
         );
         // Verify that the parent matches
@@ -1642,7 +1648,7 @@ impl BeaconState {
         {
             if participation_bit {
                 self.increase_balance(*participant_index as u64, participant_reward)?;
-                self.increase_balance(self.get_beacon_proposer_index()?, proposer_reward)?;
+                self.increase_balance(self.get_beacon_proposer_index(None)?, proposer_reward)?;
             } else {
                 self.decrease_balance(*participant_index as u64, participant_reward)?;
             }
@@ -1798,7 +1804,7 @@ impl BeaconState {
         // Verify RANDAO reveal
         if let Some(proposer) = self
             .validators
-            .get(self.get_beacon_proposer_index()? as usize)
+            .get(self.get_beacon_proposer_index(None)? as usize)
         {
             let signing_root =
                 compute_signing_root(epoch, self.get_domain(DOMAIN_RANDAO, Some(epoch)));
@@ -1936,7 +1942,7 @@ impl BeaconState {
         let proposer_reward_denominator =
             (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR / PROPOSER_WEIGHT;
         let proposer_reward = proposer_reward_numerator / proposer_reward_denominator;
-        self.increase_balance(self.get_beacon_proposer_index()?, proposer_reward)?;
+        self.increase_balance(self.get_beacon_proposer_index(None)?, proposer_reward)?;
 
         Ok(())
     }
