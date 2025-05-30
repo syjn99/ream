@@ -3303,6 +3303,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "keystore"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "anyhow",
+ "ream-bls",
+ "serde",
+ "serde_json",
+ "ssz_types",
+]
+
+[[package]]
 name = "kzg"
 version = "0.1.0"
 source = "git+https://github.com/grandinetech/rust-kzg#20ab11604e7c6747f0bc8ab404d324c35ef74fed"
