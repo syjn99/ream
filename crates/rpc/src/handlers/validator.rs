@@ -1,9 +1,9 @@
+use std::collections::HashSet;
+
 use actix_web::{
     HttpResponse, Responder, get, post,
-    web::{Data, Json, Path},
+    web::{Data, Json, Path, Query},
 };
-use actix_web_lab::extract::Query;
-use alloy_primitives::map::HashSet;
 use ream_bls::PubKey;
 use ream_consensus::validator::Validator;
 use ream_storage::db::ReamDB;
@@ -40,6 +40,38 @@ impl ValidatorData {
             validator,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+struct ValidatorBalance {
+    #[serde(with = "serde_utils::quoted_u64")]
+    index: u64,
+    #[serde(with = "serde_utils::quoted_u64")]
+    balance: u64,
+}
+
+fn build_validator_balances(
+    validators: &[(Validator, u64)],
+    filter_ids: Option<&Vec<ValidatorID>>,
+) -> Vec<ValidatorBalance> {
+    // Turn the optional Vec<ValidatorID> into an optional HashSet for O(1) lookups
+    let filtered_ids = filter_ids.map(|ids| ids.iter().collect::<HashSet<_>>());
+
+    validators
+        .iter()
+        .enumerate()
+        .filter(|(idx, (validator, _))| match &filtered_ids {
+            Some(ids) => {
+                ids.contains(&ValidatorID::Index(*idx as u64))
+                    || ids.contains(&ValidatorID::Address(validator.pubkey.clone()))
+            }
+            None => true,
+        })
+        .map(|(idx, (_, balance))| ValidatorBalance {
+            index: idx as u64,
+            balance: *balance,
+        })
+        .collect()
 }
 
 #[get("/beacon/states/{state_id}/validator/{validator_id}")]
@@ -304,4 +336,42 @@ pub async fn post_validator_identities_from_state(
         .collect();
 
     Ok(HttpResponse::Ok().json(BeaconResponse::new(validator_identities)))
+}
+
+#[get("/beacon/states/{state_id}/validator_balances")]
+pub async fn get_validator_balances_from_state(
+    state_id: Path<ID>,
+    query: Query<IdQuery>,
+    db: Data<ReamDB>,
+) -> Result<impl Responder, ApiError> {
+    let state = get_state_from_id(state_id.into_inner(), &db).await?;
+    Ok(
+        HttpResponse::Ok().json(BeaconResponse::new(build_validator_balances(
+            &state
+                .validators
+                .into_iter()
+                .zip(state.balances.into_iter())
+                .collect::<Vec<_>>(),
+            query.id.as_ref(),
+        ))),
+    )
+}
+
+#[post("/beacon/states/{state_id}/validator_balances")]
+pub async fn post_validator_balances_from_state(
+    state_id: Path<ID>,
+    body: Json<IdQuery>,
+    db: Data<ReamDB>,
+) -> Result<impl Responder, ApiError> {
+    let state = get_state_from_id(state_id.into_inner(), &db).await?;
+    Ok(
+        HttpResponse::Ok().json(BeaconResponse::new(build_validator_balances(
+            &state
+                .validators
+                .into_iter()
+                .zip(state.balances.into_iter())
+                .collect::<Vec<_>>(),
+            body.id.as_ref(),
+        ))),
+    )
 }
