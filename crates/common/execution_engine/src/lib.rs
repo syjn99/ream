@@ -4,7 +4,7 @@ pub mod utils;
 use std::path::PathBuf;
 
 use alloy_primitives::{B64, B256, Bytes, hex};
-use alloy_rpc_types_eth::{Block, BlockNumberOrTag, Filter, Log};
+use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, Filter, Log, TransactionRequest};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use jsonwebtoken::{EncodingKey, Header, encode, get_current_timestamp};
@@ -215,6 +215,33 @@ impl ExecutionEngine {
             .execute(http_post_request)
             .await?
             .json::<JsonRpcResponse<Vec<Log>>>()
+            .await?
+            .to_result()
+    }
+
+    pub async fn eth_call(
+        &self,
+        transaction: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> anyhow::Result<Bytes> {
+        let mut params = vec![json!(transaction)];
+        if let Some(block) = block {
+            params.push(json!(block));
+        }
+
+        let request_body = JsonRpcRequest {
+            id: 1,
+            jsonrpc: "2.0".to_string(),
+            method: "eth_call".to_string(),
+            params,
+        };
+
+        let http_post_request = self.build_request(request_body)?;
+
+        self.http_client
+            .execute(http_post_request)
+            .await?
+            .json::<JsonRpcResponse<Bytes>>()
             .await?
             .to_result()
     }
