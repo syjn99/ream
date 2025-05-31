@@ -4,7 +4,6 @@ use ream_consensus::{
     electra::{beacon_block::BeaconBlock, beacon_state::BeaconState},
     misc::{compute_epoch_at_slot, compute_signing_root},
 };
-
 pub fn get_block_signature(
     state: &BeaconState,
     block: &BeaconBlock,
