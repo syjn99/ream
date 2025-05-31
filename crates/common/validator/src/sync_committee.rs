@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cmp::max, collections::HashSet};
 
 use anyhow::{anyhow, bail, ensure};
 use ream_bls::{
@@ -16,8 +16,12 @@ use ssz_types::{BitVector, typenum::U512};
 use tree_hash_derive::TreeHash;
 
 use crate::{
-    constants::{DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF, SYNC_COMMITTEE_SUBNET_COUNT},
+    constants::{
+        DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF, SYNC_COMMITTEE_SUBNET_COUNT,
+        TARGET_AGGREGATORS_PER_COMMITTEE,
+    },
     contribution_and_proof::SyncCommitteeContribution,
+    hash_signature_prefix_to_u64,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, TreeHash)]
@@ -141,4 +145,13 @@ pub fn get_sync_committee_selection_proof(
         domain,
     );
     Ok(private_key.sign(signing_root.as_ref())?)
+}
+
+pub fn is_sync_committee_aggregator(signature: BLSSignature) -> bool {
+    hash_signature_prefix_to_u64(signature)
+        % max(
+            1,
+            SYNC_COMMITTEE_SIZE / SYNC_COMMITTEE_SUBNET_COUNT / TARGET_AGGREGATORS_PER_COMMITTEE,
+        )
+        == 0
 }

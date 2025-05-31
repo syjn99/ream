@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cmp::max, collections::HashSet};
 
 use anyhow::{anyhow, ensure};
 use ream_bls::{
@@ -22,7 +22,25 @@ use ssz_types::{
     typenum::{U64, U131072},
 };
 
-use crate::constants::DOMAIN_SELECTION_PROOF;
+use crate::{
+    constants::{DOMAIN_SELECTION_PROOF, TARGET_AGGREGATORS_PER_COMMITTEE},
+    hash_signature_prefix_to_u64,
+};
+
+pub fn is_aggregator(
+    state: &BeaconState,
+    slot: u64,
+    committee_index: u64,
+    slot_signature: BLSSignature,
+) -> anyhow::Result<bool> {
+    Ok(hash_signature_prefix_to_u64(slot_signature) as usize
+        % max(
+            1,
+            state.get_beacon_committee(slot, committee_index)?.len()
+                / TARGET_AGGREGATORS_PER_COMMITTEE as usize,
+        )
+        == 0)
+}
 
 /// Compute the correct subnet for an attestation for Phase 0.
 /// Note, this mimics expected future behavior where attestations will be mapped to their shard
@@ -98,4 +116,12 @@ pub fn get_slot_signature(
     let domain = state.get_domain(DOMAIN_SELECTION_PROOF, Some(compute_epoch_at_slot(slot)));
     let signing_root = compute_signing_root(slot, domain);
     Ok(private_key.sign(signing_root.as_ref())?)
+}
+
+pub fn get_aggregate_signature(attestations: Vec<Attestation>) -> anyhow::Result<BLSSignature> {
+    let signatures: Vec<&BLSSignature> = attestations
+        .iter()
+        .map(|attestation| &attestation.signature)
+        .collect();
+    Ok(BLSSignature::aggregate(&signatures)?)
 }
