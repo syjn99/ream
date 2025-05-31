@@ -496,9 +496,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-beacon"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b670cea06e692abc65d504b3668c72c6372b496eafc28ead0da399b4468f28dc"
+checksum = "241aba7808bddc3ad1c6228e296a831f326f89118b1017012090709782a13334"
 dependencies = [
  "alloy-eips",
  "alloy-primitives",
@@ -510,9 +510,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-engine"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b73f8da3d6eb98abd8b1489953f56454df7bcdff9d3d0cafbe711fa6f51e7525"
+checksum = "cab52691970553d84879d777419fa7b6a2e92e9fe8641f9324cc071008c2f656"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -1066,8 +1066,8 @@ version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "anyhow",
+ "ream-beacon-api-types",
  "ream-consensus",
- "ream-rpc",
  "serde",
  "serde_json",
  "tokio",
@@ -4898,6 +4898,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ream-beacon-api-types"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "alloy-primitives",
+ "anyhow",
+ "ethereum_serde_utils",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
+ "ream-bls",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "url",
+]
+
+[[package]]
 name = "ream-beacon-chain"
 version = "0.1.0"
 dependencies = [
@@ -5197,6 +5215,7 @@ dependencies = [
  "hashbrown 0.15.3",
  "libp2p",
  "parking_lot",
+ "ream-beacon-api-types",
  "ream-bls",
  "ream-consensus",
  "ream-fork-choice",
@@ -5256,6 +5275,7 @@ dependencies = [
  "ethereum_ssz_derive",
  "eventsource-client",
  "futures",
+ "ream-beacon-api-types",
  "ream-bls",
  "ream-consensus",
  "ream-execution-engine",
