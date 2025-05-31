@@ -2,13 +2,15 @@ pub mod event;
 pub mod http_client;
 use std::{pin::Pin, time::Duration};
 
-use anyhow;
 use event::{BeaconEvent, EventTopic};
 use eventsource_client::{Client, ClientBuilder, SSE};
 use futures::{Stream, StreamExt};
 use http_client::{ClientWithBaseUrl, ContentType};
 use ream_beacon_api_types::{
-    duties::ProposerDuty, error::ValidatorError, responses::DutiesResponse,
+    duties::ProposerDuty,
+    error::ValidatorError,
+    responses::{DataResponse, DutiesResponse},
+    sync::SyncStatus,
 };
 use reqwest::Url;
 use tracing::{error, info};
@@ -73,10 +75,31 @@ impl BeaconApiClient {
             .boxed())
     }
 
+    pub async fn get_node_syncing_status(
+        &self,
+    ) -> anyhow::Result<DataResponse<SyncStatus>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .get("/eth/v1/node/syncing".to_string())?
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
     pub async fn get_proposer_duties(
         &self,
         epoch: u64,
-    ) -> Result<DutiesResponse<ProposerDuty>, ValidatorError> {
+    ) -> anyhow::Result<DutiesResponse<ProposerDuty>, ValidatorError> {
         let response = self
             .http_client
             .execute(
@@ -92,9 +115,6 @@ impl BeaconApiClient {
             });
         }
 
-        response
-            .json()
-            .await
-            .map_err(|err| ValidatorError::JsonDecodeError(err.to_string()))
+        Ok(response.json().await?)
     }
 }
