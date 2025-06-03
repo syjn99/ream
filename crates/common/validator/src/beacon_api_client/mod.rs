@@ -9,10 +9,12 @@ use http_client::{ClientWithBaseUrl, ContentType};
 use ream_beacon_api_types::{
     duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
     error::ValidatorError,
-    responses::{DataResponse, DutiesResponse, SyncCommitteeDutiesResponse},
+    id::{ID, ValidatorID},
+    responses::{BeaconResponse, DataResponse, DutiesResponse, SyncCommitteeDutiesResponse},
     sync::SyncStatus,
+    validator::ValidatorData,
 };
-use ream_consensus::genesis::Genesis;
+use ream_consensus::{fork::Fork, genesis::Genesis};
 use ream_network_spec::networks::NetworkSpec;
 use reqwest::Url;
 use serde_json::json;
@@ -105,6 +107,53 @@ impl BeaconApiClient {
             .execute(
                 self.http_client
                     .get("/eth/v1/config/spec".to_string())?
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
+    pub async fn get_state_fork(
+        &self,
+        state_id: ID,
+    ) -> anyhow::Result<BeaconResponse<Fork>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .get(format!("/eth/v1/beacon/states/{state_id}/fork"))?
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
+    pub async fn get_state_validator(
+        &self,
+        state_id: ID,
+        validator_id: ValidatorID,
+    ) -> anyhow::Result<BeaconResponse<ValidatorData>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .get(format!(
+                        "/eth/v1/beacon/states/{state_id}/validators/{validator_id}"
+                    ))?
                     .build()?,
             )
             .await?;
