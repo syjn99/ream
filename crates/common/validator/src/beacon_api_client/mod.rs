@@ -7,11 +7,13 @@ use eventsource_client::{Client, ClientBuilder, SSE};
 use futures::{Stream, StreamExt};
 use http_client::{ClientWithBaseUrl, ContentType};
 use ream_beacon_api_types::{
-    duties::{AttesterDuty, ProposerDuty},
+    duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
     error::ValidatorError,
-    responses::{DataResponse, DutiesResponse},
+    responses::{DataResponse, DutiesResponse, SyncCommitteeDutiesResponse},
     sync::SyncStatus,
 };
+use ream_consensus::genesis::Genesis;
+use ream_network_spec::networks::NetworkSpec;
 use reqwest::Url;
 use serde_json::json;
 use tracing::{error, info};
@@ -76,6 +78,46 @@ impl BeaconApiClient {
             .boxed())
     }
 
+    pub async fn get_genesis(&self) -> anyhow::Result<DataResponse<Genesis>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .get("/eth/v1/beacon/genesis".to_string())?
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
+    pub async fn get_config_spec(
+        &self,
+    ) -> anyhow::Result<DataResponse<NetworkSpec>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .get("/eth/v1/config/spec".to_string())?
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
     pub async fn get_node_syncing_status(
         &self,
     ) -> anyhow::Result<DataResponse<SyncStatus>, ValidatorError> {
@@ -129,6 +171,35 @@ impl BeaconApiClient {
             .execute(
                 self.http_client
                     .post(format!("/eth/v1/validator/duties/attester/{epoch}"))?
+                    .json(&json!(
+                        validator_indices
+                            .iter()
+                            .map(|i| i.to_string())
+                            .collect::<Vec<_>>()
+                    ))
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
+    pub async fn get_sync_committee_duties(
+        &self,
+        epoch: u64,
+        validator_indices: &[u64],
+    ) -> Result<SyncCommitteeDutiesResponse<SyncCommitteeDuty>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .post(format!("/eth/v1/validator/duties/sync/{epoch}"))?
                     .json(&json!(
                         validator_indices
                             .iter()
