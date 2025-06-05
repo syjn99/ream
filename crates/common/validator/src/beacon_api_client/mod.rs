@@ -10,9 +10,10 @@ use ream_beacon_api_types::{
     duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
     error::ValidatorError,
     id::{ID, ValidatorID},
+    request::ValidatorsPostRequest,
     responses::{BeaconResponse, DataResponse, DutiesResponse, SyncCommitteeDutiesResponse},
     sync::SyncStatus,
-    validator::ValidatorData,
+    validator::{ValidatorData, ValidatorStatus},
 };
 use ream_consensus::{fork::Fork, genesis::Genesis};
 use ream_network_spec::networks::NetworkSpec;
@@ -129,6 +130,34 @@ impl BeaconApiClient {
             .execute(
                 self.http_client
                     .get(format!("/eth/v1/beacon/states/{state_id}/fork"))?
+                    .build()?,
+            )
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ValidatorError::RequestFailed {
+                status_code: response.status(),
+            });
+        }
+
+        Ok(response.json().await?)
+    }
+
+    pub async fn get_state_validator_list(
+        &self,
+        state_id: ID,
+        validator_ids: Option<Vec<ValidatorID>>,
+        validator_statuses: Option<Vec<ValidatorStatus>>,
+    ) -> anyhow::Result<BeaconResponse<Vec<ValidatorData>>, ValidatorError> {
+        let response = self
+            .http_client
+            .execute(
+                self.http_client
+                    .post(format!("/eth/v1/beacon/states/{state_id}/validators"))?
+                    .json(&ValidatorsPostRequest {
+                        ids: validator_ids,
+                        statuses: validator_statuses,
+                    })
                     .build()?,
             )
             .await?;
