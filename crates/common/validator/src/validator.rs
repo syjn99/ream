@@ -10,9 +10,14 @@ use ream_beacon_api_types::{
     block::{BroadcastValidation, ProduceBlockData},
     duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
     id::{ID, ValidatorID},
+    request::SyncCommitteeRequestItem,
 };
-use ream_bls::PubKey;
-use ream_consensus::{electra::beacon_state::BeaconState, misc::compute_epoch_at_slot};
+use ream_bls::{PubKey, traits::Signable};
+use ream_consensus::{
+    constants::DOMAIN_SYNC_COMMITTEE,
+    electra::beacon_state::BeaconState,
+    misc::{compute_domain, compute_epoch_at_slot, compute_signing_root},
+};
 use ream_executor::ReamExecutor;
 use ream_keystore::keystore::Keystore;
 use ream_network_spec::networks::network_spec;
@@ -259,6 +264,50 @@ impl ValidatorService {
         }
 
         Ok(())
+    }
+
+    pub async fn submit_sync_committee(
+        &self,
+        slot: u64,
+        validator_indices: &[u64],
+    ) -> anyhow::Result<()> {
+        let domain = compute_domain(
+            DOMAIN_SYNC_COMMITTEE,
+            Some(network_spec().electra_fork_version),
+            None,
+        );
+        let beacon_block_root = self
+            .beacon_api_client
+            .get_block_root(ID::Slot(slot))
+            .await?
+            .data
+            .root;
+        let signing_root = compute_signing_root(beacon_block_root, domain);
+
+        let payload = validator_indices
+            .iter()
+            .filter_map(|&validator_index| {
+                if let Some(keystore) = self.validator_index_to_keystore.get(&validator_index) {
+                    return match keystore.private_key.sign(signing_root.as_ref()) {
+                        Ok(signature) => Some(Ok(SyncCommitteeRequestItem {
+                            slot,
+                            beacon_block_root,
+                            validator_index,
+                            signature,
+                        })),
+                        Err(signing_error) => Some(Err(anyhow!(
+                            "Signing failed for validator {validator_index:?}: {signing_error:?}"
+                        ))),
+                    };
+                }
+                None
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(self
+            .beacon_api_client
+            .publish_sync_committee_signature(payload)
+            .await?)
     }
 
     pub async fn on_epoch(&mut self, epoch: u64) {
