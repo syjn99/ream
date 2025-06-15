@@ -1,8 +1,9 @@
-use std::{env, sync::Arc};
+use std::{env, process, sync::Arc};
 
 use clap::Parser;
 use ream::cli::{
     Cli, Commands,
+    account_manager::AccountManagerConfig,
     beacon_node::BeaconNodeConfig,
     import_keystores::{load_keystore_directory, load_password_file, process_password},
     validator_node::ValidatorNodeConfig,
@@ -47,7 +48,9 @@ async fn main() {
             run_beacon_node(*config, async_executor, main_executor).await
         }
         Commands::ValidatorNode(config) => run_validator_node(*config, async_executor).await,
+        Commands::AccountManager(config) => run_account_manager(*config).await,
     }
+    process::exit(0);
 }
 
 pub async fn run_beacon_node(
@@ -165,4 +168,23 @@ pub async fn run_validator_node(config: ValidatorNodeConfig, async_executor: Rea
     .expect("Failed to create validator service");
 
     validator_service.start().await;
+}
+
+pub async fn run_account_manager(mut config: AccountManagerConfig) {
+    info!("starting up account manager...");
+
+    // Validate the configuration
+    config
+        .validate()
+        .expect("Invalid account manager configuration");
+
+    info!(
+        "Account manager configuration: lifetime={}, chunk_size={}",
+        config.lifetime, config.chunk_size
+    );
+
+    let seed_phrase = config.get_seed_phrase();
+    ream_account_manager::generate_keys(&seed_phrase);
+
+    info!("Account manager completed successfully");
 }
