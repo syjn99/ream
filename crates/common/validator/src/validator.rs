@@ -5,7 +5,7 @@ use std::{
 };
 
 use alloy_primitives::Address;
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use ream_beacon_api_types::{
     block::{BroadcastValidation, ProduceBlockData},
     duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
@@ -17,6 +17,7 @@ use ream_consensus::{
     constants::DOMAIN_SYNC_COMMITTEE,
     electra::beacon_state::BeaconState,
     misc::{compute_domain, compute_epoch_at_slot, compute_signing_root},
+    single_attestation::SingleAttestation,
 };
 use ream_executor::ReamExecutor;
 use ream_keystore::keystore::Keystore;
@@ -26,6 +27,7 @@ use tokio::time::{Instant, MissedTickBehavior, interval_at};
 use tracing::{error, info, warn};
 
 use crate::{
+    attestation::sign_attestation_data,
     beacon_api_client::BeaconApiClient,
     block::{sign_beacon_block, sign_blinded_beacon_block},
     randao::sign_randao_reveal,
@@ -307,6 +309,32 @@ impl ValidatorService {
         Ok(self
             .beacon_api_client
             .publish_sync_committee_signature(payload)
+            .await?)
+    }
+
+    pub async fn make_attestation(
+        &self,
+        slot: u64,
+        validator_index: u64,
+        committee_index: u64,
+    ) -> anyhow::Result<()> {
+        let Some(keystore) = self.validator_index_to_keystore.get(&validator_index) else {
+            bail!("Keystore not found for validator: {validator_index}");
+        };
+
+        let attestation_data = self
+            .beacon_api_client
+            .get_attestation_data(slot, committee_index)
+            .await?
+            .data;
+        Ok(self
+            .beacon_api_client
+            .submit_attestation(vec![SingleAttestation {
+                attester_index: validator_index,
+                committee_index,
+                signature: sign_attestation_data(&attestation_data, &keystore.private_key)?,
+                data: attestation_data,
+            }])
             .await?)
     }
 
