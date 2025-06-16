@@ -20,7 +20,7 @@ use ssz_derive::{Decode, Encode};
 use ssz_types::{
     BitVector, FixedVector, VariableList,
     serde_utils::{quoted_u64_fixed_vec, quoted_u64_var_list},
-    typenum::{U4, U2048, U8192, U65536, U262144, U16777216, U134217728, U1099511627776},
+    typenum::{U4, U2048, U8192, U65536, U262144, U16777216, U134217728},
 };
 use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
@@ -30,6 +30,7 @@ use super::{
     beacon_block_body::BeaconBlockBody,
     execution_payload::ExecutionPayload,
     execution_payload_header::ExecutionPayloadHeader,
+    zkvm_types::ValidatorRegistryLimit,
 };
 use crate::{
     attestation::Attestation,
@@ -100,7 +101,7 @@ pub mod quoted_u8_var_list {
     use super::*;
 
     pub fn serialize<S>(
-        value: &VariableList<u8, U1099511627776>,
+        value: &VariableList<u8, ValidatorRegistryLimit>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -112,7 +113,7 @@ pub mod quoted_u8_var_list {
 
     pub fn deserialize<'de, D>(
         deserializer: D,
-    ) -> Result<VariableList<u8, U1099511627776>, D::Error>
+    ) -> Result<VariableList<u8, ValidatorRegistryLimit>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -127,6 +128,14 @@ pub mod quoted_u8_var_list {
     }
 }
 
+/// The BeaconState contains some "zkvm" features that addresses where 32-bit zkVMs would fail
+/// on constructing a VariableList larger than 2^32 size (i.e. 2^40). When "zkvm" feature
+/// is enabled, it would construct the BeaconState with 2^29 list instead.
+///
+/// This "zkvm" feature needs to be used with the modified ssz_types crate at
+/// https://github.com/ReamLabs/ssz_types/tree/magic-extended-list
+/// where the crate would detect 2^29 as a magic number when computing the root hash,
+/// and it will compute as a 2^40 list root instead.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct BeaconState {
     // Versioning
@@ -151,9 +160,9 @@ pub struct BeaconState {
     pub eth1_deposit_index: u64,
 
     // Registry
-    pub validators: VariableList<Validator, U1099511627776>,
+    pub validators: VariableList<Validator, ValidatorRegistryLimit>,
     #[serde(with = "quoted_u64_var_list")]
-    pub balances: VariableList<u64, U1099511627776>,
+    pub balances: VariableList<u64, ValidatorRegistryLimit>,
 
     // Randomness
     pub randao_mixes: FixedVector<B256, U65536>,
@@ -164,9 +173,9 @@ pub struct BeaconState {
 
     // Participation
     #[serde(with = "quoted_u8_var_list")]
-    pub previous_epoch_participation: VariableList<u8, U1099511627776>,
+    pub previous_epoch_participation: VariableList<u8, ValidatorRegistryLimit>,
     #[serde(with = "quoted_u8_var_list")]
-    pub current_epoch_participation: VariableList<u8, U1099511627776>,
+    pub current_epoch_participation: VariableList<u8, ValidatorRegistryLimit>,
 
     // Finality
     pub justification_bits: BitVector<U4>,
@@ -176,7 +185,7 @@ pub struct BeaconState {
 
     // Inactivity
     #[serde(with = "quoted_u64_var_list")]
-    pub inactivity_scores: VariableList<u64, U1099511627776>,
+    pub inactivity_scores: VariableList<u64, ValidatorRegistryLimit>,
 
     // Sync
     pub current_sync_committee: Arc<SyncCommittee>,
