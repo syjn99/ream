@@ -58,6 +58,16 @@ pub struct ValidatorNodeConfig {
         help = "The password to use for keystores. It's recommended to use password-file over this in order to prevent your keystore password from appearing in the shell history"
     )]
     pub password: Option<String>,
+
+    #[arg(long, help = "Enable external block builder")]
+    pub enable_builder: bool,
+
+    #[arg(
+        long,
+        help = "Set HTTP url of MEV relay to connect to for external block building. Will only be used if `enable_builder` is passed.",
+        requires = "enable_builder"
+    )]
+    pub mev_relay_url: Option<Url>,
 }
 
 pub fn duration_parser(duration_string: &str) -> Result<Duration, String> {

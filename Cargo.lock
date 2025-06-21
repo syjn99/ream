@@ -5590,6 +5590,7 @@ dependencies = [
  "tracing",
  "tree_hash",
  "tree_hash_derive",
+ "url",
 ]
 
 [[package]]
