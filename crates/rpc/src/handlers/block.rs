@@ -1,28 +1,20 @@
-use std::{
-    collections::{BTreeSet, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
 use actix_web::{
-    HttpResponse, Responder, get,
-    web::{Data, Path},
+    HttpResponse, Responder, get, post,
+    web::{Data, Json, Path},
 };
 use alloy_primitives::B256;
 use hashbrown::HashMap;
 use ream_beacon_api_types::{
     error::ApiError,
-    id::ID,
+    id::{ID, ValidatorID},
     responses::{
         BeaconHeadResponse, BeaconResponse, BeaconVersionedResponse, DataResponse, RootResponse,
     },
 };
 use ream_consensus::{
-    attester_slashing::AttesterSlashing,
-    constants::{
-        EFFECTIVE_BALANCE_INCREMENT, PROPOSER_WEIGHT, SLOTS_PER_EPOCH, SYNC_COMMITTEE_SIZE,
-        SYNC_REWARD_WEIGHT, WEIGHT_DENOMINATOR, WHISTLEBLOWER_REWARD_QUOTIENT,
-        genesis_validators_root,
-    },
+    constants::{WHISTLEBLOWER_REWARD_QUOTIENT, genesis_validators_root},
     electra::{beacon_block::SignedBeaconBlock, beacon_state::BeaconState},
     genesis::Genesis,
 };
@@ -34,7 +26,9 @@ use ream_storage::{
     tables::{Field, Table},
 };
 use serde::{Deserialize, Serialize};
-use tree_hash::TreeHash;
+use tracing::error;
+
+use crate::handlers::state::get_state_from_id;
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct BlockRewards {
@@ -50,6 +44,14 @@ pub struct BlockRewards {
     pub proposer_slashings: u64,
     #[serde(with = "serde_utils::quoted_u64")]
     pub attester_slashings: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorSyncCommitteeReward {
+    #[serde(with = "serde_utils::quoted_u64")]
+    pub validator_index: u64,
+    #[serde(with = "serde_utils::quoted_u64")]
+    pub reward: u64,
 }
 
 pub async fn get_block_root_from_id(block_id: ID, db: &ReamDB) -> Result<B256, ApiError> {
@@ -88,21 +90,6 @@ pub async fn get_block_root_from_id(block_id: ID, db: &ReamDB) -> Result<B256, A
     Ok(block_root)
 }
 
-async fn get_beacon_state(block_id: ID, db: &ReamDB) -> Result<BeaconState, ApiError> {
-    let block_root = get_block_root_from_id(block_id, db).await?;
-
-    db.beacon_state_provider()
-        .get(block_root)
-        .map_err(|err| {
-            ApiError::InternalError(format!(
-                "Failed to get beacon_state by block_root, error: {err:?}"
-            ))
-        })?
-        .ok_or(ApiError::NotFound(format!(
-            "Failed to find `beacon_state` from {block_root:?}"
-        )))
-}
-
 fn get_attestations_rewards(beacon_state: &BeaconState, beacon_block: &SignedBeaconBlock) -> u64 {
     let mut attester_reward = 0;
     let attestations = &beacon_block.message.body.attestations;
@@ -114,56 +101,6 @@ fn get_attestations_rewards(beacon_state: &BeaconState, beacon_block: &SignedBea
         }
     }
     attester_reward
-}
-
-fn get_sync_committee_rewards(beacon_state: &BeaconState, beacon_block: &SignedBeaconBlock) -> u64 {
-    let total_active_balance = beacon_state.get_total_active_balance();
-    let total_active_increments = total_active_balance / EFFECTIVE_BALANCE_INCREMENT;
-    let total_base_rewards = beacon_state.get_base_reward_per_increment() * total_active_increments;
-    let max_participant_rewards =
-        total_base_rewards * SYNC_REWARD_WEIGHT / WEIGHT_DENOMINATOR / SLOTS_PER_EPOCH;
-    let participant_reward = max_participant_rewards / SYNC_COMMITTEE_SIZE;
-    let proposer_reward =
-        participant_reward * PROPOSER_WEIGHT / (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT);
-
-    beacon_block
-        .message
-        .body
-        .sync_aggregate
-        .sync_committee_bits
-        .num_set_bits() as u64
-        * proposer_reward
-}
-
-fn get_slashable_attester_indices(
-    beacon_state: &BeaconState,
-    attester_shashing: &AttesterSlashing,
-) -> Vec<u64> {
-    let attestation_1 = &attester_shashing.attestation_1;
-    let attestation_2 = &attester_shashing.attestation_2;
-
-    let attestation_indices_1 = attestation_1
-        .attesting_indices
-        .iter()
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    let attestation_indices_2 = attestation_2
-        .attesting_indices
-        .iter()
-        .cloned()
-        .collect::<BTreeSet<_>>();
-
-    let mut slashing_indices = vec![];
-
-    for index in &attestation_indices_1 & &attestation_indices_2 {
-        let validator = &beacon_state.validators[index as usize];
-        let current_epoch = beacon_state.get_current_epoch();
-        if validator.is_slashable_validator(current_epoch) {
-            slashing_indices.push(index);
-        }
-    }
-
-    slashing_indices
 }
 
 fn get_proposer_slashing_rewards(
@@ -186,11 +123,20 @@ fn get_attester_slashing_rewards(
 ) -> u64 {
     let mut attester_slashing_reward = 0;
     let attester_shashings = &beacon_block.message.body.attester_slashings;
+    let current_epoch = beacon_state.get_current_epoch();
+
     for attester_shashing in attester_shashings {
-        for index in get_slashable_attester_indices(beacon_state, attester_shashing) {
-            let reward = beacon_state.validators[index as usize].effective_balance
-                / WHISTLEBLOWER_REWARD_QUOTIENT;
-            attester_slashing_reward += reward;
+        if let Ok((attestation_indices_1, attestation_indices_2)) =
+            beacon_state.get_slashable_attester_indices(attester_shashing)
+        {
+            for index in &attestation_indices_1 & &attestation_indices_2 {
+                let validator = &beacon_state.validators[index as usize];
+                if validator.is_slashable_validator(current_epoch) {
+                    let reward = beacon_state.validators[index as usize].effective_balance
+                        / WHISTLEBLOWER_REWARD_QUOTIENT;
+                    attester_slashing_reward += reward;
+                }
+            }
         }
     }
 
@@ -255,15 +201,23 @@ pub async fn get_block_rewards(
 ) -> Result<impl Responder, ApiError> {
     let block_id_value = block_id.into_inner();
     let beacon_block = get_beacon_block_from_id(block_id_value.clone(), &db).await?;
-    let beacon_state = get_beacon_state(block_id_value.clone(), &db).await?;
+    let beacon_state = get_state_from_id(block_id_value.clone(), &db).await?;
 
     let attestation_reward = get_attestations_rewards(&beacon_state, &beacon_block);
     let attester_slashing_reward = get_attester_slashing_rewards(&beacon_state, &beacon_block);
     let proposer_slashing_reward = get_proposer_slashing_rewards(&beacon_state, &beacon_block);
-    let sync_committee_reward = get_sync_committee_rewards(&beacon_state, &beacon_block);
+    let (_, proposer_reward) = beacon_state.get_proposer_and_participant_rewards();
+
+    let sync_aggregate_reward = beacon_block
+        .message
+        .body
+        .sync_aggregate
+        .sync_committee_bits
+        .num_set_bits() as u64
+        * proposer_reward;
 
     let total = attestation_reward
-        + sync_committee_reward
+        + sync_aggregate_reward
         + proposer_slashing_reward
         + attester_slashing_reward;
 
@@ -271,7 +225,7 @@ pub async fn get_block_rewards(
         proposer_index: beacon_block.message.proposer_index,
         total,
         attestations: attestation_reward,
-        sync_aggregate: sync_committee_reward,
+        sync_aggregate: sync_aggregate_reward,
         proposer_slashings: proposer_slashing_reward,
         attester_slashings: attester_slashing_reward,
     };
@@ -288,6 +242,60 @@ pub async fn get_block_from_id(
     let beacon_block = get_beacon_block_from_id(block_id.into_inner(), &db).await?;
 
     Ok(HttpResponse::Ok().json(BeaconVersionedResponse::new(beacon_block)))
+}
+
+#[post("/beacon/rewards/sync_committee/{block_id}")]
+pub async fn post_sync_committee_rewards(
+    db: Data<ReamDB>,
+    block_id: Path<ID>,
+    validators: Json<Vec<ValidatorID>>,
+) -> Result<impl Responder, ApiError> {
+    let block_id_value = block_id.into_inner();
+    let beacon_block = get_beacon_block_from_id(block_id_value.clone(), &db).await?;
+    let beacon_state = get_state_from_id(block_id_value.clone(), &db).await?;
+
+    let sync_committee_rewards_map =
+        match beacon_state.compute_sync_committee_rewards(&beacon_block) {
+            Ok(rewards) => rewards,
+            Err(err) => {
+                error!("Failed to compute sync committee rewards, error: {err:?}");
+                return Err(ApiError::InternalError(format!(
+                    "Failed to compute sync committee rewards, error: {err:?}"
+                )));
+            }
+        };
+    let sync_committee_rewards: Vec<ValidatorSyncCommitteeReward> = sync_committee_rewards_map
+        .into_iter()
+        .map(|(validator_index, reward)| ValidatorSyncCommitteeReward {
+            validator_index,
+            reward,
+        })
+        .collect();
+
+    let reward_data = if sync_committee_rewards.is_empty() {
+        None
+    } else if validators.is_empty() {
+        Some(sync_committee_rewards)
+    } else {
+        Some(
+            sync_committee_rewards
+                .into_iter()
+                .filter(|reward| {
+                    validators.iter().any(|validator| match validator {
+                        ValidatorID::Index(index) => *index == reward.validator_index,
+                        ValidatorID::Address(pubkey) => {
+                            match beacon_state.validators.get(reward.validator_index as usize) {
+                                Some(validator) => validator.public_key == *pubkey,
+                                None => false,
+                            }
+                        }
+                    })
+                })
+                .collect::<Vec<ValidatorSyncCommitteeReward>>(),
+        )
+    };
+
+    Ok(HttpResponse::Ok().json(BeaconResponse::new(reward_data)))
 }
 
 /// Called by `/beacon/heads` to get fork choice leaves.
@@ -321,7 +329,7 @@ pub async fn get_beacon_heads(db: Data<ReamDB>) -> Result<impl Responder, ApiErr
     for (block_root, block) in &blocks {
         if !referenced_parents.contains(block_root) {
             leaves.push(BeaconHeadResponse {
-                root: block.tree_hash_root(),
+                root: block.block_root(),
                 slot: block.slot,
                 execution_optimistic: false,
             });
