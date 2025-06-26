@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use actix_web::{
-    HttpResponse, Responder, get, post,
+    HttpRequest, HttpResponse, Responder, get, post,
     web::{Data, Json, Path},
 };
 use alloy_primitives::B256;
@@ -11,6 +11,7 @@ use ream_beacon_api_types::{
     id::{ID, ValidatorID},
     responses::{
         BeaconHeadResponse, BeaconResponse, BeaconVersionedResponse, DataResponse, RootResponse,
+        SSZ_CONTENT_TYPE,
     },
 };
 use ream_consensus::{
@@ -26,6 +27,7 @@ use ream_storage::{
     tables::{Field, Table},
 };
 use serde::{Deserialize, Serialize};
+use ssz::Encode;
 use tracing::error;
 
 use crate::handlers::state::get_state_from_id;
@@ -337,4 +339,24 @@ pub async fn get_beacon_heads(db: Data<ReamDB>) -> Result<impl Responder, ApiErr
     }
 
     Ok(HttpResponse::Ok().json(DataResponse::new(leaves)))
+}
+
+#[get("/beacon/blind_block/{block_id}")]
+pub async fn get_blind_block(
+    http_request: HttpRequest,
+    db: Data<ReamDB>,
+    block_id: Path<ID>,
+) -> Result<impl Responder, ApiError> {
+    let beacon_block = get_beacon_block_from_id(block_id.into_inner(), &db).await?;
+    let blinded_beacon_block = beacon_block.as_signed_blinded_beacon_block();
+    match http_request
+        .headers()
+        .get(SSZ_CONTENT_TYPE)
+        .and_then(|header| header.to_str().ok())
+    {
+        Some(SSZ_CONTENT_TYPE) => Ok(HttpResponse::Ok()
+            .content_type(SSZ_CONTENT_TYPE)
+            .body(blinded_beacon_block.as_ssz_bytes())),
+        _ => Ok(HttpResponse::Ok().json(BeaconVersionedResponse::new(blinded_beacon_block))),
+    }
 }
