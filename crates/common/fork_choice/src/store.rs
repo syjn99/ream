@@ -775,8 +775,11 @@ pub fn get_forkchoice_store(
     anchor_state: BeaconState,
     anchor_block: BeaconBlock,
     db: ReamDB,
+    anchor_state_root: Option<B256>,
 ) -> anyhow::Result<Store> {
-    ensure!(anchor_block.state_root == anchor_state.tree_hash_root());
+    let anchor_state_root = anchor_state_root.unwrap_or_else(|| anchor_state.state_root());
+    ensure!(anchor_block.state_root == anchor_state_root);
+
     let anchor_root = anchor_block.tree_hash_root();
     let anchor_epoch = anchor_state.get_current_epoch();
     let justified_checkpoint = Checkpoint {
@@ -814,7 +817,7 @@ pub fn get_forkchoice_store(
     db.beacon_state_provider()
         .insert(anchor_root, anchor_state.clone())?;
     db.state_root_index_provider()
-        .insert(anchor_state.tree_hash_root(), anchor_root)?;
+        .insert(anchor_state_root, anchor_root)?;
     db.slot_index_provider()
         .insert(anchor_state.slot, anchor_root)?;
     db.checkpoint_states_provider()

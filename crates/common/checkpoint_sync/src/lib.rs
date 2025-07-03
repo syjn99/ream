@@ -97,16 +97,13 @@ pub async fn initialize_db_from_checkpoint(
 
     info!("Fetching initial state...");
     let state = get_state(&checkpoint_sync_url, slot).await?;
-    info!(
-        "Downloaded state with root: {}. Slot: {}",
-        state.state_root(),
-        slot
-    );
+    let state_root = state.state_root();
+    info!("Downloaded state with root: {}. Slot: {}", state_root, slot);
 
     ensure!(block.message.slot == state.slot, "Slot mismatch");
 
-    ensure!(block.message.state_root == state.state_root());
-    let mut store = get_forkchoice_store(state.clone(), block.message, db)?;
+    ensure!(block.message.state_root == state_root);
+    let mut store = get_forkchoice_store(state.clone(), block.message, db, Some(state_root))?;
 
     let time = network_spec().min_genesis_time + SECONDS_PER_SLOT * (slot + 1);
     on_tick(&mut store, time)?;

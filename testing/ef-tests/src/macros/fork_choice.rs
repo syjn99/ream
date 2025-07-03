@@ -127,7 +127,7 @@ macro_rules! test_fork_choice {
 
                         let ream_dir = setup_data_dir("ream", None, true).expect("Failed to create data dir");
                         let reamdb = ReamDB::new(ream_dir).expect("count not find reabdb");
-                        let mut store = get_forkchoice_store(anchor_state, anchor_block, reamdb)
+                        let mut store = get_forkchoice_store(anchor_state, anchor_block, reamdb, None)
                             .expect("get_forkchoice_store failed");
 
                         for step in steps {
