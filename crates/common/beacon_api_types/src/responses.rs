@@ -1,6 +1,7 @@
 use alloy_primitives::B256;
 use ream_consensus::checkpoint::Checkpoint;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 
@@ -226,7 +227,6 @@ pub struct ForkChoiceResponse {
     pub justified_checkpoint: Checkpoint,
     pub finalized_checkpoint: Checkpoint,
     pub fork_choice_nodes: Vec<ForkChoiceNode>,
-    #[serde(default)]
     pub extra_data: serde_json::Value,
 }
 
@@ -240,7 +240,7 @@ impl ForkChoiceResponse {
             justified_checkpoint,
             finalized_checkpoint,
             fork_choice_nodes,
-            extra_data: serde_json::Value::default(),
+            extra_data: json!({}),
         }
     }
 }
@@ -259,7 +259,6 @@ pub struct ForkChoiceNode {
     pub weight: u64,
     pub validity: ForkChoiceValidity,
     pub execution_block_hash: B256,
-    #[serde(default)]
     pub extra_data: serde_json::Value,
 }
 

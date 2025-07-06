@@ -13,9 +13,10 @@ use ream_beacon_api_types::{
         ForkChoiceValidity,
     },
 };
-use ream_fork_choice::store::Store;
+use ream_fork_choice::store::{BlockWithEpochInfo, Store};
 use ream_operation_pool::OperationPool;
 use ream_storage::{db::ReamDB, tables::Field};
+use serde_json::json;
 
 use crate::handlers::state::get_state_from_id;
 
@@ -24,9 +25,9 @@ pub async fn get_debug_beacon_state(
     db: Data<ReamDB>,
     state_id: Path<ID>,
 ) -> Result<impl Responder, ApiError> {
-    let state = get_state_from_id(state_id.into_inner(), &db).await?;
-
-    Ok(HttpResponse::Ok().json(BeaconResponse::new(state)))
+    Ok(HttpResponse::Ok().json(BeaconResponse::new(
+        get_state_from_id(state_id.into_inner(), &db).await?,
+    )))
 }
 
 #[get("/debug/beacon/heads")]
@@ -52,11 +53,11 @@ pub async fn get_debug_beacon_heads(db: Data<ReamDB>) -> Result<impl Responder, 
     let mut leaves = vec![];
     let mut referenced_parents = HashSet::new();
 
-    for (block, _, _) in blocks.values() {
+    for BlockWithEpochInfo { block, .. } in blocks.values() {
         referenced_parents.insert(block.parent_root);
     }
 
-    for (block_root, (block, _, _)) in &blocks {
+    for (block_root, BlockWithEpochInfo { block, .. }) in &blocks {
         if !referenced_parents.contains(block_root) {
             leaves.push(BeaconHeadResponse {
                 root: block.block_root(),
@@ -90,7 +91,15 @@ pub async fn get_debug_fork_choice(db: Data<ReamDB>) -> Result<impl Responder, A
         ApiError::InternalError(format!("Failed to get filtered block tree, error: {err:?}"))
     })?;
     let mut fork_choice_nodes = Vec::with_capacity(blocks.len());
-    for (block_root, (block, justified_epoch, finalized_epoch)) in blocks {
+    for (
+        block_root,
+        BlockWithEpochInfo {
+            block,
+            justified_epoch,
+            finalized_epoch,
+        },
+    ) in blocks
+    {
         let weight = store.get_weight(block_root).map_err(|err| {
             ApiError::InternalError(format!(
                 "Failed to get weight for block {block_root:?}, error: {err:?}"
@@ -108,7 +117,7 @@ pub async fn get_debug_fork_choice(db: Data<ReamDB>) -> Result<impl Responder, A
             // in this context.
             validity: ForkChoiceValidity::Valid,
             execution_block_hash: block.body.execution_payload.block_hash,
-            extra_data: Default::default(),
+            extra_data: json!({}),
         });
     }
 
