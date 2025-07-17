@@ -16,11 +16,11 @@ use crate::misc::checksummed_address;
 pub struct ExecutionPayloadHeader {
     // Execution block header fields
     pub parent_hash: B256,
-    #[serde(with = "checksummed_address")]
+    // #[serde(with = "checksummed_address")]
     pub fee_recipient: Address,
     pub state_root: B256,
     pub receipts_root: B256,
-    #[serde(with = "hex_fixed_vec")]
+    // #[serde(with = "hex_fixed_vec")]
     pub logs_bloom: FixedVector<u8, typenum::U256>,
     pub prev_randao: B256,
     // #[serde(with = "serde_utils::quoted_u64")]
@@ -31,7 +31,7 @@ pub struct ExecutionPayloadHeader {
     pub gas_used: u64,
     // #[serde(with = "serde_utils::quoted_u64")]
     pub timestamp: u64,
-    #[serde(with = "hex_var_list")]
+    // #[serde(with = "hex_var_list")]
     pub extra_data: VariableList<u8, U32>,
     // #[serde(with = "serde_utils::quoted_u256")]
     pub base_fee_per_gas: U256,

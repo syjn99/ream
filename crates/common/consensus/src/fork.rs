@@ -7,7 +7,7 @@ use tree_hash_derive::TreeHash;
 pub struct Fork {
     pub previous_version: B32,
     pub current_version: B32,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub epoch: u64,
 }
 
