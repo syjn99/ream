@@ -22,7 +22,7 @@ use tree_hash_derive::TreeHash;
     Default,
 )]
 pub struct Checkpoint {
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub epoch: u64,
     pub root: B256,
 }

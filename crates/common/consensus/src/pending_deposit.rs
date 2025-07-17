@@ -9,9 +9,9 @@ pub struct PendingDeposit {
     #[serde(rename = "pubkey")]
     pub public_key: PublicKey,
     pub withdrawal_credentials: B256,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub amount: u64,
     pub signature: BLSSignature,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub slot: u64,
 }

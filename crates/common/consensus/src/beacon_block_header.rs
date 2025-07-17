@@ -14,9 +14,9 @@ pub struct SignedBeaconBlockHeader {
     Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash,
 )]
 pub struct BeaconBlockHeader {
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub slot: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub proposer_index: u64,
     pub parent_root: B256,
     pub state_root: B256,

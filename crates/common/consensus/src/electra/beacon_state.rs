@@ -139,10 +139,10 @@ pub mod quoted_u8_var_list {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct BeaconState {
     // Versioning
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub genesis_time: u64,
     pub genesis_validators_root: B256,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub slot: u64,
     pub fork: Fork,
 
@@ -156,25 +156,25 @@ pub struct BeaconState {
     // Eth1
     pub eth1_data: Eth1Data,
     pub eth1_data_votes: VariableList<Eth1Data, U2048>,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub eth1_deposit_index: u64,
 
     // Registry
     pub validators: VariableList<Validator, ValidatorRegistryLimit>,
-    #[serde(with = "quoted_u64_var_list")]
+    // #[serde(with = "quoted_u64_var_list")]
     pub balances: VariableList<u64, ValidatorRegistryLimit>,
 
     // Randomness
     pub randao_mixes: FixedVector<B256, U65536>,
 
     // Slashings
-    #[serde(with = "quoted_u64_fixed_vec")]
+    // #[serde(with = "quoted_u64_fixed_vec")]
     pub slashings: FixedVector<u64, U8192>,
 
     // Participation
-    #[serde(with = "quoted_u8_var_list")]
+    // #[serde(with = "quoted_u8_var_list")]
     pub previous_epoch_participation: VariableList<u8, ValidatorRegistryLimit>,
-    #[serde(with = "quoted_u8_var_list")]
+    // #[serde(with = "quoted_u8_var_list")]
     pub current_epoch_participation: VariableList<u8, ValidatorRegistryLimit>,
 
     // Finality
@@ -184,7 +184,7 @@ pub struct BeaconState {
     pub finalized_checkpoint: Checkpoint,
 
     // Inactivity
-    #[serde(with = "quoted_u64_var_list")]
+    // #[serde(with = "quoted_u64_var_list")]
     pub inactivity_scores: VariableList<u64, ValidatorRegistryLimit>,
 
     // Sync
@@ -195,26 +195,26 @@ pub struct BeaconState {
     pub latest_execution_payload_header: ExecutionPayloadHeader,
 
     // Withdrawals
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub next_withdrawal_index: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub next_withdrawal_validator_index: u64,
 
     // Deep history valid from Capella onwards.
     pub historical_summaries: VariableList<HistoricalSummary, U16777216>,
 
     // Electra
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub deposit_requests_start_index: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub deposit_balance_to_consume: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub exit_balance_to_consume: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub earliest_exit_epoch: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub consolidation_balance_to_consume: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
+    // #[serde(with = "serde_utils::quoted_u64")]
     pub earliest_consolidation_epoch: u64,
     pub pending_deposits: VariableList<PendingDeposit, U134217728>,
     pub pending_partial_withdrawals: VariableList<PendingPartialWithdrawal, U134217728>,
