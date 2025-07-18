@@ -18,7 +18,8 @@ use crate::{
     polynomial_commitments::kzg_proof::KZGProof,
 };
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "test_consensus", derive(TreeHash))]
 pub struct SignedBeaconBlock {
     pub message: BeaconBlock,
     pub signature: BLSSignature,
