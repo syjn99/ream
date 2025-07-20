@@ -2078,7 +2078,6 @@ impl BeaconState {
             );
             committee_offset += committee.len();
         }
-
         // Bitfield length matches total number of participants
         ensure!(
             attestation.aggregation_bits.len() == committee_offset,
@@ -2090,7 +2089,6 @@ impl BeaconState {
         // Participation flag indices
         let participation_flag_indices =
             self.get_attestation_participation_flag_indices(data, self.slot - data.slot)?;
-
         // Verify signature
         ensure!(
             self.is_valid_indexed_attestation(&self.get_indexed_attestation(attestation)?)?,
@@ -2122,13 +2120,11 @@ impl BeaconState {
                 }
             }
         }
-
         // Reward proposer
         let proposer_reward_denominator =
             (WEIGHT_DENOMINATOR - PROPOSER_WEIGHT) * WEIGHT_DENOMINATOR / PROPOSER_WEIGHT;
         let proposer_reward = proposer_reward_numerator / proposer_reward_denominator;
         self.increase_balance(self.get_beacon_proposer_index(None)?, proposer_reward)?;
-
         Ok(())
     }
 
@@ -2586,6 +2582,7 @@ impl BeaconState {
             if (self.slot + 1) % SLOTS_PER_EPOCH == 0 {
                 self.process_epoch()?;
             }
+
             self.slot += 1
         }
 
@@ -2596,10 +2593,12 @@ impl BeaconState {
         // Cache state root
         let previous_state_root = self.tree_hash_root();
         self.state_roots[(self.slot % SLOTS_PER_HISTORICAL_ROOT) as usize] = previous_state_root;
+
         // Cache latest block header state root
         if self.latest_block_header.state_root == B256::default() {
             self.latest_block_header.state_root = previous_state_root;
         }
+
         // Cache block root
         let previous_block_root = self.latest_block_header.tree_hash_root();
         self.block_roots[(self.slot % SLOTS_PER_HISTORICAL_ROOT) as usize] = previous_block_root;
@@ -2673,7 +2672,6 @@ impl BeaconState {
         execution_engine: &Option<impl ExecutionApi>,
     ) -> anyhow::Result<()> {
         let block = &signed_block.message;
-
         // Process slots (including those with no blocks) since block
         self.process_slots(block.slot)?;
 
@@ -2681,15 +2679,12 @@ impl BeaconState {
         if validate_result {
             ensure!(self.verify_block_signature(signed_block)?)
         }
-
         // Process block
         self.process_block(block, execution_engine).await?;
-
         // Verify state root
         if validate_result {
             ensure!(block.state_root == self.tree_hash_root())
         }
-
         Ok(())
     }
 
