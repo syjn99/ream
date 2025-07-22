@@ -10,6 +10,8 @@ impl ValidatorService {
     pub async fn start(self) {
         info!("ValidatorService started");
 
-        loop {}
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(10));
+        }
     }
 }
