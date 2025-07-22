@@ -6,6 +6,7 @@ use ream::cli::{
     account_manager::AccountManagerConfig,
     beacon_node::BeaconNodeConfig,
     import_keystores::{load_keystore_directory, load_password_file, process_password},
+    lean_node::LeanNodeConfig,
     validator_node::ValidatorNodeConfig,
 };
 use ream_checkpoint_sync::initialize_db_from_checkpoint;
@@ -45,6 +46,9 @@ fn main() {
     let executor_clone = executor.clone();
 
     match cli.command {
+        Commands::LeanNode(config) => {
+            executor_clone.spawn(async move { run_lean_node(*config, executor).await });
+        }
         Commands::BeaconNode(config) => {
             executor_clone.spawn(async move { run_beacon_node(*config, executor).await });
         }
@@ -67,6 +71,30 @@ fn main() {
     executor_clone.shutdown_runtime();
 
     process::exit(0);
+}
+
+/// Runs the lean node.
+pub async fn run_lean_node(_config: LeanNodeConfig, executor: ReamExecutor) {
+    info!("starting up lean node...");
+
+    let network_service = ream_lean_network::service::NetworkService::new().await;
+    let validator_service = ream_lean_validator::service::ValidatorService::new().await;
+
+    let network_future = executor.spawn(async move {
+        network_service.start().await;
+    });
+    let validator_future = executor.spawn(async move {
+        validator_service.start().await;
+    });
+
+    tokio::select! {
+        _ = network_future => {
+            info!("Network service has stopped unexpectedly");
+        }
+        _ = validator_future => {
+            info!("Validator service has stopped unexpectedly");
+        }
+    }
 }
 
 /// Runs the beacon node.

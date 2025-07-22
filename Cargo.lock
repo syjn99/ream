@@ -5143,6 +5143,8 @@ dependencies = [
  "ream-discv5",
  "ream-executor",
  "ream-keystore",
+ "ream-lean-network",
+ "ream-lean-validator",
  "ream-network-manager",
  "ream-network-spec",
  "ream-node",
@@ -5403,6 +5405,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "ream-lean-consensus"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
+ "ream-pqc",
+ "serde",
+ "ssz_types",
+ "tree_hash",
+ "tree_hash_derive",
+]
+
+[[package]]
+name = "ream-lean-network"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
+name = "ream-lean-validator"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "ream-light-client"
 version = "0.1.0"
 dependencies = [
@@ -5554,6 +5584,17 @@ dependencies = [
  "serde_yaml",
  "ssz_types",
  "thiserror 2.0.12",
+ "tree_hash",
+ "tree_hash_derive",
+]
+
+[[package]]
+name = "ream-pqc"
+version = "0.1.0"
+dependencies = [
+ "ethereum_ssz",
+ "ethereum_ssz_derive",
+ "serde",
  "tree_hash",
  "tree_hash_derive",
 ]
