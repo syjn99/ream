@@ -35,6 +35,7 @@ use weak_subjectivity::{WeakSubjectivityState, verify_state_from_weak_subjectivi
 ///     "data" : T
 /// })
 /// }
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 struct OptionalBeaconVersionedResponse<T> {
     pub version: Option<String>,

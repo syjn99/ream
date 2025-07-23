@@ -531,15 +531,14 @@ impl ConnectionHandler for ReqRespConnectionHandler {
             });
         }
 
-        if let ConnectionState::ShuttingDown = self.connection_state {
-            if self.inbound_streams.is_empty()
-                && self.outbound_streams.is_empty()
-                && self.pending_outbound_streams.is_empty()
-                && self.behaviour_events.is_empty()
-            {
-                self.connection_state = ConnectionState::Closed;
-                return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(HandlerEvent::Close));
-            }
+        if let ConnectionState::ShuttingDown = self.connection_state
+            && self.inbound_streams.is_empty()
+            && self.outbound_streams.is_empty()
+            && self.pending_outbound_streams.is_empty()
+            && self.behaviour_events.is_empty()
+        {
+            self.connection_state = ConnectionState::Closed;
+            return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(HandlerEvent::Close));
         }
 
         Poll::Pending

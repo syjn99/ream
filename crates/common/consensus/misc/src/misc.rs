@@ -99,7 +99,7 @@ pub fn compute_committee(
 }
 
 pub fn is_shuffling_stable(slot: u64) -> bool {
-    slot % SLOTS_PER_EPOCH != 0
+    !slot.is_multiple_of(SLOTS_PER_EPOCH)
 }
 
 /// Return the epoch number at ``slot``.

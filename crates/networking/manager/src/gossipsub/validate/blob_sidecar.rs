@@ -102,7 +102,7 @@ pub async fn validate_blob_sidecar(
 
     // [REJECT] The sidecar's blob is valid as verified by
     if !verify_blob_kzg_proof_batch(
-        &[blob_sidecar.blob.clone()],
+        std::slice::from_ref(&blob_sidecar.blob),
         &[blob_sidecar.kzg_commitment],
         &[blob_sidecar.kzg_proof],
     )? {

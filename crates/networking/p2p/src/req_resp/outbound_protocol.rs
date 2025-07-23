@@ -143,12 +143,12 @@ impl Decoder for OutboundSSZSnappyCodec {
             src.advance(B32::len_bytes());
         }
 
-        if let Some(context_bytes) = self.context_bytes {
-            if context_bytes != network_spec().fork_digest(genesis_validators_root()) {
-                return Ok(Some(RespMessage::Error(ReqRespError::InvalidData(
-                    "Invalid context bytes, we only support Electra".to_string(),
-                ))));
-            }
+        if let Some(context_bytes) = self.context_bytes
+            && context_bytes != network_spec().fork_digest(genesis_validators_root())
+        {
+            return Ok(Some(RespMessage::Error(ReqRespError::InvalidData(
+                "Invalid context bytes, we only support Electra".to_string(),
+            ))));
         }
 
         let length = match self.length {

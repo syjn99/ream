@@ -156,12 +156,10 @@ pub fn get_sync_committee_selection_proof(
 }
 
 pub fn is_sync_committee_aggregator(signature: &BLSSignature) -> bool {
-    hash_signature_prefix_to_u64(signature)
-        % max(
-            1,
-            SYNC_COMMITTEE_SIZE / SYNC_COMMITTEE_SUBNET_COUNT / TARGET_AGGREGATORS_PER_COMMITTEE,
-        )
-        == 0
+    hash_signature_prefix_to_u64(signature).is_multiple_of(max(
+        1,
+        SYNC_COMMITTEE_SIZE / SYNC_COMMITTEE_SUBNET_COUNT / TARGET_AGGREGATORS_PER_COMMITTEE,
+    ))
 }
 
 pub fn get_sync_committee_message(
