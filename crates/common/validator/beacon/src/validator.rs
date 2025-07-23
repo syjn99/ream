@@ -135,18 +135,18 @@ impl ValidatorService {
             tokio::select! {
                 _ = interval.tick() => {
                     intervals += 1;
-                    if intervals % (INTERVALS_PER_SLOT * SLOTS_PER_EPOCH) == 0 {
+                    if intervals.is_multiple_of(INTERVALS_PER_SLOT * SLOTS_PER_EPOCH) {
                         epoch += 1;
                         self.on_epoch(epoch).await;
                     }
-                    if intervals % INTERVALS_PER_SLOT == 0 {
+                    if intervals.is_multiple_of(INTERVALS_PER_SLOT) {
                         slot += 1;
                         self.on_slot(slot).await;
                     }
                     if intervals % INTERVALS_PER_SLOT == 2 {
                         self.on_slot_aggregator(slot).await;
                     }
-                    if (intervals+1) % (INTERVALS_PER_SLOT * SLOTS_PER_EPOCH) == 0 {
+                    if (intervals + 1).is_multiple_of(INTERVALS_PER_SLOT * SLOTS_PER_EPOCH) {
                         self.on_epoch_end(epoch).await;
                     }
                 }

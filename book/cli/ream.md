@@ -9,6 +9,7 @@ $ ream --help
 Usage: ream <COMMAND>
 
 Commands:
+  lean_node        Start the lean node
   beacon_node      Start the beacon node
   validator_node   Start the validator node
   account_manager  Manage validator accounts

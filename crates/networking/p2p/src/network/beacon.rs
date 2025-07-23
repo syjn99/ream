@@ -328,10 +328,8 @@ impl Network {
         loop {
             tokio::select! {
                 Some(event) = self.swarm.next() => {
-                    if let Some(event) = self.parse_swarm_event(event).await {
-                        if let Err(err) = manager_sender.send(event) {
-                            warn!("Failed to send event: {err:?}");
-                        }
+                    if let Some(event) = self.parse_swarm_event(event).await && let Err(err) = manager_sender.send(event) {
+                        warn!("Failed to send event: {err:?}");
                     }
                 }
                 Some(event) = p2p_receiver.recv() => {
@@ -518,19 +516,19 @@ impl Network {
         trace!("Discovered peers: {peers:?}");
         for (enr, _) in peers {
             let mut multiaddrs: Vec<Multiaddr> = Vec::new();
-            if let Some(ip) = enr.ip4() {
-                if let Some(tcp) = enr.tcp4() {
-                    let mut multiaddr: Multiaddr = ip.into();
-                    multiaddr.push(Protocol::Tcp(tcp));
-                    multiaddrs.push(multiaddr);
-                }
+            if let Some(ip) = enr.ip4()
+                && let Some(tcp) = enr.tcp4()
+            {
+                let mut multiaddr: Multiaddr = ip.into();
+                multiaddr.push(Protocol::Tcp(tcp));
+                multiaddrs.push(multiaddr);
             }
-            if let Some(ip6) = enr.ip6() {
-                if let Some(tcp6) = enr.tcp6() {
-                    let mut multiaddr: Multiaddr = ip6.into();
-                    multiaddr.push(Protocol::Tcp(tcp6));
-                    multiaddrs.push(multiaddr);
-                }
+            if let Some(ip6) = enr.ip6()
+                && let Some(tcp6) = enr.tcp6()
+            {
+                let mut multiaddr: Multiaddr = ip6.into();
+                multiaddr.push(Protocol::Tcp(tcp6));
+                multiaddrs.push(multiaddr);
             }
 
             let mut successfully_dialed = false;
@@ -582,12 +580,11 @@ impl Network {
         let message = match message {
             Ok(message) => message,
             Err(err) => {
-                if let ReqRespMessageError::Outbound { request_id, .. } = &err {
-                    if let Some(callback) = self.callbacks.get(request_id) {
-                        if let Err(err) = callback.send(Err(anyhow!("{err:?}"))).await {
-                            warn!("Failed to send error response: {err:?}");
-                        }
-                    }
+                if let ReqRespMessageError::Outbound { request_id, .. } = &err
+                    && let Some(callback) = self.callbacks.get(request_id)
+                    && let Err(err) = callback.send(Err(anyhow!("{err:?}"))).await
+                {
+                    warn!("Failed to send error response: {err:?}");
                 }
                 return None;
             }
@@ -697,19 +694,18 @@ impl Network {
 
                         let cached_peer =
                             self.network_state.peer_table.read().get(&peer_id).cloned();
-                        if let Some(cached_peer) = cached_peer {
-                            if cached_peer.meta_data.is_none()
+                        if let Some(cached_peer) = cached_peer
+                            && (cached_peer.meta_data.is_none()
                                 || ping.sequence_number
                                     != cached_peer
                                         .meta_data
                                         .as_ref()
-                                        .map_or(0, |meta_data| meta_data.seq_number)
-                            {
-                                let meta_data_message = RequestMessage::MetaData(
-                                    self.network_state.meta_data.read().clone().into(),
-                                );
-                                self.send_request(peer_id, meta_data_message);
-                            }
+                                        .map_or(0, |meta_data| meta_data.seq_number))
+                        {
+                            let meta_data_message = RequestMessage::MetaData(
+                                self.network_state.meta_data.read().clone().into(),
+                            );
+                            self.send_request(peer_id, meta_data_message);
                         }
                     }
                     ResponseMessage::Status(status) => {
@@ -727,23 +723,22 @@ impl Network {
                 }
 
                 self.callbacks.update_timeout(&request_id, REQUEST_TIMEOUT);
-                if let Some(callback) = self.callbacks.get(&request_id) {
-                    if let Err(err) = callback
+                if let Some(callback) = self.callbacks.get(&request_id)
+                    && let Err(err) = callback
                         .send(Ok(P2PCallbackResponse::ResponseMessage(message)))
                         .await
-                    {
-                        warn!("Failed to send response: {err:?}");
-                    }
+                {
+                    warn!("Failed to send response: {err:?}");
                 }
 
                 None
             }
             ReqRespMessageReceived::EndOfStream { request_id } => {
                 let callback = self.callbacks.remove(&request_id);
-                if let Some(callback) = callback {
-                    if let Err(err) = callback.send(Ok(P2PCallbackResponse::EndOfStream)).await {
-                        warn!("Failed to send end of stream: {err:?}");
-                    }
+                if let Some(callback) = callback
+                    && let Err(err) = callback.send(Ok(P2PCallbackResponse::EndOfStream)).await
+                {
+                    warn!("Failed to send end of stream: {err:?}");
                 }
                 None
             }

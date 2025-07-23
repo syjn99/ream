@@ -1628,7 +1628,7 @@ impl BeaconState {
     pub fn process_historical_summaries_update(&mut self) -> anyhow::Result<()> {
         // Set historical block root accumulator.
         let next_epoch = self.get_current_epoch() + 1;
-        if next_epoch % (SLOTS_PER_HISTORICAL_ROOT / SLOTS_PER_EPOCH) == 0 {
+        if next_epoch.is_multiple_of(SLOTS_PER_HISTORICAL_ROOT / SLOTS_PER_EPOCH) {
             let historical_summary = HistoricalSummary {
                 block_summary_root: self.block_roots.tree_hash_root(),
                 state_summary_root: self.state_roots.tree_hash_root(),
@@ -1964,7 +1964,7 @@ impl BeaconState {
         let next_epoch = self.get_current_epoch() + 1;
 
         // Reset eth1 data votes
-        if next_epoch % EPOCHS_PER_ETH1_VOTING_PERIOD == 0 {
+        if next_epoch.is_multiple_of(EPOCHS_PER_ETH1_VOTING_PERIOD) {
             self.eth1_data_votes = VariableList::default();
         }
 
@@ -2547,7 +2547,7 @@ impl BeaconState {
 
     pub fn process_sync_committee_updates(&mut self) -> anyhow::Result<()> {
         let next_epoch = self.get_current_epoch() + 1;
-        if next_epoch % EPOCHS_PER_SYNC_COMMITTEE_PERIOD == 0 {
+        if next_epoch.is_multiple_of(EPOCHS_PER_SYNC_COMMITTEE_PERIOD) {
             self.current_sync_committee = self.next_sync_committee.clone();
             self.next_sync_committee = Arc::new(self.get_next_sync_committee()?);
         }
@@ -2587,7 +2587,7 @@ impl BeaconState {
         while self.slot < slot {
             self.process_slot()?;
             // Process epoch on the start slot of the next epoch
-            if (self.slot + 1) % SLOTS_PER_EPOCH == 0 {
+            if (self.slot + 1).is_multiple_of(SLOTS_PER_EPOCH) {
                 self.process_epoch()?;
             }
 

@@ -718,33 +718,33 @@ impl Store {
         }
 
         // Fallback to trying engine api
-        if let Some(execution_engine) = execution_engine {
-            if blobs_and_proofs.contains(&None) {
-                let indexed_blob_versioned_hashes = blobs_and_proofs
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, blob_and_proof)| {
-                        if blob_and_proof.is_none() {
-                            Some((
-                                index,
-                                blob_kzg_commitments[index].calculate_versioned_hash(),
-                            ))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                let (indices, blob_versioned_hashes): (Vec<_>, Vec<_>) =
-                    indexed_blob_versioned_hashes.into_iter().unzip();
-                let execution_blobs_and_proofs = execution_engine
-                    .engine_get_blobs_v1(blob_versioned_hashes)
-                    .await?;
-                for (index, blob_and_proof) in indices
-                    .into_iter()
-                    .zip(execution_blobs_and_proofs.into_iter())
-                {
-                    blobs_and_proofs[index] = blob_and_proof;
-                }
+        if let Some(execution_engine) = execution_engine
+            && blobs_and_proofs.contains(&None)
+        {
+            let indexed_blob_versioned_hashes = blobs_and_proofs
+                .iter()
+                .enumerate()
+                .filter_map(|(index, blob_and_proof)| {
+                    if blob_and_proof.is_none() {
+                        Some((
+                            index,
+                            blob_kzg_commitments[index].calculate_versioned_hash(),
+                        ))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            let (indices, blob_versioned_hashes): (Vec<_>, Vec<_>) =
+                indexed_blob_versioned_hashes.into_iter().unzip();
+            let execution_blobs_and_proofs = execution_engine
+                .engine_get_blobs_v1(blob_versioned_hashes)
+                .await?;
+            for (index, blob_and_proof) in indices
+                .into_iter()
+                .zip(execution_blobs_and_proofs.into_iter())
+            {
+                blobs_and_proofs[index] = blob_and_proof;
             }
         }
 

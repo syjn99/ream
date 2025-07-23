@@ -127,10 +127,10 @@ pub async fn get_validators_from_state(
     id_query: Query<IdQuery>,
     status_query: Query<StatusQuery>,
 ) -> Result<impl Responder, ApiError> {
-    if let Some(validator_ids) = &id_query.id {
-        if validator_ids.len() >= MAX_VALIDATOR_COUNT {
-            return Err(ApiError::TooManyValidatorsIds);
-        }
+    if let Some(validator_ids) = &id_query.id
+        && validator_ids.len() >= MAX_VALIDATOR_COUNT
+    {
+        return Err(ApiError::TooManyValidatorsIds);
     }
 
     let state = get_state_from_id(state_id.into_inner(), &db).await?;

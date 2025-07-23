@@ -18,30 +18,9 @@ use reqwest::{
     header::{ACCEPT, HeaderValue},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use ssz::Decode;
 use tracing::{info, warn};
 use weak_subjectivity::{WeakSubjectivityState, verify_state_from_weak_subjectivity_checkpoint};
-
-/// A OptionalBeaconVersionedResponse data struct that can be used to wrap data type
-/// used for json rpc responses
-///
-/// # Example
-/// {
-///  "data": json!({
-///     "version": Some("electra")
-///     "execution_optimistic" : Some("false"),
-///     "finalized" : None,
-///     "data" : T
-/// })
-/// }
-#[derive(Debug, Serialize, Deserialize)]
-struct OptionalBeaconVersionedResponse<T> {
-    pub version: Option<String>,
-    pub execution_optimistic: Option<Value>,
-    pub finalized: Option<Value>,
-    pub data: T,
-}
 
 /// Entry point for checkpoint sync.
 pub async fn initialize_db_from_checkpoint(

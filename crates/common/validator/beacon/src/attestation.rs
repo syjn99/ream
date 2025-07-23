@@ -32,13 +32,13 @@ pub fn is_aggregator(
     committee_index: u64,
     slot_signature: BLSSignature,
 ) -> anyhow::Result<bool> {
-    Ok(hash_signature_prefix_to_u64(&slot_signature) as usize
-        % max(
+    Ok(
+        (hash_signature_prefix_to_u64(&slot_signature) as usize).is_multiple_of(max(
             1,
             state.get_beacon_committee(slot, committee_index)?.len()
                 / TARGET_AGGREGATORS_PER_COMMITTEE as usize,
-        )
-        == 0)
+        )),
+    )
 }
 
 /// Compute the correct subnet for an attestation for Phase 0.
