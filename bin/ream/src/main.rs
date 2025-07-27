@@ -19,7 +19,9 @@ use ream_checkpoint_sync::initialize_db_from_checkpoint;
 use ream_consensus_misc::{constants::set_genesis_validator_root, misc::compute_epoch_at_slot};
 use ream_executor::ReamExecutor;
 use ream_network_manager::service::NetworkManagerService;
-use ream_network_spec::networks::{beacon_network_spec, set_beacon_network_spec};
+use ream_network_spec::networks::{
+    beacon_network_spec, set_beacon_network_spec, set_lean_network_spec,
+};
 use ream_operation_pool::OperationPool;
 use ream_p2p::network::lean::NetworkService as LeanNetworkService;
 use ream_rpc_beacon::{config::RpcServerConfig, start_server};
@@ -88,8 +90,10 @@ fn main() {
 }
 
 /// Runs the lean node.
-pub async fn run_lean_node(_config: LeanNodeConfig, executor: ReamExecutor) {
+pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     info!("starting up lean node...");
+
+    set_lean_network_spec(config.network.clone());
 
     let network_service = LeanNetworkService::new().await;
     let validator_service = LeanValidatorService::new().await;

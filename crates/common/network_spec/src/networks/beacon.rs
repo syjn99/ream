@@ -60,7 +60,7 @@ static BEACON_NETWORK_SPEC: OnceLock<Arc<BeaconNetworkSpec>> = OnceLock::new();
 pub fn set_beacon_network_spec(network_spec: Arc<BeaconNetworkSpec>) {
     BEACON_NETWORK_SPEC
         .set(network_spec)
-        .expect("NetworkSpec should be set only once at the start of the application");
+        .expect("BeaconNetworkSpec should be set only once at the start of the application");
 }
 
 /// Returns the static [BeaconNetworkSpec] initialized by [set_beacon_network_spec].
@@ -71,7 +71,7 @@ pub fn set_beacon_network_spec(network_spec: Arc<BeaconNetworkSpec>) {
 pub fn beacon_network_spec() -> Arc<BeaconNetworkSpec> {
     BEACON_NETWORK_SPEC
         .get()
-        .expect("NetworkSpec wasn't set")
+        .expect("BeaconNetworkSpec wasn't set")
         .clone()
 }
 

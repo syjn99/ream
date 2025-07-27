@@ -60,7 +60,14 @@ mod tests {
 
     #[test]
     fn test_cli_lean_node_command() {
-        let cli = Cli::parse_from(["program", "lean_node", "--verbosity", "2"]);
+        let cli = Cli::parse_from([
+            "program",
+            "lean_node",
+            "--verbosity",
+            "2",
+            "--network",
+            "./assets/lean/sample_spec.yml",
+        ]);
 
         match cli.command {
             Commands::LeanNode(config) => {
