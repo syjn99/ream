@@ -751,13 +751,13 @@ pub async fn handle_error_response(response: reqwest::Response) -> ValidatorErro
     let status_code = response.status();
     match response.text().await {
         Ok(response_body) => {
-            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response_body) {
-                if let Some(message) = json_value["message"].as_str() {
-                    return ValidatorError::RequestFailedWithMessage {
-                        status_code,
-                        message: message.to_string(),
-                    };
-                }
+            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response_body)
+                && let Some(message) = json_value["message"].as_str()
+            {
+                return ValidatorError::RequestFailedWithMessage {
+                    status_code,
+                    message: message.to_string(),
+                };
             }
             ValidatorError::RequestFailed { status_code }
         }
