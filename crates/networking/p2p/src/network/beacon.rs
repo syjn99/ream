@@ -36,7 +36,7 @@ use parking_lot::{Mutex, RwLock};
 use ream_consensus_misc::constants::genesis_validators_root;
 use ream_discv5::discovery::{Discovery, DiscoveryOutEvent, QueryType};
 use ream_executor::ReamExecutor;
-use ream_network_spec::networks::network_spec;
+use ream_network_spec::networks::beacon_network_spec;
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     time::interval,
@@ -748,7 +748,7 @@ impl Network {
     fn handle_status_req_resp_event(&mut self, peer_id: PeerId, status: Status) {
         if self.network_state.peer_table.read().get(&peer_id).is_some() {
             // We only want to have peers on the same network as us
-            let fork_digest = network_spec().fork_digest(genesis_validators_root());
+            let fork_digest = beacon_network_spec().fork_digest(genesis_validators_root());
             if status.fork_digest != fork_digest {
                 warn!(
                     "Peer {peer_id} is not on the same network as us, removing from peer table, fork_digest: {}, our fork_digest: {fork_digest}",
@@ -889,7 +889,7 @@ mod tests {
             executor,
             &config,
             Status {
-                fork_digest: network_spec().fork_digest(genesis_validators_root()),
+                fork_digest: beacon_network_spec().fork_digest(genesis_validators_root()),
                 ..Default::default()
             },
         )

@@ -4,7 +4,7 @@ use ream_consensus_beacon::{
     blob_sidecar::BlobIdentifier, execution_engine::rpc_types::get_blobs::BlobAndProofV1,
 };
 use ream_consensus_misc::constants::genesis_validators_root;
-use ream_network_spec::networks::network_spec;
+use ream_network_spec::networks::beacon_network_spec;
 use ream_p2p::{
     channel::GossipMessage,
     gossipsub::{
@@ -34,55 +34,55 @@ pub fn init_gossipsub_config_with_topics() -> GossipsubConfig {
 
     gossipsub_config.set_topics(vec![
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::BeaconBlock,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::AggregateAndProof,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::VoluntaryExit,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::ProposerSlashing,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::AttesterSlashing,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::BeaconAttestation(0),
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::SyncCommittee(0),
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::SyncCommitteeContributionAndProof,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::BlsToExecutionChange,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::LightClientFinalityUpdate,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::LightClientOptimisticUpdate,
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::BlobSidecar(0),
         },
         GossipTopic {
-            fork: network_spec().fork_digest(genesis_validators_root()),
+            fork: beacon_network_spec().fork_digest(genesis_validators_root()),
             kind: GossipTopicKind::VoluntaryExit,
         },
     ]);

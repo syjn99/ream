@@ -35,7 +35,7 @@ use ream_consensus_beacon::{
     voluntary_exit::SignedVoluntaryExit,
 };
 use ream_consensus_misc::{attestation_data::AttestationData, fork::Fork};
-use ream_network_spec::networks::NetworkSpec;
+use ream_network_spec::networks::BeaconNetworkSpec;
 use reqwest::{Url, header::HeaderMap};
 use serde_json::json;
 use ssz::{Decode, Encode};
@@ -149,7 +149,7 @@ impl BeaconApiClient {
 
     pub async fn get_config_spec(
         &self,
-    ) -> anyhow::Result<DataResponse<NetworkSpec>, ValidatorError> {
+    ) -> anyhow::Result<DataResponse<BeaconNetworkSpec>, ValidatorError> {
         let response = self
             .http_client
             .execute(

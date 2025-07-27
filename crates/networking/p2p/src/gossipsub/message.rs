@@ -9,7 +9,7 @@ use ream_consensus_misc::constants::genesis_validators_root;
 use ream_light_client::{
     finality_update::LightClientFinalityUpdate, optimistic_update::LightClientOptimisticUpdate,
 };
-use ream_network_spec::networks::network_spec;
+use ream_network_spec::networks::beacon_network_spec;
 use ream_validator_beacon::{
     aggregate_and_proof::AggregateAndProof, contribution_and_proof::SignedContributionAndProof,
     sync_committee::SyncCommitteeMessage,
@@ -41,7 +41,7 @@ impl GossipsubMessage {
     pub fn decode(topic: &TopicHash, data: &[u8]) -> Result<Self, GossipsubError> {
         let gossip_topic = GossipTopic::from_topic_hash(topic)?;
 
-        if gossip_topic.fork != network_spec().fork_digest(genesis_validators_root()) {
+        if gossip_topic.fork != beacon_network_spec().fork_digest(genesis_validators_root()) {
             return Err(GossipsubError::InvalidTopic(format!(
                 "Invalid topic fork: {topic:?}"
             )));

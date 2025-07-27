@@ -1,8 +1,8 @@
 use std::{fs, sync::Arc};
 
-use crate::networks::{DEV, HOLESKY, HOODI, MAINNET, NetworkSpec, SEPOLIA};
+use crate::networks::{BeaconNetworkSpec, DEV, HOLESKY, HOODI, MAINNET, SEPOLIA};
 
-pub fn network_parser(network_string: &str) -> Result<Arc<NetworkSpec>, String> {
+pub fn beacon_network_parser(network_string: &str) -> Result<Arc<BeaconNetworkSpec>, String> {
     match network_string {
         "mainnet" => Ok(MAINNET.clone()),
         "holesky" => Ok(HOLESKY.clone()),
