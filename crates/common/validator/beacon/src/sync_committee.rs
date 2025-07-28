@@ -14,7 +14,7 @@ use ream_consensus_misc::{
     constants::{DOMAIN_SYNC_COMMITTEE, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SYNC_COMMITTEE_SIZE},
     misc::{compute_domain, compute_epoch_at_slot, compute_signing_root},
 };
-use ream_network_spec::networks::network_spec;
+use ream_network_spec::networks::beacon_network_spec;
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{BitVector, typenum::U512};
@@ -144,7 +144,7 @@ pub fn get_sync_committee_selection_proof(
 ) -> anyhow::Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_SYNC_COMMITTEE,
-        Some(network_spec().electra_fork_version),
+        Some(beacon_network_spec().electra_fork_version),
         None,
     );
     let signing_root = compute_signing_root(

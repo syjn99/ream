@@ -12,7 +12,7 @@ use ream_consensus_misc::{
     constants::DOMAIN_VOLUNTARY_EXIT,
     misc::{compute_domain, compute_signing_root},
 };
-use ream_network_spec::networks::network_spec;
+use ream_network_spec::networks::beacon_network_spec;
 use tokio::time::sleep;
 use tracing::info;
 
@@ -35,7 +35,7 @@ pub fn sign_voluntary_exit(
                     &voluntary_exit,
                     compute_domain(
                         DOMAIN_VOLUNTARY_EXIT,
-                        Some(network_spec().electra_fork_version),
+                        Some(beacon_network_spec().electra_fork_version),
                         None,
                     ),
                 )
@@ -76,7 +76,7 @@ pub async fn process_voluntary_exit(
 
     if wait_till_exit {
         loop {
-            sleep(Duration::from_secs(network_spec().seconds_per_slot)).await;
+            sleep(Duration::from_secs(beacon_network_spec().seconds_per_slot)).await;
             match beacon_api_client
                 .get_state_validator(ID::Head, ValidatorID::Index(validator_index))
                 .await?

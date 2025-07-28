@@ -35,7 +35,7 @@ use ream_consensus_beacon::{
     voluntary_exit::SignedVoluntaryExit,
 };
 use ream_consensus_misc::{attestation_data::AttestationData, fork::Fork};
-use ream_network_spec::networks::NetworkSpec;
+use ream_network_spec::networks::BeaconNetworkSpec;
 use reqwest::{Url, header::HeaderMap};
 use serde_json::json;
 use ssz::{Decode, Encode};
@@ -149,7 +149,7 @@ impl BeaconApiClient {
 
     pub async fn get_config_spec(
         &self,
-    ) -> anyhow::Result<DataResponse<NetworkSpec>, ValidatorError> {
+    ) -> anyhow::Result<DataResponse<BeaconNetworkSpec>, ValidatorError> {
         let response = self
             .http_client
             .execute(
@@ -751,13 +751,13 @@ pub async fn handle_error_response(response: reqwest::Response) -> ValidatorErro
     let status_code = response.status();
     match response.text().await {
         Ok(response_body) => {
-            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response_body) {
-                if let Some(message) = json_value["message"].as_str() {
-                    return ValidatorError::RequestFailedWithMessage {
-                        status_code,
-                        message: message.to_string(),
-                    };
-                }
+            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response_body)
+                && let Some(message) = json_value["message"].as_str()
+            {
+                return ValidatorError::RequestFailedWithMessage {
+                    status_code,
+                    message: message.to_string(),
+                };
             }
             ValidatorError::RequestFailed { status_code }
         }

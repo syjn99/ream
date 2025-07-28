@@ -3,7 +3,7 @@ use ream_beacon_chain::beacon_chain::BeaconChain;
 use ream_consensus_beacon::{
     bls_to_execution_change::SignedBLSToExecutionChange, electra::beacon_state::BeaconState,
 };
-use ream_network_spec::networks::network_spec;
+use ream_network_spec::networks::beacon_network_spec;
 use ream_storage::{
     cache::{AddressValidaterIndexIdentifier, CachedDB},
     tables::Table,
@@ -27,7 +27,7 @@ pub async fn validate_bls_to_execution_change(
 
     // [IGNORE] current_epoch >= CAPELLA_FORK_EPOCH, where current_epoch is defined by the current
     // wall-clock time.
-    if state.get_current_epoch() < network_spec().capella_fork_epoch {
+    if state.get_current_epoch() < beacon_network_spec().capella_fork_epoch {
         return Ok(ValidationResult::Ignore(
             "Current epoch is before Capella fork".into(),
         ));
