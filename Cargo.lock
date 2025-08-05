@@ -5756,6 +5756,8 @@ dependencies = [
 name = "ream-validator-lean"
 version = "0.1.0"
 dependencies = [
+ "ream-network-spec",
+ "tokio",
  "tracing",
 ]
 

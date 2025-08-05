@@ -10,4 +10,8 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+tokio.workspace = true
 tracing = { workspace = true, features = ["log"] }
+
+# ream dependencies
+ream-network-spec.workspace = true
