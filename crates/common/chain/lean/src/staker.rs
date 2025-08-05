@@ -139,7 +139,8 @@ impl Staker {
     }
 
     fn get_current_slot(&self) -> anyhow::Result<u64> {
-        return Err(anyhow::anyhow!("get_current_slot not implemented"));
+        // Temporary.
+        Ok(1)
     }
 
     /// Called when it's the staker's turn to propose a block
