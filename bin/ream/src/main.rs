@@ -15,6 +15,7 @@ use ream::cli::{
     voluntary_exit::VoluntaryExitConfig,
 };
 use ream_beacon_api_types::id::{ID, ValidatorID};
+use ream_chain_lean::service::LeanChainService;
 use ream_checkpoint_sync::initialize_db_from_checkpoint;
 use ream_consensus_misc::{
     constants::beacon::set_genesis_validator_root, misc::compute_epoch_at_slot,
@@ -97,9 +98,13 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
 
     set_lean_network_spec(config.network.clone());
 
+    let chain_service = LeanChainService::new().await;
     let network_service = LeanNetworkService::new().await;
     let validator_service = LeanValidatorService::new().await;
 
+    let chain_future = executor.spawn(async move {
+        chain_service.start().await;
+    });
     let network_future = executor.spawn(async move {
         network_service.start().await;
     });
@@ -108,6 +113,9 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     });
 
     tokio::select! {
+        _ = chain_future => {
+            info!("Chain service has stopped unexpectedly");
+        }
         _ = network_future => {
             info!("Network service has stopped unexpectedly");
         }

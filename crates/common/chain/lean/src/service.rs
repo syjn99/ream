@@ -5,24 +5,17 @@ use ream_network_spec::networks::lean_network_spec;
 use tokio::time::{Instant, MissedTickBehavior, interval_at};
 use tracing::info;
 
-/// ValidatorService is responsible for managing validator operations
-/// such as proposing blocks and voting on them.
-///
-/// Every first tick (t=0) it proposes a block if it's the validator's turn.
-/// Every second tick (t=1/4) it votes on the proposed block.
-///
-/// NOTE: Other ticks should be handled by the other services, such as the consensus service.
-pub struct ValidatorService {}
+pub struct LeanChainService {}
 
-impl ValidatorService {
+impl LeanChainService {
     pub async fn new() -> Self {
-        ValidatorService {}
+        LeanChainService {}
     }
 
     pub async fn start(self) {
-        info!("Validator Service started");
+        info!("Lean Chain Service started");
 
-        // TODO: Duplicate clock logic from LeanChainService. May need to refactor later.
+        // TODO: Duplicate clock logic from ValidatorService. May need to refactor later.
 
         // Get the Lean network specification.
         let network_spec = lean_network_spec();
@@ -50,16 +43,16 @@ impl ValidatorService {
             tokio::select! {
                 _ = interval.tick() => {
                     match tick_count % 4 {
-                        0 => {
-                            // First tick (t=0): Propose a block.
-                            info!("Propose block if it's my turn.");
+                        2 => {
+                            // Third tick (t=2/4): Compute the safe target.
+                            info!("Compute safe target.");
                         }
-                        1 => {
-                            // Second tick (t=1/4): Vote.
-                            info!("Vote.");
+                        3 => {
+                            // Fourth tick (t=3/4): Accept new votes.
+                            info!("Accept new votes.");
                         }
                         _ => {
-                            // Other ticks (t=2/4, t=3/4): Do nothing.
+                            // Other ticks (t=0, t=1/4): Do nothing.
                         }
                     }
                     tick_count += 1;

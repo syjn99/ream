@@ -5161,6 +5161,7 @@ dependencies = [
  "rand 0.8.5",
  "ream-account-manager",
  "ream-beacon-api-types",
+ "ream-chain-lean",
  "ream-checkpoint-sync",
  "ream-consensus-beacon",
  "ream-consensus-misc",
@@ -5756,6 +5757,7 @@ dependencies = [
 name = "ream-validator-lean"
 version = "0.1.0"
 dependencies = [
+ "ream-consensus-misc",
  "ream-network-spec",
  "tokio",
  "tracing",
