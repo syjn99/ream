@@ -1,15 +1,25 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
-use tokio::time::{Instant, MissedTickBehavior, interval_at};
+use tokio::{
+    sync::RwLock,
+    time::{Instant, MissedTickBehavior, interval_at},
+};
 use tracing::info;
 
-pub struct LeanChainService {}
+use crate::lean_chain::LeanChain;
+
+pub struct LeanChainService {
+    lean_chain: Arc<RwLock<LeanChain>>,
+}
 
 impl LeanChainService {
-    pub async fn new() -> Self {
-        LeanChainService {}
+    pub async fn new(lean_chain: Arc<RwLock<LeanChain>>) -> Self {
+        LeanChainService { lean_chain }
     }
 
     pub async fn start(self) {

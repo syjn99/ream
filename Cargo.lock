@@ -5570,6 +5570,7 @@ dependencies = [
  "libp2p-identity",
  "libp2p-mplex",
  "parking_lot",
+ "ream-chain-lean",
  "ream-consensus-beacon",
  "ream-consensus-misc",
  "ream-discv5",
@@ -5756,6 +5757,7 @@ dependencies = [
 name = "ream-validator-lean"
 version = "0.1.0"
 dependencies = [
+ "ream-chain-lean",
  "ream-consensus-misc",
  "ream-network-spec",
  "tokio",

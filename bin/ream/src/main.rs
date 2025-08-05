@@ -15,7 +15,7 @@ use ream::cli::{
     voluntary_exit::VoluntaryExitConfig,
 };
 use ream_beacon_api_types::id::{ID, ValidatorID};
-use ream_chain_lean::service::LeanChainService;
+use ream_chain_lean::{genesis as lean_genesis, lean_chain::LeanChain, service::LeanChainService};
 use ream_checkpoint_sync::initialize_db_from_checkpoint;
 use ream_consensus_misc::{
     constants::beacon::set_genesis_validator_root, misc::compute_epoch_at_slot,
@@ -38,6 +38,7 @@ use ream_validator_beacon::{
     voluntary_exit::process_voluntary_exit,
 };
 use ream_validator_lean::service::ValidatorService as LeanValidatorService;
+use tokio::sync::RwLock;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -98,9 +99,12 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
 
     set_lean_network_spec(config.network.clone());
 
-    let chain_service = LeanChainService::new().await;
-    let network_service = LeanNetworkService::new().await;
-    let validator_service = LeanValidatorService::new().await;
+    let (genesis_block, genesis_state) = lean_genesis::setup_genesis();
+    let lean_chain = Arc::new(RwLock::new(LeanChain::new(genesis_block, genesis_state)));
+
+    let chain_service = LeanChainService::new(lean_chain.clone()).await;
+    let network_service = LeanNetworkService::new(lean_chain.clone()).await;
+    let validator_service = LeanValidatorService::new(lean_chain.clone()).await;
 
     let chain_future = executor.spawn(async move {
         chain_service.start().await;

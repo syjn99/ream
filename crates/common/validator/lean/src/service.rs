@@ -1,8 +1,15 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
+use ream_chain_lean::lean_chain::LeanChain;
 use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
-use tokio::time::{Instant, MissedTickBehavior, interval_at};
+use tokio::{
+    sync::RwLock,
+    time::{Instant, MissedTickBehavior, interval_at},
+};
 use tracing::info;
 
 /// ValidatorService is responsible for managing validator operations
@@ -12,11 +19,13 @@ use tracing::info;
 /// Every second tick (t=1/4) it votes on the proposed block.
 ///
 /// NOTE: Other ticks should be handled by the other services, such as the consensus service.
-pub struct ValidatorService {}
+pub struct ValidatorService {
+    lean_chain: Arc<RwLock<LeanChain>>,
+}
 
 impl ValidatorService {
-    pub async fn new() -> Self {
-        ValidatorService {}
+    pub async fn new(lean_chain: Arc<RwLock<LeanChain>>) -> Self {
+        ValidatorService { lean_chain }
     }
 
     pub async fn start(self) {
