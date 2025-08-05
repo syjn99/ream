@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{
@@ -12,7 +9,6 @@ use ream_consensus_lean::{
     vote::{SignedVote, Vote},
 };
 use ream_consensus_misc::constants::lean::SLOT_DURATION;
-use ream_p2p::network::lean::NetworkService;
 use ream_pqc::PQSignature;
 use ssz_types::VariableList;
 use tracing::info;
@@ -21,7 +17,6 @@ use tree_hash::TreeHash;
 pub struct Staker {
     pub validator_id: u64,
     pub chain: HashMap<B256, Block>,
-    pub network: Arc<Mutex<NetworkService>>,
     pub post_states: HashMap<B256, LeanState>,
     pub known_votes: Vec<Vote>,
     pub new_votes: Vec<Vote>,
@@ -33,19 +28,12 @@ pub struct Staker {
 }
 
 impl Staker {
-    pub fn new(
-        validator_id: u64,
-        network: Arc<Mutex<NetworkService>>,
-        genesis_block: Block,
-        genesis_state: LeanState,
-    ) -> Staker {
+    pub fn new(validator_id: u64, genesis_block: Block, genesis_state: LeanState) -> Staker {
         let genesis_hash = genesis_block.tree_hash_root();
 
         Staker {
             // This node's validator ID
             validator_id,
-            // Hook to the p2p network
-            network,
             // Votes that we have received and taken into account
             known_votes: Vec::new(),
             // Votes that we have received but not yet taken into account
@@ -116,11 +104,13 @@ impl Staker {
     pub fn tick(&mut self) -> anyhow::Result<()> {
         let current_slot = self.get_current_slot()?;
         let time_in_slot = {
-            let network = self
-                .network
-                .lock()
-                .map_err(|err| anyhow::anyhow!("Failed to acquire network lock: {err:?}"))?;
-            network.time % SLOT_DURATION
+            // let network = self
+            //     .network
+            //     .lock()
+            //     .map_err(|err| anyhow::anyhow!("Failed to acquire network lock: {err:?}"))?;
+            // network.time % SLOT_DURATION
+
+            1
         };
 
         // t=0: propose a block
@@ -149,11 +139,7 @@ impl Staker {
     }
 
     fn get_current_slot(&self) -> anyhow::Result<u64> {
-        let network = self
-            .network
-            .lock()
-            .map_err(|err| anyhow::anyhow!("Failed to acquire network lock: {err:?}"))?;
-        Ok(network.time / SLOT_DURATION + 2)
+        return Err(anyhow::anyhow!("get_current_slot not implemented"));
     }
 
     /// Called when it's the staker's turn to propose a block
