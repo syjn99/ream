@@ -2,10 +2,13 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{
-    QueueItem, block::Block, get_fork_choice_head, get_latest_justified_hash, state::LeanState,
-    vote::Vote,
+    QueueItem, block::Block, get_fork_choice_head, get_latest_justified_hash, is_justifiable_slot,
+    process_block, state::LeanState, vote::Vote,
 };
+use ssz_types::VariableList;
 use tree_hash::TreeHash;
+
+use crate::slot::get_current_slot;
 
 #[derive(Clone, Debug)]
 pub struct LeanChain {
@@ -57,7 +60,7 @@ impl LeanChain {
     }
 
     /// Compute the latest block that the staker is allowed to choose as the target
-    fn compute_safe_target(&self) -> anyhow::Result<B256> {
+    pub fn compute_safe_target(&self) -> anyhow::Result<B256> {
         let justified_hash = get_latest_justified_hash(&self.post_states)
             .ok_or_else(|| anyhow::anyhow!("No justified hash found in post states"))?;
 
@@ -71,7 +74,7 @@ impl LeanChain {
 
     /// Process new votes that the staker has received. Vote processing is done
     /// at a particular time, because of safe target and view merge rule
-    fn accept_new_votes(&mut self) -> anyhow::Result<()> {
+    pub fn accept_new_votes(&mut self) -> anyhow::Result<()> {
         for new_vote in self.new_votes.drain(..) {
             if !self.known_votes.contains(&new_vote) {
                 self.known_votes.push(new_vote);
@@ -91,5 +94,110 @@ impl LeanChain {
         Ok(())
     }
 
-    // TODO: Add necessary methods for processs_block, vote, and receive.
+    pub fn build_block(&mut self) -> anyhow::Result<Block> {
+        let new_slot = get_current_slot();
+
+        let head_state = self
+            .post_states
+            .get(&self.head)
+            .ok_or_else(|| anyhow::anyhow!("Post state not found for head: {}", self.head))?;
+        let mut new_block = Block {
+            slot: new_slot,
+            parent: self.head,
+            votes: VariableList::empty(),
+            // Diverged from Python implementation: Using `B256::ZERO` instead of `None`)
+            state_root: B256::ZERO,
+        };
+        let mut state: LeanState;
+
+        // Keep attempt to add valid votes from the list of available votes
+        loop {
+            state = process_block(head_state, &new_block)?;
+
+            let new_votes_to_add = self
+                .known_votes
+                .clone()
+                .into_iter()
+                .filter(|vote| vote.source == state.latest_justified_hash)
+                .filter(|vote| !new_block.votes.contains(vote))
+                .collect::<Vec<_>>();
+
+            if new_votes_to_add.is_empty() {
+                break;
+            }
+
+            for vote in new_votes_to_add {
+                new_block
+                    .votes
+                    .push(vote)
+                    .map_err(|err| anyhow::anyhow!("Failed to add vote to new_block: {err:?}"))?;
+            }
+        }
+
+        new_block.state_root = state.tree_hash_root();
+
+        let digest = new_block.tree_hash_root();
+
+        self.chain.insert(digest, new_block.clone());
+        self.post_states.insert(digest, state);
+
+        Ok(new_block)
+    }
+
+    pub fn build_vote(&self) -> anyhow::Result<Vote> {
+        let state = self
+            .post_states
+            .get(&self.head)
+            .ok_or_else(|| anyhow::anyhow!("Post state not found for head: {}", self.head))?;
+        let mut target_block = self
+            .chain
+            .get(&self.head)
+            .ok_or_else(|| anyhow::anyhow!("Block not found in chain for head: {}", self.head))?;
+
+        // If there is no very recent safe target, then vote for the k'th ancestor
+        // of the head
+        for _ in 0..3 {
+            let safe_target_block = self.chain.get(&self.safe_target).ok_or_else(|| {
+                anyhow::anyhow!("Block not found for safe target hash: {}", self.safe_target)
+            })?;
+            if target_block.slot > safe_target_block.slot {
+                target_block = self.chain.get(&target_block.parent).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Block not found for target block's parent hash: {}",
+                        target_block.parent
+                    )
+                })?;
+            }
+        }
+
+        // If the latest finalized slot is very far back, then only some slots are
+        // valid to justify, make sure the target is one of those
+        while !is_justifiable_slot(&state.latest_finalized_slot, &target_block.slot) {
+            target_block = self.chain.get(&target_block.parent).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Block not found for target block's parent hash: {}",
+                    target_block.parent
+                )
+            })?;
+        }
+
+        let head_block = self
+            .chain
+            .get(&self.head)
+            .ok_or_else(|| anyhow::anyhow!("Block not found for head: {}", self.head))?;
+
+        Ok(Vote {
+            // Replace with actual validator ID
+            validator_id: 0,
+            slot: get_current_slot(),
+            head: self.head,
+            head_slot: head_block.slot,
+            target: target_block.tree_hash_root(),
+            target_slot: target_block.slot,
+            source: state.latest_justified_hash,
+            source_slot: state.latest_justified_slot,
+        })
+    }
+
+    // TODO: Add necessary methods for receive.
 }

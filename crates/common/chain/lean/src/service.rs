@@ -9,7 +9,7 @@ use tokio::{
     sync::RwLock,
     time::{Instant, MissedTickBehavior, interval_at},
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::lean_chain::LeanChain;
 
@@ -55,11 +55,14 @@ impl LeanChainService {
                     match tick_count % 4 {
                         2 => {
                             // Third tick (t=2/4): Compute the safe target.
-                            info!("Compute safe target.");
+                            debug!("Compute safe target.");
+                            let mut lean_chain = self.lean_chain.write().await;
+                            lean_chain.safe_target = lean_chain.compute_safe_target().expect("Failed to compute safe target");
                         }
                         3 => {
                             // Fourth tick (t=3/4): Accept new votes.
-                            info!("Accept new votes.");
+                            debug!("Accept new votes.");
+                            self.lean_chain.write().await.accept_new_votes().expect("Failed to accept new votes");
                         }
                         _ => {
                             // Other ticks (t=0, t=1/4): Do nothing.

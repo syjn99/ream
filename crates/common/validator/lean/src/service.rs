@@ -3,14 +3,21 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use ream_chain_lean::lean_chain::LeanChain;
+use ream_chain_lean::{lean_chain::LeanChain, slot::get_current_slot};
 use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
 use tokio::{
     sync::RwLock,
     time::{Instant, MissedTickBehavior, interval_at},
 };
-use tracing::info;
+use tracing::{debug, info};
+
+// TODO: We need to replace this after PQC integration.
+// For now, we only need ID for keystore.
+// Keystore MUST have
+struct LeanKeystore {
+    id: u64,
+}
 
 /// ValidatorService is responsible for managing validator operations
 /// such as proposing blocks and voting on them.
@@ -21,11 +28,18 @@ use tracing::info;
 /// NOTE: Other ticks should be handled by the other services, such as the consensus service.
 pub struct ValidatorService {
     lean_chain: Arc<RwLock<LeanChain>>,
+
+    keystores: Vec<LeanKeystore>,
 }
 
 impl ValidatorService {
     pub async fn new(lean_chain: Arc<RwLock<LeanChain>>) -> Self {
-        ValidatorService { lean_chain }
+        ValidatorService {
+            lean_chain,
+
+            // TODO: We need to load keystores from the config.
+            keystores: Vec::new(),
+        }
     }
 
     pub async fn start(self) {
@@ -61,11 +75,38 @@ impl ValidatorService {
                     match tick_count % 4 {
                         0 => {
                             // First tick (t=0): Propose a block.
-                            info!("Propose block if it's my turn.");
+                            if let Some(keystore) = self.is_proposer() {
+                                debug!("Propose block, validator ID: {}", keystore.id);
+
+                                let mut lean_chain = self.lean_chain.write().await;
+                                lean_chain.accept_new_votes().expect("Failed to accept new votes");
+                                let new_block = lean_chain.build_block().expect("Failed to build block");
+
+
+                                debug!(
+                                    "Built block for validator {} at slot {}",
+                                    keystore.id, new_block.slot
+                                );
+
+                                // TODO 1: Sign the block with the keystore.
+                                // TODO 2: Send the block to the network.
+                                debug!("Not a proposer, skipping block proposal.");
+                            }
                         }
                         1 => {
                             // Second tick (t=1/4): Vote.
-                            info!("Vote.");
+                            debug!("Vote.");
+
+                            // Build the vote from LeanChain, and modify its validator ID
+                            let vote_template = self.lean_chain.read().await.build_vote().expect("Failed to build vote");
+                            let _votes = self.keystores.iter().map(|ks| {
+                                let mut vote = vote_template.clone();
+                                vote.validator_id = ks.id;
+                                vote
+                            }).collect::<Vec<_>>();
+
+                            // TODO 1: Sign the votes with the keystore.
+                            // TODO 2: Send the votes to the network.
                         }
                         _ => {
                             // Other ticks (t=2/4, t=3/4): Do nothing.
@@ -75,5 +116,15 @@ impl ValidatorService {
                 }
             }
         }
+    }
+
+    /// Determine if one of the keystores is the proposer for the current slot.
+    fn is_proposer(&self) -> Option<&LeanKeystore> {
+        let current_slot = get_current_slot();
+        let proposer_index = current_slot % lean_network_spec().num_validators;
+
+        self.keystores
+            .iter()
+            .find(|ks| ks.id == proposer_index as u64)
     }
 }

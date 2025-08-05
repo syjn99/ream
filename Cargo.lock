@@ -5758,6 +5758,7 @@ name = "ream-validator-lean"
 version = "0.1.0"
 dependencies = [
  "ream-chain-lean",
+ "ream-consensus-lean",
  "ream-consensus-misc",
  "ream-network-spec",
  "tokio",
