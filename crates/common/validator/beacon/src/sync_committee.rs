@@ -11,7 +11,9 @@ use ream_consensus_beacon::{
     sync_aggregate::SyncAggregate,
 };
 use ream_consensus_misc::{
-    constants::{DOMAIN_SYNC_COMMITTEE, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SYNC_COMMITTEE_SIZE},
+    constants::beacon::{
+        DOMAIN_SYNC_COMMITTEE, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SYNC_COMMITTEE_SIZE,
+    },
     misc::{compute_domain, compute_epoch_at_slot, compute_signing_root},
 };
 use ream_network_spec::networks::beacon_network_spec;

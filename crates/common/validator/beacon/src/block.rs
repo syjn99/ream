@@ -5,7 +5,7 @@ use ream_consensus_beacon::electra::{
     blinded_beacon_block::{BlindedBeaconBlock, SignedBlindedBeaconBlock},
 };
 use ream_consensus_misc::{
-    constants::DOMAIN_BEACON_PROPOSER,
+    constants::beacon::DOMAIN_BEACON_PROPOSER,
     misc::{compute_domain, compute_epoch_at_slot, compute_signing_root},
 };
 use ream_network_spec::networks::beacon_network_spec;

@@ -1,7 +1,7 @@
 use ream_bls::{BLSSignature, PrivateKey, traits::Signable};
 use ream_consensus_beacon::{attestation::Attestation, electra::beacon_state::BeaconState};
 use ream_consensus_misc::{
-    constants::DOMAIN_AGGREGATE_AND_PROOF,
+    constants::beacon::DOMAIN_AGGREGATE_AND_PROOF,
     misc::{compute_domain, compute_epoch_at_slot, compute_signing_root},
 };
 use ream_network_spec::networks::beacon_network_spec;

@@ -1,7 +1,7 @@
 use alloy_primitives::B256;
 use ream_bls::BLSSignature;
 use ream_consensus_misc::{
-    constants::{
+    constants::beacon::{
         BLOB_KZG_COMMITMENTS_INDEX, BLOCK_BODY_MERKLE_DEPTH, EXECUTION_PAYLOAD_INDEX,
         KZG_COMMITMENTS_MERKLE_DEPTH,
     },

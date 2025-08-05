@@ -20,6 +20,7 @@ tree_hash.workspace = true
 
 # ream dependencies
 ream-consensus-lean.workspace = true
+ream-consensus-misc.workspace = true
 ream-network-spec.workspace = true
 ream-p2p.workspace = true
 ream-pqc.workspace = true

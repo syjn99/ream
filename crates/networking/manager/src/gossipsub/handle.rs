@@ -3,7 +3,7 @@ use ream_chain_beacon::beacon_chain::BeaconChain;
 use ream_consensus_beacon::{
     blob_sidecar::BlobIdentifier, execution_engine::rpc_types::get_blobs::BlobAndProofV1,
 };
-use ream_consensus_misc::constants::genesis_validators_root;
+use ream_consensus_misc::constants::beacon::genesis_validators_root;
 use ream_network_spec::networks::beacon_network_spec;
 use ream_p2p::{
     channel::GossipMessage,

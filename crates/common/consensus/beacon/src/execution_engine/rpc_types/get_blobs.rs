@@ -1,4 +1,4 @@
-use ream_consensus_misc::constants::BYTES_PER_BLOB;
+use ream_consensus_misc::constants::beacon::BYTES_PER_BLOB;
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, serde_utils::hex_fixed_vec, typenum::U131072};

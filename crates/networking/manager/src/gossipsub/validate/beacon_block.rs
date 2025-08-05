@@ -5,7 +5,7 @@ use ream_consensus_beacon::{
     execution_engine::new_payload_request::NewPayloadRequest,
 };
 use ream_consensus_misc::{
-    constants::MAX_BLOBS_PER_BLOCK_ELECTRA, misc::compute_start_slot_at_epoch,
+    constants::beacon::MAX_BLOBS_PER_BLOCK_ELECTRA, misc::compute_start_slot_at_epoch,
 };
 use ream_execution_engine::rpc_types::payload_status::PayloadStatus;
 use ream_storage::{
@@ -241,37 +241,35 @@ pub async fn validate_beacon_block(
         ));
     }
 
-    if is_parent {
-        if let Some(execution_enigne) = &beacon_chain.execution_engine {
-            let mut versioned_hashes = vec![];
-            for commitment in block.message.body.blob_kzg_commitments.iter() {
-                versioned_hashes.push(commitment.calculate_versioned_hash());
+    if is_parent && let Some(execution_enigne) = &beacon_chain.execution_engine {
+        let mut versioned_hashes = vec![];
+        for commitment in block.message.body.blob_kzg_commitments.iter() {
+            versioned_hashes.push(commitment.calculate_versioned_hash());
+        }
+
+        let payload_verification_status = execution_enigne
+            .notify_new_payload(NewPayloadRequest {
+                execution_payload: block.message.body.execution_payload.clone(),
+                versioned_hashes,
+                parent_beacon_block_root: block.message.parent_root,
+                execution_requests: block.message.body.execution_requests.clone(),
+            })
+            .await?;
+
+        match payload_verification_status {
+            // If execution_payload verification of block's parent by an execution node is not
+            // complete: [REJECT] The block's parent passes all validation (excluding
+            // execution node verification of the block.body.execution_payload)
+            PayloadStatus::Valid | PayloadStatus::Accepted | PayloadStatus::Syncing => {
+                return Ok(ValidationResult::Accept);
             }
-
-            let payload_verification_status = execution_enigne
-                .notify_new_payload(NewPayloadRequest {
-                    execution_payload: block.message.body.execution_payload.clone(),
-                    versioned_hashes,
-                    parent_beacon_block_root: block.message.parent_root,
-                    execution_requests: block.message.body.execution_requests.clone(),
-                })
-                .await?;
-
-            match payload_verification_status {
-                // If execution_payload verification of block's parent by an execution node is not
-                // complete: [REJECT] The block's parent passes all validation (excluding
-                // execution node verification of the block.body.execution_payload)
-                PayloadStatus::Valid | PayloadStatus::Accepted | PayloadStatus::Syncing => {
-                    return Ok(ValidationResult::Accept);
-                }
-                // Otherwise:
-                // [IGNORE] The block's parent passes all validation (including execution node
-                // verification of the block.body.execution_payload).
-                PayloadStatus::InvalidBlockHash | PayloadStatus::Invalid => {
-                    return Ok(ValidationResult::Reject(
-                        "Execution payload is invalid".to_string(),
-                    ));
-                }
+            // Otherwise:
+            // [IGNORE] The block's parent passes all validation (including execution node
+            // verification of the block.body.execution_payload).
+            PayloadStatus::InvalidBlockHash | PayloadStatus::Invalid => {
+                return Ok(ValidationResult::Reject(
+                    "Execution payload is invalid".to_string(),
+                ));
             }
         }
     }

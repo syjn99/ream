@@ -5,7 +5,7 @@ use ream_consensus_beacon::{
     electra::beacon_state::BeaconState, execution_requests::ExecutionRequests,
     withdrawal_request::WithdrawalRequest,
 };
-use ream_consensus_misc::constants::{
+use ream_consensus_misc::constants::beacon::{
     CONSOLIDATION_REQUEST_TYPE, DEPOSIT_REQUEST_TYPE, WITHDRAWAL_REQUEST_TYPE,
 };
 use ream_execution_engine::{

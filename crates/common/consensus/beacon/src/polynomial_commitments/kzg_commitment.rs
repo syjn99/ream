@@ -6,7 +6,7 @@ use std::{
 
 use alloy_primitives::{B256, hex};
 use ethereum_hashing::hash_fixed;
-use ream_consensus_misc::constants::BYTES_PER_COMMITMENT;
+use ream_consensus_misc::constants::beacon::BYTES_PER_COMMITMENT;
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},

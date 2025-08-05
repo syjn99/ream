@@ -5,7 +5,7 @@ use ream_consensus_beacon::{
     attestation::Attestation, attester_slashing::AttesterSlashing,
     electra::beacon_block::SignedBeaconBlock,
 };
-use ream_consensus_misc::constants::genesis_validators_root;
+use ream_consensus_misc::constants::beacon::genesis_validators_root;
 use ream_execution_engine::ExecutionEngine;
 use ream_fork_choice::{
     handlers::{on_attestation, on_attester_slashing, on_block, on_tick},

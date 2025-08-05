@@ -1,7 +1,7 @@
 use std::cmp;
 
 use alloy_primitives::B256;
-use ream_consensus_misc::constants::{EFFECTIVE_BALANCE_INCREMENT, SLOTS_PER_EPOCH};
+use ream_consensus_misc::constants::beacon::{EFFECTIVE_BALANCE_INCREMENT, SLOTS_PER_EPOCH};
 
 use crate::electra::beacon_state::BeaconState;
 

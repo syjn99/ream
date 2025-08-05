@@ -5,7 +5,7 @@ use ssz_derive::{Decode, Encode};
 use tree_hash_derive::TreeHash;
 
 use crate::{
-    constants::{
+    constants::beacon::{
         ETH1_ADDRESS_WITHDRAWAL_PREFIX, FAR_FUTURE_EPOCH, MAX_EFFECTIVE_BALANCE_ELECTRA,
         MIN_ACTIVATION_BALANCE,
     },

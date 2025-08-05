@@ -18,7 +18,7 @@ use ream_consensus_misc::{
     attestation_data::AttestationData,
     beacon_block_header::{BeaconBlockHeader, SignedBeaconBlockHeader},
     checkpoint::Checkpoint,
-    constants::{
+    constants::beacon::{
         BASE_REWARD_FACTOR, BEACON_STATE_MERKLE_DEPTH, BLS_WITHDRAWAL_PREFIX, CAPELLA_FORK_VERSION,
         CHURN_LIMIT_QUOTIENT, COMPOUNDING_WITHDRAWAL_PREFIX, CURRENT_SYNC_COMMITTEE_INDEX,
         DEPOSIT_CONTRACT_TREE_DEPTH, DOMAIN_BEACON_ATTESTER, DOMAIN_BEACON_PROPOSER,

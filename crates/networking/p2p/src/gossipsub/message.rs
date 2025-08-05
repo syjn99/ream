@@ -5,7 +5,7 @@ use ream_consensus_beacon::{
     proposer_slashing::ProposerSlashing, single_attestation::SingleAttestation,
     voluntary_exit::SignedVoluntaryExit,
 };
-use ream_consensus_misc::constants::genesis_validators_root;
+use ream_consensus_misc::constants::beacon::genesis_validators_root;
 use ream_light_client::{
     finality_update::LightClientFinalityUpdate, optimistic_update::LightClientOptimisticUpdate,
 };

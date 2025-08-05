@@ -1,7 +1,7 @@
 use alloy_primitives::B256;
 use ream_consensus_misc::{
     beacon_block_header::SignedBeaconBlockHeader,
-    constants::{
+    constants::beacon::{
         BLOB_KZG_COMMITMENTS_INDEX, KZG_COMMITMENT_INCLUSION_PROOF_DEPTH, MAX_BLOBS_PER_BLOCK,
     },
 };
