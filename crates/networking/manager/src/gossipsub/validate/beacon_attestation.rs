@@ -5,7 +5,7 @@ use ream_consensus_beacon::{
     electra::beacon_state::BeaconState, single_attestation::SingleAttestation,
 };
 use ream_consensus_misc::{
-    constants::DOMAIN_BEACON_ATTESTER,
+    constants::beacon::DOMAIN_BEACON_ATTESTER,
     misc::{compute_epoch_at_slot, compute_signing_root},
 };
 use ream_storage::{

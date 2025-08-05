@@ -14,7 +14,9 @@ use ream_consensus_beacon::{
     electra::{beacon_block::SignedBeaconBlock, beacon_state::BeaconState},
     genesis::Genesis,
 };
-use ream_consensus_misc::constants::{WHISTLEBLOWER_REWARD_QUOTIENT, genesis_validators_root};
+use ream_consensus_misc::constants::beacon::{
+    WHISTLEBLOWER_REWARD_QUOTIENT, genesis_validators_root,
+};
 use ream_network_spec::networks::beacon_network_spec;
 use ream_storage::{
     db::ReamDB,

@@ -5,7 +5,9 @@ use ream_consensus_beacon::{
     sync_aggregate::SyncAggregate,
     sync_committee::SyncCommittee,
 };
-use ream_consensus_misc::{constants::GENESIS_SLOT, misc::compute_sync_committee_period_at_slot};
+use ream_consensus_misc::{
+    constants::beacon::GENESIS_SLOT, misc::compute_sync_committee_period_at_slot,
+};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, typenum::U6};

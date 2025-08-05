@@ -1,6 +1,6 @@
 use alloy_primitives::B256;
 use ream_consensus_misc::{
-    constants::{ETH1_FOLLOW_DISTANCE, SECONDS_PER_ETH1_BLOCK},
+    constants::beacon::{ETH1_FOLLOW_DISTANCE, SECONDS_PER_ETH1_BLOCK},
     eth_1_data::Eth1Data,
 };
 use serde::{Deserialize, Serialize};

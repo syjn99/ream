@@ -7,7 +7,7 @@ use ssz_types::{BitVector, typenum::U64};
 use tree_hash::TreeHash;
 
 use crate::{
-    constants::{
+    constants::beacon::{
         COMPOUNDING_WITHDRAWAL_PREFIX, EPOCHS_PER_SYNC_COMMITTEE_PERIOD, GENESIS_FORK_VERSION,
         MAX_SEED_LOOKAHEAD, SHUFFLE_ROUND_COUNT, SLOTS_PER_EPOCH,
     },

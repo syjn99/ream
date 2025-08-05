@@ -16,7 +16,7 @@ use ream_consensus_beacon::{
     },
     execution_requests::ExecutionRequests,
 };
-use ream_consensus_misc::constants::{
+use ream_consensus_misc::constants::beacon::{
     CONSOLIDATION_REQUEST_TYPE, DEPOSIT_REQUEST_TYPE, WITHDRAWAL_REQUEST_TYPE,
 };
 use reqwest::{Client, Request, Url};

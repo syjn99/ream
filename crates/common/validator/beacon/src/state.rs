@@ -8,7 +8,7 @@ use ream_consensus_beacon::{
     execution_engine::engine_trait::ExecutionApi,
 };
 use ream_consensus_misc::{
-    constants::DOMAIN_RANDAO,
+    constants::beacon::DOMAIN_RANDAO,
     misc::{compute_epoch_at_slot, compute_signing_root},
 };
 use tree_hash::TreeHash;

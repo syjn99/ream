@@ -5,7 +5,9 @@ use ream_consensus_beacon::{
     electra::beacon_block::SignedBeaconBlock, execution_engine::engine_trait::ExecutionApi,
     predicates::is_slashable_attestation_data,
 };
-use ream_consensus_misc::{constants::INTERVALS_PER_SLOT, misc::compute_start_slot_at_epoch};
+use ream_consensus_misc::{
+    constants::beacon::INTERVALS_PER_SLOT, misc::compute_start_slot_at_epoch,
+};
 use ream_network_spec::networks::beacon_network_spec;
 use ream_storage::{
     errors::StoreError,

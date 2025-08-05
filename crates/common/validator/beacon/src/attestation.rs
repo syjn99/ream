@@ -9,7 +9,7 @@ use ream_bls::{
 use ream_consensus_beacon::{attestation::Attestation, electra::beacon_state::BeaconState};
 use ream_consensus_misc::{
     attestation_data::AttestationData,
-    constants::{
+    constants::beacon::{
         DOMAIN_BEACON_ATTESTER, MAX_COMMITTEES_PER_SLOT, MAX_VALIDATORS_PER_COMMITTEE,
         SLOTS_PER_EPOCH,
     },

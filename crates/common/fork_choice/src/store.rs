@@ -18,7 +18,7 @@ use ream_consensus_beacon::{
 };
 use ream_consensus_misc::{
     checkpoint::Checkpoint,
-    constants::{GENESIS_EPOCH, GENESIS_SLOT, INTERVALS_PER_SLOT, SLOTS_PER_EPOCH},
+    constants::beacon::{GENESIS_EPOCH, GENESIS_SLOT, INTERVALS_PER_SLOT, SLOTS_PER_EPOCH},
     misc::{compute_epoch_at_slot, compute_start_slot_at_epoch, is_shuffling_stable},
 };
 use ream_network_spec::networks::beacon_network_spec;

@@ -13,7 +13,7 @@ use futures::{
 };
 use libp2p::{OutboundUpgrade, bytes::Buf, core::UpgradeInfo};
 use ream_consensus_beacon::{blob_sidecar::BlobSidecar, electra::beacon_block::SignedBeaconBlock};
-use ream_consensus_misc::constants::genesis_validators_root;
+use ream_consensus_misc::constants::beacon::genesis_validators_root;
 use ream_network_spec::networks::beacon_network_spec;
 use snap::{read::FrameDecoder, write::FrameEncoder};
 use ssz::{Decode, Encode};

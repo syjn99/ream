@@ -5,12 +5,13 @@ use std::{
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{
-    QueueItem, SLOT_DURATION,
+    QueueItem,
     block::Block,
     get_fork_choice_head, get_latest_justified_hash, is_justifiable_slot, process_block,
     state::LeanState,
     vote::{SignedVote, Vote},
 };
+use ream_consensus_misc::constants::lean::SLOT_DURATION;
 use ream_p2p::network::lean::NetworkService;
 use ream_pqc::PQSignature;
 use ssz_types::VariableList;

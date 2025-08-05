@@ -1,5 +1,6 @@
 use alloy_primitives::B256;
 use anyhow::anyhow;
+use ream_consensus_misc::constants::lean::VALIDATOR_REGISTRY_LIMIT;
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{
@@ -8,7 +9,7 @@ use ssz_types::{
 };
 use tree_hash_derive::TreeHash;
 
-use crate::{VALIDATOR_REGISTRY_LIMIT, config::Config};
+use crate::config::Config;
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct LeanState {
