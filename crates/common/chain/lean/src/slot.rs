@@ -11,9 +11,9 @@ pub fn get_current_slot() -> u64 {
     let genesis_time = network_spec.genesis_time;
 
     let genesis_instant = UNIX_EPOCH + Duration::from_secs(genesis_time);
-    let elapsed = genesis_instant
-        .duration_since(SystemTime::now())
-        .expect("Genesis time is in the past");
+    let elapsed = SystemTime::now()
+        .duration_since(genesis_instant)
+        .expect("Called before genesis time");
 
     elapsed.as_secs() / seconds_per_slot
 }
