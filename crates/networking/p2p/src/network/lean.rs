@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 /// NetworkService is responsible for the following:
-/// 1. Peer discovery and management.
+/// 1. Peer management. (We will connect with static peers for PQ devnet.)
 /// 2. Gossiping blocks and votes.
 ///
 /// TBD: It will be best if we reuse the existing NetworkManagerService for the beacon node.
