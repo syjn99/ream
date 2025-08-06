@@ -4,26 +4,25 @@ use ream_chain_lean::lean_chain::LeanChain;
 use tokio::sync::RwLock;
 use tracing::info;
 
+/// NetworkService is responsible for the following:
+/// 1. Peer discovery and management.
+/// 2. Gossiping blocks and votes.
+///
+/// TBD: It will be best if we reuse the existing NetworkManagerService for the beacon node.
 pub struct NetworkService {
-    pub time: u64,
-
     lean_chain: Arc<RwLock<LeanChain>>,
 }
 
 impl NetworkService {
     pub async fn new(lean_chain: Arc<RwLock<LeanChain>>) -> Self {
-        NetworkService {
-            time: 0,
-
-            lean_chain,
-        }
+        NetworkService { lean_chain }
     }
 
     pub async fn start(self) {
         info!("NetworkService started");
-
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(10));
-        }
+        info!(
+            "Current LeanChain head: {}",
+            self.lean_chain.read().await.head
+        );
     }
 }

@@ -13,6 +13,11 @@ use tracing::info;
 
 use crate::lean_chain::LeanChain;
 
+/// LeanChainService is responsible for updating the [LeanChain] state. `LeanChain` is updated when:
+/// 1. Every third (t=2/4) and fourth (t=3/4) ticks.
+/// 2. Receiving new blocks or votes from the network.
+///
+/// NOTE: This service will be the core service to implement `receive()` function.
 pub struct LeanChainService {
     lean_chain: Arc<RwLock<LeanChain>>,
 }

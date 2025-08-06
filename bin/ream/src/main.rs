@@ -96,6 +96,14 @@ fn main() {
 }
 
 /// Runs the lean node.
+///
+/// A lean node runs several services with different responsibilities.
+/// Refer to each service's documentation for more details.
+///
+/// A lean node has one shared state, `LeanChain` (wrapped with synchronization primitives), which
+/// is used by all services.
+///
+/// Besides the shared state, each service holds the channels to communicate with each other.
 pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     info!("starting up lean node...");
 
@@ -124,10 +132,11 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     let lean_chain = Arc::new(RwLock::new(LeanChain::new(genesis_block, genesis_state)));
 
     // Initialize the services that will run in the lean node.
-    // TODO: Add RPC service for lean node.
+    // TODO 1: Load keystores from the config.
+    // TODO 2: Add RPC service for lean node.
     let chain_service = LeanChainService::new(lean_chain.clone()).await;
     let network_service = LeanNetworkService::new(lean_chain.clone()).await;
-    let validator_service = LeanValidatorService::new(lean_chain.clone()).await;
+    let validator_service = LeanValidatorService::new(lean_chain.clone(), Vec::new()).await;
 
     // Start the services concurrently.
     let chain_future = executor.spawn(async move {

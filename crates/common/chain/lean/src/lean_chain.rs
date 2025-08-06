@@ -10,6 +10,10 @@ use tree_hash::TreeHash;
 
 use crate::slot::get_current_slot;
 
+/// [LeanChain] represents the state that the Lean node should maintain.
+///
+/// Most of the fields are based on the Python implementation of [`Staker`](https://github.com/ethereum/research/blob/d225a6775a9b184b5c1fd6c830cc58a375d9535f/3sf-mini/p2p.py#L15-L42),
+/// but doesn't include `validator_id` as a node should manage multiple validators.
 #[derive(Clone, Debug)]
 pub struct LeanChain {
     pub chain: HashMap<B256, Block>,
@@ -94,7 +98,7 @@ impl LeanChain {
         Ok(())
     }
 
-    pub fn build_block(&mut self) -> anyhow::Result<Block> {
+    pub fn propose_block(&mut self) -> anyhow::Result<Block> {
         let new_slot = get_current_slot();
 
         let head_state = self
