@@ -1,5 +1,7 @@
 use std::{
-    env, process,
+    env,
+    ops::Deref,
+    process,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -97,7 +99,25 @@ fn main() {
 pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     info!("starting up lean node...");
 
-    set_lean_network_spec(config.network.clone());
+    // Hack: It is bothersome to modify the spec every time we run the lean node.
+    // Set genesis time to a future time if it is in the past.
+    // FIXME: Add a script to generate the YAML config file.
+    let network = {
+        let current_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("System time is before UNIX epoch")
+            .as_secs();
+
+        if config.network.genesis_time < current_timestamp {
+            let mut network = config.network.deref().clone();
+            network.genesis_time = current_timestamp + 3; // Set genesis time to 3 seconds in the future.
+            Arc::new(network)
+        } else {
+            config.network.clone()
+        }
+    };
+
+    set_lean_network_spec(network);
 
     // Initialize the lean chain with genesis block and state.
     let (genesis_block, genesis_state) = lean_genesis::setup_genesis();
