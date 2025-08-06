@@ -99,13 +99,17 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
 
     set_lean_network_spec(config.network.clone());
 
+    // Initialize the lean chain with genesis block and state.
     let (genesis_block, genesis_state) = lean_genesis::setup_genesis();
     let lean_chain = Arc::new(RwLock::new(LeanChain::new(genesis_block, genesis_state)));
 
+    // Initialize the services that will run in the lean node.
+    // TODO: Add RPC service for lean node.
     let chain_service = LeanChainService::new(lean_chain.clone()).await;
     let network_service = LeanNetworkService::new(lean_chain.clone()).await;
     let validator_service = LeanValidatorService::new(lean_chain.clone()).await;
 
+    // Start the services concurrently.
     let chain_future = executor.spawn(async move {
         chain_service.start().await;
     });

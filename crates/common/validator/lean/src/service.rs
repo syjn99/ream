@@ -14,7 +14,6 @@ use tracing::{debug, info};
 
 // TODO: We need to replace this after PQC integration.
 // For now, we only need ID for keystore.
-// Keystore MUST have
 struct LeanKeystore {
     id: u64,
 }
@@ -78,10 +77,14 @@ impl ValidatorService {
                             if let Some(keystore) = self.is_proposer() {
                                 debug!("Propose block, validator ID: {}", keystore.id);
 
+                                // Acquire the write lock. `accept_new_votes` and `build_block` will modify the lean chain.
                                 let mut lean_chain = self.lean_chain.write().await;
-                                lean_chain.accept_new_votes().expect("Failed to accept new votes");
-                                let new_block = lean_chain.build_block().expect("Failed to build block");
 
+                                // Accept new votes and modify the lean chain.
+                                lean_chain.accept_new_votes().expect("Failed to accept new votes");
+
+                                // Build a block from the lean chain.
+                                let new_block = lean_chain.build_block().expect("Failed to build block");
 
                                 debug!(
                                     "Built block for validator {} at slot {}",
@@ -90,6 +93,7 @@ impl ValidatorService {
 
                                 // TODO 1: Sign the block with the keystore.
                                 // TODO 2: Send the block to the network.
+                            } else {
                                 debug!("Not a proposer, skipping block proposal.");
                             }
                         }
