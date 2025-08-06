@@ -10,7 +10,7 @@ use tokio::{
     sync::RwLock,
     time::{Instant, MissedTickBehavior, interval_at},
 };
-use tracing::{debug, info};
+use tracing::info;
 
 // TODO: We need to replace this after PQC integration.
 // For now, we only need ID for keystore.
@@ -75,7 +75,7 @@ impl ValidatorService {
                         0 => {
                             // First tick (t=0): Propose a block.
                             if let Some(keystore) = self.is_proposer() {
-                                debug!("Propose block, validator ID: {}", keystore.id);
+                                info!("Propose block, validator ID: {}", keystore.id);
 
                                 // Acquire the write lock. `accept_new_votes` and `build_block` will modify the lean chain.
                                 let mut lean_chain = self.lean_chain.write().await;
@@ -86,7 +86,7 @@ impl ValidatorService {
                                 // Build a block from the lean chain.
                                 let new_block = lean_chain.build_block().expect("Failed to build block");
 
-                                debug!(
+                                info!(
                                     "Built block for validator {} at slot {}",
                                     keystore.id, new_block.slot
                                 );
@@ -94,12 +94,12 @@ impl ValidatorService {
                                 // TODO 1: Sign the block with the keystore.
                                 // TODO 2: Send the block to the network.
                             } else {
-                                debug!("Not a proposer, skipping block proposal.");
+                                info!("Not a proposer, skipping block proposal.");
                             }
                         }
                         1 => {
                             // Second tick (t=1/4): Vote.
-                            debug!("Vote.");
+                            info!("Vote.");
 
                             // Build the vote from LeanChain, and modify its validator ID
                             let vote_template = self.lean_chain.read().await.build_vote().expect("Failed to build vote");
