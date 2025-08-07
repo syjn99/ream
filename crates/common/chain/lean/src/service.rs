@@ -15,7 +15,7 @@ use tokio::{
 use tracing::info;
 use tree_hash::TreeHash;
 
-use crate::lean_chain::LeanChain;
+use crate::{lean_chain::LeanChain, slot::get_current_slot};
 
 #[derive(Debug, Clone)]
 pub struct LeanChainServiceMessage {
@@ -48,14 +48,14 @@ impl LeanChainService {
     }
 
     pub async fn start(mut self) {
-        info!("Lean Chain Service started");
-
         // TODO: Duplicate clock logic from ValidatorService. May need to refactor later.
 
         // Get the Lean network specification.
         let network_spec = lean_network_spec();
         let seconds_per_slot = network_spec.seconds_per_slot;
         let genesis_time = network_spec.genesis_time;
+
+        info!("LeanChainService started with genesis_time={genesis_time}");
 
         // Calculate the genesis instant from the genesis time (in seconds).
         let genesis_instant = UNIX_EPOCH + Duration::from_secs(genesis_time);
@@ -80,13 +80,15 @@ impl LeanChainService {
                     match tick_count % 4 {
                         2 => {
                             // Third tick (t=2/4): Compute the safe target.
-                            info!("Compute safe target.");
+                            let current_slot = get_current_slot();
+                            info!("Computing safe target at slot {current_slot} (tick {tick_count})");
                             let mut lean_chain = self.lean_chain.write().await;
                             lean_chain.safe_target = lean_chain.compute_safe_target().expect("Failed to compute safe target");
                         }
                         3 => {
                             // Fourth tick (t=3/4): Accept new votes.
-                            info!("Accept new votes.");
+                            let current_slot = get_current_slot();
+                            info!("Accepting new votes at slot {current_slot} (tick {tick_count})");
                             self.lean_chain.write().await.accept_new_votes().expect("Failed to accept new votes");
                         }
                         _ => {
@@ -109,11 +111,22 @@ impl LeanChainService {
     async fn handle_item(&mut self, item: QueueItem) {
         match item {
             QueueItem::BlockItem(block) => {
-                info!("Received block: {:?}", block);
+                let block_hash = block.tree_hash_root();
+                info!(
+                    "Received block at slot {} with hash {block_hash:?} from parent {:?}",
+                    block.slot, block.parent
+                );
                 let _ = self.handle_block(block).await;
             }
             QueueItem::VoteItem(vote_item) => {
-                info!("Received vote_item: {:?}", vote_item);
+                let vote = match &vote_item {
+                    VoteItem::Signed(signed) => &signed.data,
+                    VoteItem::Unsigned(vote) => vote,
+                };
+                info!(
+                    "Received vote from validator {} for head {:?} at slot {}",
+                    vote.validator_id, vote.head, vote.slot
+                );
                 self.handle_vote(vote_item).await;
             }
         }

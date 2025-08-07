@@ -61,14 +61,17 @@ impl ValidatorService {
     }
 
     pub async fn start(self) {
-        info!("Validator Service started");
-
         // TODO: Duplicate clock logic from LeanChainService. May need to refactor later.
 
         // Get the Lean network specification.
         let network_spec = lean_network_spec();
         let seconds_per_slot = network_spec.seconds_per_slot;
         let genesis_time = network_spec.genesis_time;
+
+        info!(
+            "ValidatorService started with {} validator(s), genesis_time={genesis_time}",
+            self.keystores.len()
+        );
 
         // Calculate the genesis instant from the genesis time (in seconds).
         let genesis_instant = UNIX_EPOCH + Duration::from_secs(genesis_time);
@@ -93,8 +96,9 @@ impl ValidatorService {
                     match tick_count % 4 {
                         0 => {
                             // First tick (t=0): Propose a block.
+                            let current_slot = get_current_slot();
                             if let Some(keystore) = self.is_proposer() {
-                                info!("Propose block by validator {}", keystore.id);
+                                info!("Validator {} proposing block for slot {current_slot} (tick {tick_count})", keystore.id);
 
                                 // Acquire the write lock. `accept_new_votes` and `build_block` will modify the lean chain.
                                 let mut lean_chain = self.lean_chain.write().await;
@@ -106,7 +110,7 @@ impl ValidatorService {
                                 let new_block = lean_chain.propose_block().expect("Failed to build block");
 
                                 info!(
-                                    "Built block for validator {}. Block Info(slot: {}, parent: {}, len(votes): {}, state_root: {})",
+                                    "Validator {} built block: slot={}, parent={:?}, votes={}, state_root={:?}",
                                     keystore.id,
                                     new_block.slot,
                                     new_block.parent,
@@ -117,21 +121,23 @@ impl ValidatorService {
                                 // TODO 1: Sign the block with the keystore.
                                 // TODO 2: Send the block to the network.
                             } else {
-                                info!("Not a proposer, skipping block proposal.");
+                                let proposer_index = current_slot % lean_network_spec().num_validators;
+                                info!("Not proposer for slot {current_slot} (proposer is validator {proposer_index}), skipping");
                             }
                         }
                         1 => {
                             // Second tick (t=1/4): Vote.
-                            info!("Vote.");
+                            let current_slot = get_current_slot();
+                            info!("Starting vote phase at slot {current_slot} (tick {tick_count}): {} validator(s) voting", self.keystores.len());
 
                             // Build the vote from LeanChain, and modify its validator ID
                             let vote_template = self.lean_chain.read().await.build_vote().expect("Failed to build vote");
 
-                            info!("Built votes for validators: {vote_template:?}");
+                            info!("Built vote template for head {:?} at slot {} with target {:?}", vote_template.head, vote_template.slot, vote_template.target);
 
-                            let votes = self.keystores.iter().map(|ks| {
+                            let votes = self.keystores.iter().map(|keystore| {
                                 let mut vote = vote_template.clone();
-                                vote.validator_id = ks.id;
+                                vote.validator_id = keystore.id;
                                 vote
                             }).collect::<Vec<_>>();
 
@@ -163,6 +169,6 @@ impl ValidatorService {
 
         self.keystores
             .iter()
-            .find(|ks| ks.id == proposer_index as u64)
+            .find(|keystore| keystore.id == proposer_index as u64)
     }
 }
