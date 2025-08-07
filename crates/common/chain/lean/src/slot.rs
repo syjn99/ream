@@ -2,8 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ream_network_spec::networks::lean_network_spec;
 
-/// NOTE: Vitalik's implementation of 3SF-mini adds 2 slots more due to the test setup, unlike our
-/// implementation.
+/// NOTE: Vitalik's implementation of 3SF-mini adds 2 slots more due to the test setup.
 /// This is due to the fact that his test code starts at slot 1.
 pub fn get_current_slot() -> u64 {
     let network_spec = lean_network_spec();
@@ -15,5 +14,5 @@ pub fn get_current_slot() -> u64 {
         .duration_since(genesis_instant)
         .expect("Called before genesis time");
 
-    elapsed.as_secs() / seconds_per_slot
+    (elapsed.as_secs() / seconds_per_slot) + 2
 }
