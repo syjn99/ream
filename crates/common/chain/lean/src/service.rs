@@ -119,14 +119,22 @@ impl LeanChainService {
                 let _ = self.handle_block(block).await;
             }
             QueueItem::VoteItem(vote_item) => {
-                let vote = match &vote_item {
-                    VoteItem::Signed(signed) => &signed.data,
-                    VoteItem::Unsigned(vote) => vote,
-                };
-                info!(
-                    "Received vote from validator {} for head {:?} at slot {}",
-                    vote.validator_id, vote.head, vote.slot
-                );
+                match &vote_item {
+                    VoteItem::Signed(signed_vote) => {
+                        let vote = &signed_vote.data;
+                        info!(
+                            "Received signed vote from validator {} for head {:?} at slot {}",
+                            vote.validator_id, vote.head, vote.slot
+                        );
+                    }
+                    VoteItem::Unsigned(vote) => {
+                        info!(
+                            "Received unsigned vote from validator {} for head {:?} at slot {}",
+                            vote.validator_id, vote.head, vote.slot
+                        );
+                    }
+                }
+
                 self.handle_vote(vote_item).await;
             }
         }

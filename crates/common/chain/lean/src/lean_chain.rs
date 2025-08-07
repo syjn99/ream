@@ -188,7 +188,9 @@ impl LeanChain {
             .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?;
 
         Ok(Vote {
-            // Replace with actual validator ID
+            // NOTE: This is a placeholder for `validator_id`.
+            // This field will eventually be set by the `ValidatorService` with the actual validator
+            // IDs.
             validator_id: 0,
             slot: get_current_slot(),
             head: self.head,
