@@ -10,6 +10,7 @@ pub static LEAN_NETWORK_SPEC: OnceLock<Arc<LeanNetworkSpec>> = OnceLock::new();
 pub struct LeanNetworkSpec {
     pub genesis_time: u64,
     pub seconds_per_slot: u64,
+    pub num_validators: u64,
 }
 
 /// MUST be called only once at the start of the application to initialize static

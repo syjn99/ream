@@ -5161,6 +5161,7 @@ dependencies = [
  "rand 0.8.5",
  "ream-account-manager",
  "ream-beacon-api-types",
+ "ream-chain-lean",
  "ream-checkpoint-sync",
  "ream-consensus-beacon",
  "ream-consensus-misc",
@@ -5262,7 +5263,6 @@ dependencies = [
  "ream-consensus-lean",
  "ream-consensus-misc",
  "ream-network-spec",
- "ream-p2p",
  "ream-pqc",
  "serde",
  "ssz_types",
@@ -5570,6 +5570,7 @@ dependencies = [
  "libp2p-identity",
  "libp2p-mplex",
  "parking_lot",
+ "ream-chain-lean",
  "ream-consensus-beacon",
  "ream-consensus-misc",
  "ream-discv5",
@@ -5756,6 +5757,11 @@ dependencies = [
 name = "ream-validator-lean"
 version = "0.1.0"
 dependencies = [
+ "ream-chain-lean",
+ "ream-consensus-lean",
+ "ream-consensus-misc",
+ "ream-network-spec",
+ "tokio",
  "tracing",
 ]
 

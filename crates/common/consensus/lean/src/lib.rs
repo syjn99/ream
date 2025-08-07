@@ -16,9 +16,15 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum VoteItem {
+    Signed(SignedVote),
+    Unsigned(Vote),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum QueueItem {
     BlockItem(Block),
-    VoteItem(SignedVote),
+    VoteItem(VoteItem),
 }
 
 /// We allow justification of slots either <= 5 or a perfect square or oblong after
@@ -126,7 +132,7 @@ pub fn get_fork_choice_head(
     let mut root = *provided_root;
 
     // Start at genesis by default
-    if *root == B256::ZERO {
+    if root == B256::ZERO {
         root = blocks
             .iter()
             .min_by_key(|(_, block)| block.slot)
