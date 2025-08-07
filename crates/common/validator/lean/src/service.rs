@@ -3,11 +3,14 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use ream_chain_lean::{lean_chain::LeanChain, slot::get_current_slot};
+use ream_chain_lean::{
+    lean_chain::LeanChain, service::LeanChainServiceMessage, slot::get_current_slot,
+};
+use ream_consensus_lean::{QueueItem, VoteItem};
 use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
 use tokio::{
-    sync::RwLock,
+    sync::{RwLock, mpsc},
     time::{Instant, MissedTickBehavior, interval_at},
 };
 use tracing::info;
@@ -28,15 +31,24 @@ pub struct LeanKeystore {
 /// NOTE: Other ticks should be handled by the other services, such as [LeanChainService].
 pub struct ValidatorService {
     lean_chain: Arc<RwLock<LeanChain>>,
-
     keystores: Vec<LeanKeystore>,
+    chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
 }
 
 impl ValidatorService {
-    pub async fn new(lean_chain: Arc<RwLock<LeanChain>>, keystores: Vec<LeanKeystore>) -> Self {
+    pub async fn new(
+        lean_chain: Arc<RwLock<LeanChain>>,
+        keystores: Vec<LeanKeystore>,
+        chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+    ) -> Self {
         // Hack: If no keystores are provided, create a default one.
         let keystores = if keystores.is_empty() {
-            vec![LeanKeystore { id: 0 }] // Placeholder for keystores
+            vec![
+                LeanKeystore { id: 0 },
+                LeanKeystore { id: 1 },
+                LeanKeystore { id: 2 },
+                LeanKeystore { id: 3 },
+            ] // Placeholder for keystores
         } else {
             keystores
         };
@@ -44,6 +56,7 @@ impl ValidatorService {
         ValidatorService {
             lean_chain,
             keystores,
+            chain_sender,
         }
     }
 
@@ -116,15 +129,22 @@ impl ValidatorService {
 
                             info!("Built votes for validators: {vote_template:?}");
 
-                            let _votes = self.keystores.iter().map(|ks| {
+                            let votes = self.keystores.iter().map(|ks| {
                                 let mut vote = vote_template.clone();
                                 vote.validator_id = ks.id;
                                 vote
                             }).collect::<Vec<_>>();
 
-                            // TODO 1: Send these votes to `LeanChainService`.
-                            // TODO 2: Sign the votes with the keystore.
-                            // TODO 3: Send the votes to the network.
+                            for vote in votes {
+                                self.chain_sender
+                                    .send(LeanChainServiceMessage {
+                                        item: QueueItem::VoteItem(VoteItem::Unsigned(vote)),
+                                    })
+                                    .expect("Failed to send vote to LeanChainService");
+                            }
+
+                            // TODO 1: Sign the votes with the keystore.
+                            // TODO 2: Send the votes to the network.
                         }
                         _ => {
                             // Other ticks (t=2/4, t=3/4): Do nothing.

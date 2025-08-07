@@ -16,9 +16,15 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum VoteItem {
+    Signed(SignedVote),
+    Unsigned(Vote),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum QueueItem {
     BlockItem(Block),
-    VoteItem(SignedVote),
+    VoteItem(VoteItem),
 }
 
 /// We allow justification of slots either <= 5 or a perfect square or oblong after

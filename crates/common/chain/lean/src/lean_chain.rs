@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{
-    QueueItem, block::Block, get_fork_choice_head, get_latest_justified_hash, is_justifiable_slot,
+    block::Block, get_fork_choice_head, get_latest_justified_hash, is_justifiable_slot,
     process_block, state::LeanState, vote::Vote,
 };
 use ssz_types::VariableList;
@@ -20,7 +20,6 @@ pub struct LeanChain {
     pub post_states: HashMap<B256, LeanState>,
     pub known_votes: Vec<Vote>,
     pub new_votes: Vec<Vote>,
-    pub dependencies: HashMap<B256, Vec<QueueItem>>,
     pub genesis_hash: B256,
     pub num_validators: u64,
     pub safe_target: B256,
@@ -36,8 +35,6 @@ impl LeanChain {
             known_votes: Vec::new(),
             // Votes that we have received but not yet taken into account
             new_votes: Vec::new(),
-            // Objects that we will process once we have processed their parents
-            dependencies: HashMap::new(),
             // Initialize the chain with the genesis block
             genesis_hash,
             num_validators: genesis_state.config.num_validators,

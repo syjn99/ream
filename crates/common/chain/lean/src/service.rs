@@ -1,17 +1,25 @@
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use alloy_primitives::B256;
+use ream_consensus_lean::{QueueItem, VoteItem};
 use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
 use tokio::{
-    sync::RwLock,
+    sync::{RwLock, mpsc},
     time::{Instant, MissedTickBehavior, interval_at},
 };
 use tracing::info;
 
 use crate::lean_chain::LeanChain;
+
+#[derive(Debug, Clone)]
+pub struct LeanChainServiceMessage {
+    pub item: QueueItem,
+}
 
 /// LeanChainService is responsible for updating the [LeanChain] state. `LeanChain` is updated when:
 /// 1. Every third (t=2/4) and fourth (t=3/4) ticks.
@@ -20,14 +28,25 @@ use crate::lean_chain::LeanChain;
 /// NOTE: This service will be the core service to implement `receive()` function.
 pub struct LeanChainService {
     lean_chain: Arc<RwLock<LeanChain>>,
+    receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
+
+    // Objects that we will process once we have processed their parents
+    dependencies: HashMap<B256, Vec<QueueItem>>,
 }
 
 impl LeanChainService {
-    pub async fn new(lean_chain: Arc<RwLock<LeanChain>>) -> Self {
-        LeanChainService { lean_chain }
+    pub async fn new(
+        lean_chain: Arc<RwLock<LeanChain>>,
+        receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
+    ) -> Self {
+        LeanChainService {
+            lean_chain,
+            receiver,
+            dependencies: HashMap::new(),
+        }
     }
 
-    pub async fn start(self) {
+    pub async fn start(mut self) {
         info!("Lean Chain Service started");
 
         // TODO: Duplicate clock logic from ValidatorService. May need to refactor later.
@@ -75,7 +94,51 @@ impl LeanChainService {
                     }
                     tick_count += 1;
                 }
+                Some(message) = self.receiver.recv() => {
+                    self.handle_message(message).await;
+                }
             }
+        }
+    }
+
+    async fn handle_message(&mut self, message: LeanChainServiceMessage) {
+        match message.item {
+            QueueItem::BlockItem(block) => {
+                info!("Received block: {:?}", block);
+            }
+            QueueItem::VoteItem(vote_item) => {
+                info!("Received vote_item: {:?}", vote_item);
+                self.handle_vote(vote_item).await;
+            }
+        }
+    }
+
+    async fn handle_vote(&mut self, vote_item: VoteItem) {
+        let vote = match vote_item {
+            VoteItem::Signed(vote) => {
+                // TODO: Validate the signature.
+                vote.data
+            }
+            VoteItem::Unsigned(vote) => vote,
+        };
+
+        let lean_chain = self.lean_chain.read().await;
+        let is_known_vote = lean_chain.known_votes.contains(&vote);
+        let is_new_vote = lean_chain.new_votes.contains(&vote);
+
+        if is_known_vote || is_new_vote {
+            // Do nothing
+        } else if lean_chain.chain.contains_key(&vote.head) {
+            drop(lean_chain);
+
+            // We should acquire another write lock
+            let mut lean_chain = self.lean_chain.write().await;
+            lean_chain.new_votes.push(vote);
+        } else {
+            self.dependencies
+                .entry(vote.head)
+                .or_default()
+                .push(QueueItem::VoteItem(VoteItem::Unsigned(vote)));
         }
     }
 }

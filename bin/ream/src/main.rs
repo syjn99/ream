@@ -17,7 +17,11 @@ use ream::cli::{
     voluntary_exit::VoluntaryExitConfig,
 };
 use ream_beacon_api_types::id::{ID, ValidatorID};
-use ream_chain_lean::{genesis as lean_genesis, lean_chain::LeanChain, service::LeanChainService};
+use ream_chain_lean::{
+    genesis as lean_genesis,
+    lean_chain::LeanChain,
+    service::{LeanChainService, LeanChainServiceMessage},
+};
 use ream_checkpoint_sync::initialize_db_from_checkpoint;
 use ream_consensus_misc::{
     constants::beacon::set_genesis_validator_root, misc::compute_epoch_at_slot,
@@ -40,7 +44,7 @@ use ream_validator_beacon::{
     voluntary_exit::process_voluntary_exit,
 };
 use ream_validator_lean::service::ValidatorService as LeanValidatorService;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, mpsc};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -132,11 +136,14 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     let lean_chain = Arc::new(RwLock::new(LeanChain::new(genesis_block, genesis_state)));
 
     // Initialize the services that will run in the lean node.
+    let (chain_sender, chain_receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
+
     // TODO 1: Load keystores from the config.
     // TODO 2: Add RPC service for lean node.
-    let chain_service = LeanChainService::new(lean_chain.clone()).await;
+    let chain_service = LeanChainService::new(lean_chain.clone(), chain_receiver).await;
     let network_service = LeanNetworkService::new(lean_chain.clone()).await;
-    let validator_service = LeanValidatorService::new(lean_chain.clone(), Vec::new()).await;
+    let validator_service =
+        LeanValidatorService::new(lean_chain.clone(), Vec::new(), chain_sender).await;
 
     // Start the services concurrently.
     let chain_future = executor.spawn(async move {
