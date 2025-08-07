@@ -126,7 +126,7 @@ pub fn get_fork_choice_head(
     let mut root = *provided_root;
 
     // Start at genesis by default
-    if *root == B256::ZERO {
+    if root == B256::ZERO {
         root = blocks
             .iter()
             .min_by_key(|(_, block)| block.slot)
