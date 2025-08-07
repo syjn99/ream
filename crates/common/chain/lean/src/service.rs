@@ -5,7 +5,7 @@ use std::{
 };
 
 use alloy_primitives::B256;
-use ream_consensus_lean::{QueueItem, VoteItem};
+use ream_consensus_lean::{QueueItem, VoteItem, block::Block, process_block};
 use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
 use tokio::{
@@ -13,6 +13,7 @@ use tokio::{
     time::{Instant, MissedTickBehavior, interval_at},
 };
 use tracing::info;
+use tree_hash::TreeHash;
 
 use crate::lean_chain::LeanChain;
 
@@ -102,15 +103,67 @@ impl LeanChainService {
     }
 
     async fn handle_message(&mut self, message: LeanChainServiceMessage) {
-        match message.item {
+        self.handle_item(message.item).await;
+    }
+
+    async fn handle_item(&mut self, item: QueueItem) {
+        match item {
             QueueItem::BlockItem(block) => {
                 info!("Received block: {:?}", block);
+                let _ = self.handle_block(block).await;
             }
             QueueItem::VoteItem(vote_item) => {
                 info!("Received vote_item: {:?}", vote_item);
                 self.handle_vote(vote_item).await;
             }
         }
+    }
+
+    async fn handle_block(&mut self, block: Block) -> anyhow::Result<()> {
+        let block_hash = block.tree_hash_root();
+
+        let mut lean_chain = self.lean_chain.write().await;
+
+        // If the block is already known, ignore it
+        if lean_chain.chain.contains_key(&block_hash) {
+            return Ok(());
+        }
+
+        match lean_chain.post_states.get(&block.parent) {
+            Some(parent_state) => {
+                let state = process_block(parent_state, &block)?;
+
+                for vote in &block.votes {
+                    if !lean_chain.known_votes.contains(vote) {
+                        lean_chain.known_votes.push(vote.clone());
+                    }
+                }
+
+                lean_chain.chain.insert(block_hash, block);
+                lean_chain.post_states.insert(block_hash, state);
+
+                lean_chain.recompute_head()?;
+
+                drop(lean_chain);
+
+                // Once we have received a block, also process all of its dependencies
+                if let Some(queue_items) = self.dependencies.remove(&block_hash) {
+                    for item in queue_items {
+                        Box::pin(self.handle_item(item)).await;
+                    }
+                }
+            }
+            None => {
+                // If we have not yet seen the block's parent, ignore for now,
+                // process later once we actually see the parent
+                self.dependencies
+                    .entry(block.parent)
+                    .or_default()
+                    .push(QueueItem::BlockItem(block));
+            }
+        }
+
+        Ok(())
     }
 
     async fn handle_vote(&mut self, vote_item: VoteItem) {

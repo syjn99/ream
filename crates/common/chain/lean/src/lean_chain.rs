@@ -87,7 +87,7 @@ impl LeanChain {
     }
 
     /// Done upon processing new votes or a new block
-    fn recompute_head(&mut self) -> anyhow::Result<()> {
+    pub fn recompute_head(&mut self) -> anyhow::Result<()> {
         let justified_hash = get_latest_justified_hash(&self.post_states).ok_or_else(|| {
             anyhow::anyhow!("Failed to get latest_justified_hash from post_states")
         })?;
