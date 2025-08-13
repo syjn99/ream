@@ -143,7 +143,8 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
 
     // TODO 1: Load keystores from the config.
     // TODO 2: Add RPC service for lean node.
-    let chain_service = LeanChainService::new(lean_chain.clone(), chain_receiver).await;
+    let chain_service =
+        LeanChainService::new(lean_chain.clone(), chain_receiver, chain_sender.clone()).await;
     let network_service = LeanNetworkService::new(
         Arc::new(LeanNetworkConfig {
             gossipsub_config: LeanGossipsubConfig::default(),

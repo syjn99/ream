@@ -30,6 +30,7 @@ pub struct LeanChainServiceMessage {
 pub struct LeanChainService {
     lean_chain: Arc<RwLock<LeanChain>>,
     receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
+    sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
 
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
@@ -39,10 +40,12 @@ impl LeanChainService {
     pub async fn new(
         lean_chain: Arc<RwLock<LeanChain>>,
         receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
+        sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     ) -> Self {
         LeanChainService {
             lean_chain,
             receiver,
+            sender,
             dependencies: HashMap::new(),
         }
     }
@@ -123,14 +126,14 @@ impl LeanChainService {
                     VoteItem::Signed(signed_vote) => {
                         let vote = &signed_vote.data;
                         info!(
-                            "Received signed vote from validator {} for head {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.slot
+                            "Received signed vote from validator {} for head {:?} / source_slot {:?} at slot {}",
+                            vote.validator_id, vote.head, vote.source_slot, vote.slot
                         );
                     }
                     VoteItem::Unsigned(vote) => {
                         info!(
-                            "Received unsigned vote from validator {} for head {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.slot
+                            "Received unsigned vote from validator {} for head {:?} / source_slot {:?} at slot {}",
+                            vote.validator_id, vote.head, vote.source_slot, vote.slot
                         );
                     }
                 }
@@ -168,9 +171,10 @@ impl LeanChainService {
                 drop(lean_chain);
 
                 // Once we have received a block, also process all of its dependencies
+                // by sending them to this service itself.
                 if let Some(queue_items) = self.dependencies.remove(&block_hash) {
                     for item in queue_items {
-                        Box::pin(self.handle_item(item)).await;
+                        self.sender.send(LeanChainServiceMessage { item })?;
                     }
                 }
             }
