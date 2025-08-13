@@ -1,21 +1,14 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::B256;
+use anyhow::anyhow;
 use ream_consensus_lean::{QueueItem, VoteItem, block::Block, process_block};
-use ream_consensus_misc::constants::lean::INTERVALS_PER_SLOT;
 use ream_network_spec::networks::lean_network_spec;
-use tokio::{
-    sync::{RwLock, mpsc},
-    time::{Instant, MissedTickBehavior, interval_at},
-};
+use tokio::sync::{RwLock, mpsc};
 use tracing::info;
 use tree_hash::TreeHash;
 
-use crate::{lean_chain::LeanChain, slot::get_current_slot};
+use crate::{clock::create_lean_clock_interval, lean_chain::LeanChain, slot::get_current_slot};
 
 #[derive(Debug, Clone)]
 pub struct LeanChainServiceMessage {
@@ -50,32 +43,16 @@ impl LeanChainService {
         }
     }
 
-    pub async fn start(mut self) {
-        // TODO: Duplicate clock logic from ValidatorService. May need to refactor later.
-
-        // Get the Lean network specification.
-        let network_spec = lean_network_spec();
-        let seconds_per_slot = network_spec.seconds_per_slot;
-        let genesis_time = network_spec.genesis_time;
-
-        info!("LeanChainService started with genesis_time={genesis_time}");
-
-        // Calculate the genesis instant from the genesis time (in seconds).
-        let genesis_instant = UNIX_EPOCH + Duration::from_secs(genesis_time);
-
-        // Assume genesis time is "always" in the future,
-        // as we don't support syncing features yet.
-        let interval_start = Instant::now()
-            + genesis_instant
-                .duration_since(SystemTime::now())
-                .expect("Genesis time is in the past");
+    pub async fn start(mut self) -> anyhow::Result<()> {
+        info!(
+            "LeanChainService started with genesis_time: {}",
+            lean_network_spec().genesis_time
+        );
 
         let mut tick_count = 0u64;
-        let mut interval = interval_at(
-            interval_start,
-            Duration::from_secs(seconds_per_slot / INTERVALS_PER_SLOT),
-        );
-        interval.set_missed_tick_behavior(MissedTickBehavior::Burst);
+
+        let mut interval = create_lean_clock_interval()
+            .map_err(|err| anyhow!("Failed to create clock interval: {err}"))?;
 
         loop {
             tokio::select! {
