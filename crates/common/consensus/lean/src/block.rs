@@ -9,7 +9,7 @@ use crate::vote::Vote;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct SignedBlock {
-    pub message: Block,
+    pub data: Block,
     pub signature: PQSignature,
 }
 
