@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use anyhow::anyhow;
 use ream_consensus_lean::{
-    block::Block, get_fork_choice_head, get_latest_justified_hash, is_justifiable_slot,
-    process_block, state::LeanState, vote::Vote,
+    block::Block, checkpoint::Checkpoint, get_fork_choice_head, get_latest_justified_hash,
+    is_justifiable_slot, process_block, state::LeanState, vote::Vote,
 };
 use ssz_types::VariableList;
 use tree_hash::TreeHash;
@@ -58,7 +58,7 @@ impl LeanChain {
     pub fn latest_finalized_hash(&self) -> Option<B256> {
         self.post_states
             .get(&self.head)
-            .map(|state| state.latest_finalized_hash)
+            .map(|state| state.latest_finalized.root)
     }
 
     /// Compute the latest block that the staker is allowed to choose as the target
@@ -119,7 +119,7 @@ impl LeanChain {
                 .known_votes
                 .clone()
                 .into_iter()
-                .filter(|vote| vote.source == state.latest_justified_hash)
+                .filter(|vote| vote.source.root == state.latest_justified.root)
                 .filter(|vote| !new_block.votes.contains(vote))
                 .collect::<Vec<_>>();
 
@@ -173,7 +173,7 @@ impl LeanChain {
 
         // If the latest finalized slot is very far back, then only some slots are
         // valid to justify, make sure the target is one of those
-        while !is_justifiable_slot(&state.latest_finalized_slot, &target_block.slot) {
+        while !is_justifiable_slot(&state.latest_finalized.slot, &target_block.slot) {
             target_block = self.chain.get(&target_block.parent).ok_or_else(|| {
                 anyhow!(
                     "Block not found for target block's parent hash: {}",
@@ -193,12 +193,18 @@ impl LeanChain {
             // IDs.
             validator_id: 0,
             slot: get_current_slot(),
-            head: self.head,
-            head_slot: head_block.slot,
-            target: target_block.tree_hash_root(),
-            target_slot: target_block.slot,
-            source: state.latest_justified_hash,
-            source_slot: state.latest_justified_slot,
+            head: Checkpoint {
+                root: self.head,
+                slot: head_block.slot,
+            },
+            target: Checkpoint {
+                root: target_block.tree_hash_root(),
+                slot: target_block.slot,
+            },
+            source: Checkpoint {
+                root: state.latest_justified.root,
+                slot: state.latest_justified.slot,
+            },
         })
     }
 

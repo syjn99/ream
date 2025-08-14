@@ -9,16 +9,14 @@ use ssz_types::{
 };
 use tree_hash_derive::TreeHash;
 
-use crate::config::Config;
+use crate::{checkpoint::Checkpoint, config::Config};
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct LeanState {
     pub config: Config,
 
-    pub latest_justified_hash: B256,
-    pub latest_justified_slot: u64,
-    pub latest_finalized_hash: B256,
-    pub latest_finalized_slot: u64,
+    pub latest_justified: Checkpoint,
+    pub latest_finalized: Checkpoint,
 
     pub historical_block_hashes: VariableList<B256, U262144>,
     pub justified_slots: VariableList<bool, U262144>,
@@ -36,10 +34,8 @@ impl LeanState {
         LeanState {
             config: Config { num_validators },
 
-            latest_justified_hash: B256::ZERO,
-            latest_justified_slot: 0,
-            latest_finalized_hash: B256::ZERO,
-            latest_finalized_slot: 0,
+            latest_justified: Checkpoint::default(),
+            latest_finalized: Checkpoint::default(),
 
             historical_block_hashes: VariableList::empty(),
             justified_slots: VariableList::empty(),

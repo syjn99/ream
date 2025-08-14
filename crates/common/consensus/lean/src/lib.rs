@@ -1,4 +1,5 @@
 pub mod block;
+pub mod checkpoint;
 pub mod config;
 pub mod state;
 pub mod vote;
@@ -75,37 +76,37 @@ pub fn process_block(pre_state: &LeanState, block: &Block) -> anyhow::Result<Lea
         // Ignore votes whose source is not already justified,
         // or whose target is not in the history, or whose target is not a
         // valid justifiable slot
-        if !state.justified_slots[vote.source_slot as usize]
-            || vote.source != state.historical_block_hashes[vote.source_slot as usize]
-            || vote.target != state.historical_block_hashes[vote.target_slot as usize]
-            || vote.target_slot <= vote.source_slot
-            || !is_justifiable_slot(&state.latest_finalized_slot, &vote.target_slot)
+        if !state.justified_slots[vote.source.slot as usize]
+            || vote.source.root != state.historical_block_hashes[vote.source.slot as usize]
+            || vote.target.root != state.historical_block_hashes[vote.target.slot as usize]
+            || vote.target.slot <= vote.source.slot
+            || !is_justifiable_slot(&state.latest_finalized.slot, &vote.target.slot)
         {
             continue;
         }
 
         // Track attempts to justify new hashes
-        state.initialize_justifications_for_root(&vote.target)?;
-        state.set_justification(&vote.target, &vote.validator_id, true)?;
+        state.initialize_justifications_for_root(&vote.target.root)?;
+        state.set_justification(&vote.target.root, &vote.validator_id, true)?;
 
-        let count = state.count_justifications(&vote.target)?;
+        let count = state.count_justifications(&vote.target.root)?;
 
         // If 2/3 voted for the same new valid hash to justify
         if count == (2 * state.config.num_validators) / 3 {
-            state.latest_justified_hash = vote.target;
-            state.latest_justified_slot = vote.target_slot;
-            state.justified_slots[vote.target_slot as usize] = true;
+            state.latest_justified.root = vote.target.root;
+            state.latest_justified.slot = vote.target.slot;
+            state.justified_slots[vote.target.slot as usize] = true;
 
-            state.remove_justifications(&vote.target)?;
+            state.remove_justifications(&vote.target.root)?;
 
             // Finalization: if the target is the next valid justifiable
             // hash after the source
-            let is_target_next_valid_justifiable_slot = !((vote.source_slot + 1)..vote.target_slot)
-                .any(|slot| is_justifiable_slot(&state.latest_finalized_slot, &slot));
+            let is_target_next_valid_justifiable_slot = !((vote.source.slot + 1)..vote.target.slot)
+                .any(|slot| is_justifiable_slot(&state.latest_finalized.slot, &slot));
 
             if is_target_next_valid_justifiable_slot {
-                state.latest_finalized_hash = vote.source;
-                state.latest_finalized_slot = vote.source_slot;
+                state.latest_finalized.root = vote.source.root;
+                state.latest_finalized.slot = vote.source.slot;
             }
         }
     }
@@ -117,8 +118,8 @@ pub fn process_block(pre_state: &LeanState, block: &Block) -> anyhow::Result<Lea
 pub fn get_latest_justified_hash(post_states: &HashMap<B256, LeanState>) -> Option<B256> {
     post_states
         .values()
-        .max_by_key(|state| state.latest_justified_slot)
-        .map(|state| state.latest_justified_hash)
+        .max_by_key(|state| state.latest_justified.slot)
+        .map(|state| state.latest_justified.root)
 }
 
 /// Use LMD GHOST to get the head, given a particular root (usually the
@@ -159,8 +160,8 @@ pub fn get_fork_choice_head(
     let mut vote_weights = HashMap::<B256, u64>::new();
 
     for vote in latest_votes.values() {
-        if blocks.contains_key(&vote.head) {
-            let mut block_hash = vote.head;
+        if blocks.contains_key(&vote.head.root) {
+            let mut block_hash = vote.head.root;
             while {
                 let current_block = blocks
                     .get(&block_hash)
@@ -195,21 +196,16 @@ pub fn get_fork_choice_head(
     // choose the child with the most latest votes, tiebreaking by slot then hash
     let mut current_root = root;
 
-    loop {
-        match children_map.get(&current_root) {
-            None => {
-                break Ok(current_root);
-            }
-            Some(children) => {
-                current_root = *children
-                    .iter()
-                    .max_by_key(|child_hash| {
-                        let vote_weight = vote_weights.get(*child_hash).unwrap_or(&0);
-                        let slot = blocks.get(*child_hash).map(|block| block.slot).unwrap_or(0);
-                        (*vote_weight, slot, *(*child_hash))
-                    })
-                    .ok_or_else(|| anyhow!("No children found for current root: {current_root}"))?;
-            }
-        }
+    while let Some(children) = children_map.get(&current_root) {
+        current_root = *children
+            .iter()
+            .max_by_key(|child_hash| {
+                let vote_weight = vote_weights.get(*child_hash).unwrap_or(&0);
+                let slot = blocks.get(*child_hash).map(|block| block.slot).unwrap_or(0);
+                (*vote_weight, slot, *(*child_hash))
+            })
+            .ok_or_else(|| anyhow!("No children found for current root: {current_root}"))?;
     }
+
+    Ok(current_root)
 }

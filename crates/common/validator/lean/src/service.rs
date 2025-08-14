@@ -110,7 +110,7 @@ impl ValidatorService {
                             // Build the vote from LeanChain, and modify its validator ID
                             let vote_template = self.lean_chain.read().await.build_vote().expect("Failed to build vote");
 
-                            info!("Built vote template for head {:?} at slot {} with target {:?}", vote_template.head, vote_template.slot, vote_template.target);
+                            info!("Built vote template for head {:?} at slot {} with target {:?}", vote_template.head, vote_template.slot, vote_template.target.slot);
 
                             let votes = self.keystores.iter().map(|keystore| {
                                 let mut vote = vote_template.clone();

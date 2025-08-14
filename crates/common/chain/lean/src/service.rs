@@ -104,13 +104,13 @@ impl LeanChainService {
                         let vote = &signed_vote.data;
                         info!(
                             "Received signed vote from validator {} for head {:?} / source_slot {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.source_slot, vote.slot
+                            vote.validator_id, vote.head, vote.source.slot, vote.slot
                         );
                     }
                     VoteItem::Unsigned(vote) => {
                         info!(
                             "Received unsigned vote from validator {} for head {:?} / source_slot {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.source_slot, vote.slot
+                            vote.validator_id, vote.head, vote.source.slot, vote.slot
                         );
                     }
                 }
@@ -183,7 +183,7 @@ impl LeanChainService {
 
         if is_known_vote || is_new_vote {
             // Do nothing
-        } else if lean_chain.chain.contains_key(&vote.head) {
+        } else if lean_chain.chain.contains_key(&vote.head.root) {
             drop(lean_chain);
 
             // We should acquire another write lock
@@ -191,7 +191,7 @@ impl LeanChainService {
             lean_chain.new_votes.push(vote);
         } else {
             self.dependencies
-                .entry(vote.head)
+                .entry(vote.head.root)
                 .or_default()
                 .push(QueueItem::VoteItem(VoteItem::Unsigned(vote)));
         }
