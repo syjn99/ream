@@ -1,14 +1,35 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use std::sync::Arc;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+use actix_web::{App, HttpServer, middleware, web::Data};
+use config::LeanRpcServerConfig;
+use ream_chain_lean::lean_chain::LeanChain;
+use tokio::sync::RwLock;
+use tracing::info;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+use crate::routes::register_routers;
+
+pub mod config;
+pub mod handlers;
+pub mod routes;
+
+/// Start the Lean API server.
+pub async fn start_lean_server(
+    server_config: LeanRpcServerConfig,
+    lean_chain: Arc<RwLock<LeanChain>>,
+) -> std::io::Result<()> {
+    info!(
+        "starting HTTP server on {:?}",
+        server_config.http_socket_address
+    );
+
+    let server = HttpServer::new(move || {
+        App::new()
+            .wrap(middleware::Logger::default())
+            .app_data(Data::new(lean_chain.clone()))
+            .configure(register_routers)
+    })
+    .bind(server_config.http_socket_address)?
+    .run();
+
+    server.await
 }
