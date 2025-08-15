@@ -1,7 +1,5 @@
 use std::{
-    env,
-    ops::Deref,
-    process,
+    env, process,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -115,31 +113,7 @@ fn main() {
 pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     info!("starting up lean node...");
 
-    // Hack: It is bothersome to modify the spec every time we run the lean node.
-    // Set genesis time to a future time if it is in the past.
-    // FIXME: Add a script to generate the YAML config file.
-    let network = {
-        let current_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("System time is before UNIX epoch")
-            .as_secs();
-
-        if config.network.genesis_time < current_timestamp {
-            let mut network = config.network.deref().clone();
-            network.genesis_time = current_timestamp + 3; // Set genesis time to 3 seconds in the future.
-            Arc::new(network)
-        } else {
-            config.network.clone()
-        }
-    };
-
-    let server_config = LeanRpcServerConfig::new(
-        config.http_address,
-        config.http_port,
-        config.http_allow_origin,
-    );
-
-    set_lean_network_spec(network);
+    set_lean_network_spec(config.network);
 
     // Initialize the lean chain with genesis block and state.
     let (genesis_block, genesis_state) = lean_genesis::setup_genesis();
@@ -149,7 +123,6 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     let (chain_sender, chain_receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
 
     // TODO 1: Load keystores from the config.
-    // TODO 2: Add RPC service for lean node.
     let chain_service =
         LeanChainService::new(lean_chain.clone(), chain_receiver, chain_sender.clone()).await;
     let network_service = LeanNetworkService::new(
@@ -164,6 +137,12 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
 
     let validator_service =
         LeanValidatorService::new(lean_chain.clone(), Vec::new(), chain_sender).await;
+
+    let server_config = LeanRpcServerConfig::new(
+        config.http_address,
+        config.http_port,
+        config.http_allow_origin,
+    );
 
     // Start the services concurrently.
     let chain_future = executor.spawn(async move {

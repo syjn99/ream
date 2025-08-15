@@ -13,7 +13,7 @@ pub struct LeanNodeConfig {
 
     #[arg(
       long,
-      help = "Provide a path to a YAML config file",
+      help = "Provide a path to a YAML config file, or use 'ephemery' for the Ephemery network",
       value_parser = lean_network_parser
   )]
     pub network: Arc<LeanNetworkSpec>,
