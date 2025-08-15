@@ -15,8 +15,11 @@ pub fn beacon_network_parser(network_string: &str) -> Result<Arc<BeaconNetworkSp
     }
 }
 
-pub fn lean_network_parser(path: &str) -> Result<Arc<LeanNetworkSpec>, String> {
-    read_network_spec(path)
+pub fn lean_network_parser(network_string: &str) -> Result<Arc<LeanNetworkSpec>, String> {
+    match network_string {
+        "ephemery" => Ok(LeanNetworkSpec::ephemery()),
+        path => read_network_spec(path),
+    }
 }
 
 fn read_network_spec<T: DeserializeOwned>(path: &str) -> Result<Arc<T>, String> {
