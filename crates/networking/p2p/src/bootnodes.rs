@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 use discv5::Enr;
+use libp2p::Multiaddr;
 use ream_network_spec::networks::Network;
+
+use crate::utils::to_multiaddrs;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum Bootnodes {
@@ -10,6 +13,7 @@ pub enum Bootnodes {
     Default,
     None,
     Custom(Vec<Enr>),
+    Multiaddr(Vec<Multiaddr>),
 }
 
 impl FromStr for Bootnodes {
@@ -19,18 +23,31 @@ impl FromStr for Bootnodes {
         match s {
             "default" => Ok(Bootnodes::Default),
             "none" => Ok(Bootnodes::None),
-            _ => s
-                .split(',')
-                .map(Enr::from_str)
-                .collect::<Result<Vec<_>, String>>()
-                .map(Bootnodes::Custom)
-                .map_err(|err| anyhow!("Failed to parse bootnodes: {err:?}")),
+            _ => {
+                if let Ok(enrs) = s
+                    .split(',')
+                    .map(Enr::from_str)
+                    .collect::<Result<Vec<_>, _>>()
+                {
+                    return Ok(Bootnodes::Custom(enrs));
+                }
+
+                if let Ok(addresses) = s
+                    .split(',')
+                    .map(Multiaddr::from_str)
+                    .collect::<Result<Vec<_>, _>>()
+                {
+                    return Ok(Bootnodes::Multiaddr(addresses));
+                }
+
+                Err(anyhow!("Failed to parse {s} as ENR or Multiaddr"))
+            }
         }
     }
 }
 
 impl Bootnodes {
-    pub fn to_enrs(self, network: Network) -> Vec<Enr> {
+    pub fn to_enrs_beacon(self, network: Network) -> Vec<Enr> {
         let bootnodes: Vec<Enr> = match network {
             Network::Mainnet => {
                 serde_yaml::from_str(include_str!("../resources/bootnodes_mainnet.yaml"))
@@ -55,6 +72,19 @@ impl Bootnodes {
             Bootnodes::Default => bootnodes,
             Bootnodes::None => vec![],
             Bootnodes::Custom(bootnodes) => bootnodes,
+            Bootnodes::Multiaddr(_) => vec![],
+        }
+    }
+
+    pub fn to_multiaddrs_lean(&self) -> Vec<Multiaddr> {
+        match self {
+            Bootnodes::Default => {
+                serde_yaml::from_str(include_str!("../resources/lean_peers.yaml"))
+                    .expect("should deserialize static lean peers")
+            }
+            Bootnodes::None => vec![],
+            Bootnodes::Custom(enrs) => to_multiaddrs(enrs),
+            Bootnodes::Multiaddr(multiaddrs) => multiaddrs.to_vec(),
         }
     }
 }

@@ -125,9 +125,13 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     // TODO 1: Load keystores from the config.
     let chain_service =
         LeanChainService::new(lean_chain.clone(), chain_receiver, chain_sender.clone()).await;
-    let network_service = LeanNetworkService::new(
+
+    // Starts the network service by listening on the specified socket address and port.
+    let mut network_service = LeanNetworkService::new(
         Arc::new(LeanNetworkConfig {
             gossipsub_config: LeanGossipsubConfig::default(),
+            socket_address: config.socket_address,
+            socket_port: config.socket_port,
         }),
         lean_chain.clone(),
         executor.clone(),
@@ -151,7 +155,7 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
         }
     });
     let network_future = executor.spawn(async move {
-        if let Err(err) = network_service.start().await {
+        if let Err(err) = network_service.start(config.bootnodes).await {
             panic!("Network service exited with error: {err}");
         }
     });
