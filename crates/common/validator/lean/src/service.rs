@@ -76,7 +76,7 @@ impl ValidatorService {
                         0 => {
                             // First tick (t=0): Propose a block.
                             let current_slot = get_current_slot_from_tick(tick_count);
-                            if let Some(keystore) = self.is_proposer() {
+                            if let Some(keystore) = self.is_proposer(current_slot) {
                                 info!("Validator {} proposing block for slot {current_slot} (tick {tick_count})", keystore.id);
 
                                 // Acquire the write lock. `accept_new_votes` and `build_block` will modify the lean chain.
@@ -142,8 +142,7 @@ impl ValidatorService {
     }
 
     /// Determine if one of the keystores is the proposer for the current slot.
-    fn is_proposer(&self) -> Option<&LeanKeystore> {
-        let current_slot = get_current_slot();
+    fn is_proposer(&self, current_slot: u64) -> Option<&LeanKeystore> {
         let proposer_index: u64 = current_slot % lean_network_spec().num_validators;
 
         self.keystores
