@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use ream_consensus_misc::constants::lean::{INTERVALS_PER_SLOT, SLOT_OFFSET};
 use ream_network_spec::networks::lean_network_spec;
 
 /// NOTE: Vitalik's implementation of 3SF-mini adds 2 slots more due to the test setup.
@@ -14,5 +15,10 @@ pub fn get_current_slot() -> u64 {
         .duration_since(genesis_instant)
         .expect("Called before genesis time");
 
-    (elapsed.as_secs() / seconds_per_slot) + 2
+    (elapsed.as_secs() / seconds_per_slot) + SLOT_OFFSET
+}
+
+/// Calculate the current slot from a tick.
+pub fn get_current_slot_from_tick(tick: u64) -> u64 {
+    (tick / INTERVALS_PER_SLOT) + SLOT_OFFSET
 }

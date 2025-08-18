@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use ream_chain_lean::{
-    clock::create_lean_clock_interval, lean_chain::LeanChain, service::LeanChainServiceMessage,
-    slot::get_current_slot,
+    clock::create_lean_clock_interval,
+    lean_chain::LeanChain,
+    service::LeanChainServiceMessage,
+    slot::{get_current_slot, get_current_slot_from_tick},
 };
 use ream_consensus_lean::{QueueItem, VoteItem};
 use ream_network_spec::networks::lean_network_spec;
@@ -73,7 +75,7 @@ impl ValidatorService {
                     match tick_count % 4 {
                         0 => {
                             // First tick (t=0): Propose a block.
-                            let current_slot = get_current_slot();
+                            let current_slot = get_current_slot_from_tick(tick_count);
                             if let Some(keystore) = self.is_proposer() {
                                 info!("Validator {} proposing block for slot {current_slot} (tick {tick_count})", keystore.id);
 
@@ -84,7 +86,7 @@ impl ValidatorService {
                                 lean_chain.accept_new_votes().expect("Failed to accept new votes");
 
                                 // Build a block and propose the block.
-                                let new_block = lean_chain.propose_block().expect("Failed to build block");
+                                let new_block = lean_chain.propose_block(current_slot).expect("Failed to build block");
 
                                 info!(
                                     "Validator {} built block: slot={}, parent={:?}, votes={}, state_root={:?}",
