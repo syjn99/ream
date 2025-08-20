@@ -2601,6 +2601,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snap",
+ "tempdir",
  "tokio",
 ]
 
