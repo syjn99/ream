@@ -27,7 +27,7 @@ use crate::{
     gossipsub::{
         GossipsubBehaviour, lean::configurations::LeanGossipsubConfig, snappy::SnappyTransform,
     },
-    network::misc::{Executor, build_transport},
+    network::misc::Executor,
     peer::ConnectionState,
 };
 
@@ -117,23 +117,16 @@ impl LeanNetworkService {
             }
         };
 
-        let transport = build_transport(local_key.clone())
-            .map_err(|err| anyhow!("Failed to build transport: {err:?}"))?;
-
         let swarm = {
             let config = Config::with_executor(Executor(executor))
                 .with_notify_handler_buffer_size(NonZeroUsize::new(7).expect("Not zero"))
                 .with_per_connection_event_buffer_size(4)
                 .with_dial_concurrency_factor(NonZeroU8::new(1).unwrap());
 
-            let builder = SwarmBuilder::with_existing_identity(local_key.clone())
+            SwarmBuilder::with_existing_identity(local_key.clone())
                 .with_tokio()
-                .with_other_transport(|_key| transport)
-                .expect("initializing swarm");
-
-            builder
-                .with_behaviour(|_| behaviour)
-                .expect("initializing swarm")
+                .with_quic()
+                .with_behaviour(|_| behaviour)?
                 .with_swarm_config(|_| config)
                 .build()
         };
@@ -146,9 +139,11 @@ impl LeanNetworkService {
         };
 
         let mut multi_addr: Multiaddr = lean_network_service.network_config.socket_address.into();
-        multi_addr.push(Protocol::Tcp(
+        multi_addr.push(Protocol::Udp(
             lean_network_service.network_config.socket_port,
         ));
+        multi_addr.push(Protocol::QuicV1);
+        info!("Listening on {multi_addr:?}");
 
         lean_network_service
             .swarm
@@ -199,12 +194,8 @@ impl LeanNetworkService {
                 info!("Disconnected from peer: {peer_id:?}");
                 Some(ReamNetworkEvent::PeerDisconnected(peer_id))
             }
-            SwarmEvent::IncomingConnection {
-                local_addr,
-                send_back_addr,
-                ..
-            } => {
-                info!("Incoming connection from {send_back_addr:?} to {local_addr:?}");
+            SwarmEvent::IncomingConnection { local_addr, .. } => {
+                info!("Incoming connection from {local_addr:?}");
                 None
             }
             SwarmEvent::Dialing { peer_id, .. } => {
@@ -238,11 +229,15 @@ impl LeanNetworkService {
             }
         }
     }
+
+    pub fn local_peer_id(&self) -> PeerId {
+        *self.swarm.local_peer_id()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{net::Ipv4Addr, time::Duration};
+    use std::{net::Ipv4Addr, sync::Once, time::Duration};
 
     use libp2p::{Multiaddr, multiaddr::Protocol};
     use ream_chain_lean::lean_chain::LeanChain;
@@ -252,40 +247,46 @@ mod tests {
     use super::*;
     use crate::bootnodes::Bootnodes;
 
+    static INIT: Once = Once::new();
+
+    fn ensure_network_spec_init() {
+        INIT.call_once(|| {
+            set_lean_network_spec(LeanNetworkSpec::default().into());
+        });
+    }
+
+    pub async fn setup_lean_node(
+        socket_port: u16,
+    ) -> anyhow::Result<(LeanNetworkService, Multiaddr)> {
+        ensure_network_spec_init();
+
+        let lean_chain = Arc::new(RwLock::new(LeanChain::default()));
+        let executor = ReamExecutor::new();
+        let config = Arc::new(LeanNetworkConfig {
+            gossipsub_config: LeanGossipsubConfig::default(),
+            socket_address: Ipv4Addr::new(127, 0, 0, 1).into(),
+            socket_port,
+        });
+        let node = LeanNetworkService::new(config.clone(), lean_chain, executor.unwrap()).await?;
+        let multi_addr: Multiaddr = config.socket_address.into();
+        Ok((node, multi_addr))
+    }
+
+    // Test to check connection between 2 QUIC lean nodes
     #[tokio::test]
     #[traced_test]
-    async fn test_two_lean_nodes_connection() -> anyhow::Result<()> {
-        set_lean_network_spec(LeanNetworkSpec::default().into());
+    async fn test_two_quic_lean_nodes_connection() -> anyhow::Result<()> {
+        let socket_port1 = 9000;
+        let socket_port2 = 9001;
 
-        let lean_chain1 = Arc::new(RwLock::new(LeanChain::default()));
-        let lean_chain2 = Arc::new(RwLock::new(LeanChain::default()));
+        let (mut node1, mut node1_addr) = setup_lean_node(socket_port1).await?;
+        let (mut node2, _) = setup_lean_node(socket_port2).await?;
 
-        let executor1 = ReamExecutor::new();
-        let executor2 = ReamExecutor::new();
+        let node1_peer_id = node1.local_peer_id();
+        let node2_peer_id = node2.local_peer_id();
 
-        let config1 = Arc::new(LeanNetworkConfig {
-            gossipsub_config: LeanGossipsubConfig::default(),
-            socket_address: Ipv4Addr::new(127, 0, 0, 1).into(),
-            socket_port: 9000,
-        });
-
-        let config2 = Arc::new(LeanNetworkConfig {
-            gossipsub_config: LeanGossipsubConfig::default(),
-            socket_address: Ipv4Addr::new(127, 0, 0, 1).into(),
-            socket_port: 9001,
-        });
-
-        let mut node1 =
-            LeanNetworkService::new(config1.clone(), lean_chain1, executor1.unwrap()).await?;
-
-        let mut node2 =
-            LeanNetworkService::new(config2.clone(), lean_chain2, executor2.unwrap()).await?;
-
-        let node1_peer_id = *node1.swarm.local_peer_id();
-        let node2_peer_id = *node2.swarm.local_peer_id();
-
-        let mut node1_addr: Multiaddr = config1.socket_address.into();
-        node1_addr.push(Protocol::Tcp(config1.socket_port));
+        node1_addr.push(Protocol::Udp(socket_port1));
+        node1_addr.push(Protocol::QuicV1);
         node1_addr.push(Protocol::P2p(node1_peer_id));
 
         let node1_handle = tokio::spawn(async move {

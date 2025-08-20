@@ -18,13 +18,19 @@ Options:
       --socket-address <SOCKET_ADDRESS>
           Set P2P socket address [default: 0.0.0.0]
       --socket-port <SOCKET_PORT>
-          Set P2P socket port (TCP) [default: 9000]
+          Set P2P socket port (QUIC) [default: 9000]
       --http-address <HTTP_ADDRESS>
           Set HTTP address [default: 127.0.0.1]
       --http-port <HTTP_PORT>
           Set HTTP Port [default: 5052]
       --http-allow-origin
 
+      --metrics
+          Enable metrics
+      --metrics-address <METRICS_ADDRESS>
+          Set metrics address [default: 127.0.0.1]
+      --metrics-port <METRICS_PORT>
+          Set metrics port [default: 8080]
   -h, --help
           Print help
 ```
