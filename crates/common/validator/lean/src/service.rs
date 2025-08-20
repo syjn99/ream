@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use ream_chain_lean::{
     clock::create_lean_clock_interval, lean_chain::LeanChain, service::LeanChainServiceMessage,
-    slot::get_current_slot,
 };
 use ream_consensus_lean::{QueueItem, VoteItem};
 use ream_network_spec::networks::lean_network_spec;
@@ -64,6 +63,9 @@ impl ValidatorService {
 
         let mut tick_count = 0u64;
 
+        // Start from slot 1, will be incremented for every slot boundary.
+        let mut slot = 1;
+
         let mut interval = create_lean_clock_interval()
             .map_err(|err| anyhow!("Failed to create clock interval: {err}"))?;
 
@@ -72,10 +74,11 @@ impl ValidatorService {
                 _ = interval.tick() => {
                     match tick_count % 4 {
                         0 => {
+                            slot += 1;
+
                             // First tick (t=0): Propose a block.
-                            let current_slot = get_current_slot();
-                            if let Some(keystore) = self.is_proposer() {
-                                info!("Validator {} proposing block for slot {current_slot} (tick {tick_count})", keystore.id);
+                            if let Some(keystore) = self.is_proposer(slot) {
+                                info!("Validator {} proposing block for slot {slot} (tick {tick_count})", keystore.id);
 
                                 // Acquire the write lock. `accept_new_votes` and `build_block` will modify the lean chain.
                                 let mut lean_chain = self.lean_chain.write().await;
@@ -84,7 +87,7 @@ impl ValidatorService {
                                 lean_chain.accept_new_votes().expect("Failed to accept new votes");
 
                                 // Build a block and propose the block.
-                                let new_block = lean_chain.propose_block().expect("Failed to build block");
+                                let new_block = lean_chain.propose_block(slot).expect("Failed to build block");
 
                                 info!(
                                     "Validator {} built block: slot={}, parent={:?}, votes={}, state_root={:?}",
@@ -98,14 +101,13 @@ impl ValidatorService {
                                 // TODO 1: Sign the block with the keystore.
                                 // TODO 2: Send the block to the network.
                             } else {
-                                let proposer_index = current_slot % lean_network_spec().num_validators;
-                                info!("Not proposer for slot {current_slot} (proposer is validator {proposer_index}), skipping");
+                                let proposer_index = slot % lean_network_spec().num_validators;
+                                info!("Not proposer for slot {slot} (proposer is validator {proposer_index}), skipping");
                             }
                         }
                         1 => {
                             // Second tick (t=1/4): Vote.
-                            let current_slot = get_current_slot();
-                            info!("Starting vote phase at slot {current_slot} (tick {tick_count}): {} validator(s) voting", self.keystores.len());
+                            info!("Starting vote phase at slot {slot} (tick {tick_count}): {} validator(s) voting", self.keystores.len());
 
                             // Build the vote from LeanChain, and modify its validator ID
                             let vote_template = self.lean_chain.read().await.build_vote().expect("Failed to build vote");
@@ -140,9 +142,8 @@ impl ValidatorService {
     }
 
     /// Determine if one of the keystores is the proposer for the current slot.
-    fn is_proposer(&self) -> Option<&LeanKeystore> {
-        let current_slot = get_current_slot();
-        let proposer_index: u64 = current_slot % lean_network_spec().num_validators;
+    fn is_proposer(&self, slot: u64) -> Option<&LeanKeystore> {
+        let proposer_index = slot % lean_network_spec().num_validators;
 
         self.keystores
             .iter()

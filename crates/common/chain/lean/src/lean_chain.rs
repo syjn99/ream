@@ -96,15 +96,14 @@ impl LeanChain {
         Ok(())
     }
 
-    pub fn propose_block(&mut self) -> anyhow::Result<Block> {
+    pub fn propose_block(&mut self, slot: u64) -> anyhow::Result<Block> {
         let initialize_block_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["initialize_block"]);
-        let new_slot = get_current_slot();
         let head_state = self
             .post_states
             .get(&self.head)
             .ok_or_else(|| anyhow!("Post state not found for head: {}", self.head))?;
         let mut new_block = Block {
-            slot: new_slot,
+            slot,
             parent: self.head,
             votes: VariableList::empty(),
             // Diverged from Python implementation: Using `B256::ZERO` instead of `None`)
