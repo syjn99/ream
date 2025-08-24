@@ -1,11 +1,10 @@
 use anyhow::ensure;
-use bip32::Mnemonic;
 use clap::Parser;
-use rand::rngs::OsRng;
-use tracing::warn;
 
 const MIN_CHUNK_SIZE: u64 = 4;
 const MIN_LIFETIME: u64 = 18;
+const DEFAULT_ACTIVATION_EPOCH: usize = 0;
+const DEFAULT_NUM_ACTIVE_EPOCHS: usize = 1 << 28;
 
 #[derive(Debug, Parser)]
 pub struct AccountManagerConfig {
@@ -24,6 +23,14 @@ pub struct AccountManagerConfig {
     /// Seed phrase for key generation
     #[arg(short, long)]
     pub seed_phrase: Option<String>,
+
+    /// Activation epoch for the validator
+    #[arg(long, default_value_t = DEFAULT_ACTIVATION_EPOCH)]
+    pub activation_epoch: usize,
+
+    /// Number of active epochs
+    #[arg(long, default_value_t = DEFAULT_NUM_ACTIVE_EPOCHS)]
+    pub num_active_epochs: usize,
 }
 
 impl Default for AccountManagerConfig {
@@ -33,6 +40,8 @@ impl Default for AccountManagerConfig {
             lifetime: 28,
             chunk_size: 5,
             seed_phrase: None,
+            activation_epoch: DEFAULT_ACTIVATION_EPOCH,
+            num_active_epochs: DEFAULT_NUM_ACTIVE_EPOCHS,
         }
     }
 }
@@ -58,13 +67,7 @@ impl AccountManagerConfig {
         if let Some(phrase) = &self.seed_phrase {
             phrase.clone()
         } else {
-            let mnemonic = Mnemonic::random(OsRng, Default::default());
-            let phrase = mnemonic.phrase().to_string();
-            warn!("⚠️  IMPORTANT: Generated new seed phrase: {phrase}");
-            warn!(
-                "⚠️  Please save this seed phrase somewhere safe. You will need it to recover your keys."
-            );
-            phrase
+            "default_seed_phrase".to_string()
         }
     }
 }
