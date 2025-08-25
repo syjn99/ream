@@ -14,10 +14,10 @@ pub enum LeanGossipsubMessage {
 impl LeanGossipsubMessage {
     pub fn decode(topic: &TopicHash, data: &[u8]) -> Result<Self, GossipsubError> {
         match LeanGossipTopic::from_topic_hash(topic)?.kind {
-            LeanGossipTopicKind::LeanBlock => {
+            LeanGossipTopicKind::Block => {
                 Ok(Self::Block(Box::new(SignedBlock::from_ssz_bytes(data)?)))
             }
-            LeanGossipTopicKind::LeanVote => {
+            LeanGossipTopicKind::Vote => {
                 Ok(Self::Vote(Box::new(SignedVote::from_ssz_bytes(data)?)))
             }
         }

@@ -206,7 +206,7 @@ impl LeanNetworkService {
                                         .gossipsub_config
                                         .topics
                                         .iter()
-                                        .find(|block_topic| matches!(block_topic.kind, LeanGossipTopicKind::LeanBlock))
+                                        .find(|block_topic| matches!(block_topic.kind, LeanGossipTopicKind::Block))
                                         .map(|block_topic| IdentTopic::from(block_topic.clone()))
                                         .expect("LeanBlock topic configured"),
                                     block.as_ssz_bytes(),
@@ -231,7 +231,7 @@ impl LeanNetworkService {
                                         .gossipsub_config
                                         .topics
                                         .iter()
-                                        .find(|vote_topic| matches!(vote_topic.kind, LeanGossipTopicKind::LeanVote))
+                                        .find(|vote_topic| matches!(vote_topic.kind, LeanGossipTopicKind::Vote))
                                         .map(|vote_topic| IdentTopic::from(vote_topic.clone()))
                                         .expect("LeanVote topic configured"),
                                     bytes,
@@ -302,12 +302,12 @@ impl LeanNetworkService {
                     if let Err(err) =
                         self.chain_message_sender
                             .send(LeanChainServiceMessage::QueueItem(QueueItem::Block(
-                                (signed_block).data.clone(),
+                                (signed_block).message.clone(),
                             )))
                     {
                         warn!(
                             "failed to send block for slot {} item to chain: {err:?}",
-                            signed_block.data.slot
+                            signed_block.message.slot
                         );
                     }
                 }

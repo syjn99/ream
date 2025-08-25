@@ -93,8 +93,8 @@ impl ValidatorService {
                                     "Validator {} built block: slot={}, parent={:?}, votes={}, state_root={:?}",
                                     keystore.id,
                                     new_block.slot,
-                                    new_block.parent,
-                                    new_block.votes.len(),
+                                    new_block.parent_root,
+                                    new_block.body.votes.len(),
                                     new_block.state_root
                                 );
 
