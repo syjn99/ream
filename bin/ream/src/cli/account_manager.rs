@@ -4,7 +4,7 @@ use clap::Parser;
 const MIN_CHUNK_SIZE: u64 = 4;
 const MIN_LIFETIME: u64 = 18;
 const DEFAULT_ACTIVATION_EPOCH: usize = 0;
-const DEFAULT_NUM_ACTIVE_EPOCHS: usize = 1 << 28;
+const DEFAULT_NUM_ACTIVE_EPOCHS: usize = 1 << 18;
 
 #[derive(Debug, Parser)]
 pub struct AccountManagerConfig {
@@ -13,7 +13,7 @@ pub struct AccountManagerConfig {
     pub verbosity: u8,
 
     /// Account lifetime in 2 ** lifetime slots
-    #[arg(short, long, default_value_t = 28)]
+    #[arg(short, long, default_value_t = 18)]
     pub lifetime: u64,
 
     /// Chunk size for messages
@@ -37,7 +37,7 @@ impl Default for AccountManagerConfig {
     fn default() -> Self {
         Self {
             verbosity: 3,
-            lifetime: 28,
+            lifetime: 18,
             chunk_size: 5,
             seed_phrase: None,
             activation_epoch: DEFAULT_ACTIVATION_EPOCH,

@@ -48,8 +48,10 @@ pub fn process_block(pre_state: &LeanState, block: &Block) -> anyhow::Result<Lea
     // Track historical blocks in the state
     state
         .historical_block_hashes
-        .push(block.parent)
-        .map_err(|err| anyhow!("Failed to add block.parent to historical_block_hashes: {err:?}"))?;
+        .push(block.parent_root)
+        .map_err(|err| {
+            anyhow!("Failed to add block.parent_root to historical_block_hashes: {err:?}")
+        })?;
     state
         .justified_slots
         .push(false)
@@ -69,7 +71,7 @@ pub fn process_block(pre_state: &LeanState, block: &Block) -> anyhow::Result<Lea
     }
 
     // Process votes
-    for vote in &block.votes {
+    for vote in &block.body.votes {
         // Ignore votes whose source is not already justified,
         // or whose target is not in the history, or whose target is not a
         // valid justifiable slot
@@ -174,7 +176,7 @@ pub fn get_fork_choice_head(
                 vote_weights.insert(block_hash, current_weights + 1);
                 block_hash = blocks
                     .get(&block_hash)
-                    .map(|block| block.parent)
+                    .map(|block| block.parent_root)
                     .ok_or_else(|| anyhow!("Block not found for block parent: {block_hash}"))?;
             }
         }
@@ -186,8 +188,11 @@ pub fn get_fork_choice_head(
     for (hash, block) in blocks {
         // Original Python impl uses `block.parent` to imply that the block has a parent,
         // So for Rust, we use `block.parent != B256::ZERO` instead.
-        if block.parent != B256::ZERO && *vote_weights.get(hash).unwrap_or(&0) >= min_score {
-            children_map.entry(block.parent).or_default().push(*hash);
+        if block.parent_root != B256::ZERO && *vote_weights.get(hash).unwrap_or(&0) >= min_score {
+            children_map
+                .entry(block.parent_root)
+                .or_default()
+                .push(*hash);
         }
     }
 

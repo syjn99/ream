@@ -4,12 +4,23 @@ use actix_web::{
     HttpResponse, Responder, get, post,
     web::{Data, Json},
 };
-use ream_api_types_beacon::{error::ApiError, id::ID, responses::DataResponse};
-use ream_consensus_beacon::{
-    bls_to_execution_change::SignedBLSToExecutionChange, voluntary_exit::SignedVoluntaryExit,
+use ream_api_types_beacon::{
+    error::ApiError,
+    id::ID,
+    responses::{DataResponse, DataVersionedResponse},
 };
+use ream_consensus_beacon::{
+    attester_slashing::AttesterSlashing, bls_to_execution_change::SignedBLSToExecutionChange,
+    voluntary_exit::SignedVoluntaryExit,
+};
+use ream_network_manager::service::NetworkManagerService;
 use ream_operation_pool::OperationPool;
+use ream_p2p::{
+    gossipsub::beacon::topics::{GossipTopic, GossipTopicKind},
+    network::beacon::channel::GossipMessage,
+};
 use ream_storage::db::ReamDB;
+use ssz::Encode;
 
 use crate::handlers::state::get_state_from_id;
 
@@ -95,6 +106,57 @@ pub async fn post_voluntary_exits(
 
     operation_pool.insert_signed_voluntary_exit(signed_voluntary_exit);
     // TODO: publish voluntary exit to peers (gossipsub) - https://github.com/ReamLabs/ream/issues/556
+
+    Ok(HttpResponse::Ok())
+}
+
+/// GET /eth/v2/beacon/pool/attester_slashings
+#[get("/beacon/pool/attester_slashings")]
+pub async fn get_pool_attester_slashings(
+    operation_pool: Data<Arc<OperationPool>>,
+) -> Result<impl Responder, ApiError> {
+    Ok(HttpResponse::Ok().json(DataVersionedResponse::new(
+        operation_pool.get_all_attester_slashings(),
+    )))
+}
+
+/// POST /eth/v2/beacon/pool/attester_slashings
+#[post("/beacon/pool/attester_slashings")]
+pub async fn post_pool_attester_slashings(
+    db: Data<ReamDB>,
+    operation_pool: Data<Arc<OperationPool>>,
+    network_manager: Data<Arc<NetworkManagerService>>,
+    attester_slashing: Json<AttesterSlashing>,
+) -> Result<impl Responder, ApiError> {
+    let attester_slashing = attester_slashing.into_inner();
+
+    let highest_slot = db
+        .slot_index_provider()
+        .get_highest_slot()
+        .map_err(|err| {
+            ApiError::InternalError(format!("Failed to get_highest_slot, error: {err:?}"))
+        })?
+        .ok_or(ApiError::NotFound(
+            "Failed to find highest slot".to_string(),
+        ))?;
+    let beacon_state = get_state_from_id(ID::Slot(highest_slot), &db).await?;
+
+    beacon_state
+        .get_slashable_attester_indices(&attester_slashing)
+        .map_err(|err| {
+            ApiError::BadRequest(
+                format!("Invalid attester slashing, it will never pass validation so it's rejected, err: {err:?}"),
+            )
+        })?;
+    network_manager.p2p_sender.send_gossip(GossipMessage {
+        topic: GossipTopic {
+            fork: beacon_state.fork.current_version,
+            kind: GossipTopicKind::AttesterSlashing,
+        },
+        data: attester_slashing.as_ssz_bytes(),
+    });
+
+    operation_pool.insert_attester_slashing(attester_slashing);
 
     Ok(HttpResponse::Ok())
 }

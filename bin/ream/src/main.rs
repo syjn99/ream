@@ -55,7 +55,7 @@ use ream_validator_beacon::{
 use ream_validator_lean::{
     registry::load_validator_registry, service::ValidatorService as LeanValidatorService,
 };
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::Instant};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -155,11 +155,11 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     let topics: Vec<LeanGossipTopic> = vec![
         LeanGossipTopic {
             fork: fork.clone(),
-            kind: LeanGossipTopicKind::LeanBlock,
+            kind: LeanGossipTopicKind::Block,
         },
         LeanGossipTopic {
             fork,
-            kind: LeanGossipTopicKind::LeanVote,
+            kind: LeanGossipTopicKind::Vote,
         },
     ];
 
@@ -378,11 +378,17 @@ pub async fn run_account_manager(mut config: AccountManagerConfig) {
     );
 
     let seed_phrase = config.get_seed_phrase();
+
+    // Measure key generation time
+    let start_time = Instant::now();
     let (_public_key, _private_key) = ream_account_manager::generate_keys(
         &seed_phrase,
         config.activation_epoch,
         config.num_active_epochs,
     );
+    let duration = start_time.elapsed();
+    info!("Key generation complete, took {:?}", duration);
+
     info!("Account manager completed successfully");
 }
 

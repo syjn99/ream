@@ -11,6 +11,10 @@ use tree_hash_derive::TreeHash;
 
 use crate::{checkpoint::Checkpoint, config::Config};
 
+/// Represents the state of the Lean chain.
+///
+/// See the [Lean specification](https://github.com/leanEthereum/leanSpec/blob/main/docs/client/containers.md#state)
+/// for detailed protocol information.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct LeanState {
     pub config: Config,
@@ -21,18 +25,17 @@ pub struct LeanState {
     pub historical_block_hashes: VariableList<B256, U262144>,
     pub justified_slots: VariableList<bool, U262144>,
 
-    // Diverged from Python implementation:
-    // Originally `justifications: Dict[str, List[bool]]`
     pub justifications_roots: VariableList<B256, U262144>,
-    // The size is MAX_HISTORICAL_BLOCK_HASHES * VALIDATOR_REGISTRY_LIMIT
-    // to accommodate equivalent to `justifications[root][validator_id]`
     pub justifications_roots_validators: BitList<U1073741824>,
 }
 
 impl LeanState {
-    pub fn new(num_validators: u64) -> LeanState {
+    pub fn new(num_validators: u64, genesis_time: u64) -> LeanState {
         LeanState {
-            config: Config { num_validators },
+            config: Config {
+                num_validators,
+                genesis_time,
+            },
 
             latest_justified: Checkpoint::default(),
             latest_finalized: Checkpoint::default(),
@@ -171,7 +174,7 @@ mod test {
 
     #[test]
     fn initialize_justifications_for_root() {
-        let mut state = LeanState::new(1);
+        let mut state = LeanState::new(1, 0);
 
         // Initialize 1st root
         state
@@ -206,7 +209,7 @@ mod test {
 
     #[test]
     fn set_justification() {
-        let mut state = LeanState::new(1);
+        let mut state = LeanState::new(1, 0);
         let root0 = B256::repeat_byte(1);
         let root1 = B256::repeat_byte(2);
         let validator_id = 7u64;
@@ -238,7 +241,7 @@ mod test {
 
     #[test]
     fn count_justifications() {
-        let mut state = LeanState::new(1);
+        let mut state = LeanState::new(1, 0);
         let root0 = B256::repeat_byte(1);
         let root1 = B256::repeat_byte(2);
 
@@ -265,7 +268,7 @@ mod test {
     #[test]
     fn remove_justifications() {
         // Assuming 3 roots & 4 validators
-        let mut state = LeanState::new(3);
+        let mut state = LeanState::new(3, 0);
         let root0 = B256::repeat_byte(1);
         let root1 = B256::repeat_byte(2);
         let root2 = B256::repeat_byte(3);

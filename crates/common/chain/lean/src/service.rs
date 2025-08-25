@@ -134,7 +134,7 @@ impl LeanChainService {
                 let block_hash = block.tree_hash_root();
                 info!(
                     "Received block at slot {} with hash {block_hash:?} from parent {:?}",
-                    block.slot, block.parent
+                    block.slot, block.parent_root
                 );
                 self.handle_block(block).await
             }
@@ -170,11 +170,11 @@ impl LeanChainService {
             return Ok(());
         }
 
-        match lean_chain.post_states.get(&block.parent) {
+        match lean_chain.post_states.get(&block.parent_root) {
             Some(parent_state) => {
                 let state = process_block(parent_state, &block)?;
 
-                for vote in &block.votes {
+                for vote in &block.body.votes {
                     if !lean_chain.known_votes.contains(vote) {
                         lean_chain.known_votes.push(vote.clone());
                     }
@@ -199,7 +199,7 @@ impl LeanChainService {
                 // If we have not yet seen the block's parent, ignore for now,
                 // process later once we actually see the parent
                 self.dependencies
-                    .entry(block.parent)
+                    .entry(block.parent_root)
                     .or_default()
                     .push(QueueItem::Block(block));
             }
