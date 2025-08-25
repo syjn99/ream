@@ -1,4 +1,4 @@
-use std::{net::IpAddr, sync::Arc};
+use std::{net::IpAddr, path::PathBuf, sync::Arc};
 
 use clap::Parser;
 use ream_network_spec::{cli::lean_network_parser, networks::LeanNetworkSpec};
@@ -28,6 +28,9 @@ pub struct LeanNodeConfig {
         help = "One or more comma-delimited base64-encoded ENR's of peers to initially connect to. Use 'default' to use the default bootnodes for the network. Use 'none' to disable bootnodes."
     )]
     pub bootnodes: Bootnodes,
+
+    #[arg(long, help = "The path to the validator registry")]
+    pub validator_registry_path: PathBuf,
 
     #[arg(long, help = "Set P2P socket address", default_value_t = DEFAULT_SOCKET_ADDRESS)]
     pub socket_address: IpAddr,

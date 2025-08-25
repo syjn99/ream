@@ -11,6 +11,8 @@ version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
 tokio.workspace = true
 tracing = { workspace = true, features = ["log"] }
 
@@ -19,4 +21,5 @@ ream-chain-lean.workspace = true
 ream-consensus-lean.workspace = true
 ream-consensus-misc.workspace = true
 ream-network-spec.workspace = true
+ream-post-quantum-crypto.workspace = true
 ream-sync.workspace = true

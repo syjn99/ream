@@ -6,7 +6,7 @@ Start the lean node
 $ ream lean_node --help
 ```
 ```txt
-Usage: ream lean_node [OPTIONS] --network <NETWORK>
+Usage: ream lean_node [OPTIONS] --network <NETWORK> --validator-registry-path <VALIDATOR_REGISTRY_PATH>
 
 Options:
   -v, --verbosity <VERBOSITY>
@@ -15,6 +15,8 @@ Options:
           Provide a path to a YAML config file, or use 'ephemery' for the Ephemery network
       --bootnodes <BOOTNODES>
           One or more comma-delimited base64-encoded ENR's of peers to initially connect to. Use 'default' to use the default bootnodes for the network. Use 'none' to disable bootnodes. [default: default]
+      --validator-registry-path <VALIDATOR_REGISTRY_PATH>
+          The path to the validator registry
       --socket-address <SOCKET_ADDRESS>
           Set P2P socket address [default: 0.0.0.0]
       --socket-port <SOCKET_PORT>

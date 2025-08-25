@@ -1,0 +1,9 @@
+validators:
+- validator_id: 0
+  keystore_path: /path/to/keystore
+- validator_id: 1
+  keystore_path: /path/to/keystore
+- validator_id: 2
+  keystore_path: /path/to/keystore
+- validator_id: 3
+  keystore_path: /path/to/keystore

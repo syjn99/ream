@@ -52,7 +52,9 @@ use ream_validator_beacon::{
     beacon_api_client::BeaconApiClient, validator::ValidatorService,
     voluntary_exit::process_voluntary_exit,
 };
-use ream_validator_lean::service::ValidatorService as LeanValidatorService;
+use ream_validator_lean::{
+    registry::load_validator_registry, service::ValidatorService as LeanValidatorService,
+};
 use tokio::{sync::mpsc, time::Instant};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
@@ -141,7 +143,6 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     let (chain_sender, chain_receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
     let (outbound_p2p_sender, outbound_p2p_receiver) = mpsc::unbounded_channel::<QueueItem>();
 
-    // TODO 1: Load keystores from the config.
     let chain_service = LeanChainService::new(
         lean_chain_writer,
         chain_receiver,
@@ -167,10 +168,6 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
         ..Default::default()
     };
 
-    let validator_service =
-        LeanValidatorService::new(lean_chain_reader.clone(), Vec::new(), chain_sender.clone())
-            .await;
-
     let mut network_service = LeanNetworkService::new(
         Arc::new(LeanNetworkConfig {
             gossipsub_config,
@@ -179,11 +176,16 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
         }),
         lean_chain_reader.clone(),
         executor.clone(),
-        chain_sender,
+        chain_sender.clone(),
         outbound_p2p_receiver,
     )
     .await
     .expect("Failed to create network service");
+
+    let keystores = load_validator_registry(&config.validator_registry_path)
+        .expect("Failed to load validator registry");
+    let validator_service =
+        LeanValidatorService::new(lean_chain_reader.clone(), keystores, chain_sender).await;
 
     let server_config = LeanRpcServerConfig::new(
         config.http_address,
