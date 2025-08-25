@@ -67,6 +67,8 @@ mod tests {
             "2",
             "--network",
             "./assets/lean/sample_spec.yml",
+            "--validator-registry-path",
+            "./assets/lean/validator_registry.yml",
         ]);
 
         match cli.command {

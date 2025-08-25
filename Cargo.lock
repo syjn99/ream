@@ -5843,7 +5843,10 @@ dependencies = [
  "ream-consensus-lean",
  "ream-consensus-misc",
  "ream-network-spec",
+ "ream-post-quantum-crypto",
  "ream-sync",
+ "serde",
+ "serde_yaml",
  "tokio",
  "tracing",
 ]

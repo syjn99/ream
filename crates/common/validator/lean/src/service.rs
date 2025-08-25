@@ -9,11 +9,7 @@ use ream_network_spec::networks::lean_network_spec;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
 
-// TODO: We need to replace this after PQC integration.
-// For now, we only need ID for keystore.
-pub struct LeanKeystore {
-    id: u64,
-}
+use crate::registry::LeanKeystore;
 
 /// ValidatorService is responsible for managing validator operations
 /// such as proposing blocks and voting on them. This service also holds the keystores
@@ -35,18 +31,6 @@ impl ValidatorService {
         keystores: Vec<LeanKeystore>,
         chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     ) -> Self {
-        // Hack: If no keystores are provided, create a default one.
-        let keystores = if keystores.is_empty() {
-            vec![
-                LeanKeystore { id: 0 },
-                LeanKeystore { id: 1 },
-                LeanKeystore { id: 2 },
-                LeanKeystore { id: 3 },
-            ] // Placeholder for keystores
-        } else {
-            keystores
-        };
-
         ValidatorService {
             lean_chain,
             keystores,
@@ -78,7 +62,7 @@ impl ValidatorService {
 
                             // First tick (t=0): Propose a block.
                             if let Some(keystore) = self.is_proposer(slot) {
-                                info!("Validator {} proposing block for slot {slot} (tick {tick_count})", keystore.id);
+                                info!("Validator {} proposing block for slot {slot} (tick {tick_count})", keystore.validator_id);
 
                                 let (tx, rx) = oneshot::channel();
                                 self.chain_sender
@@ -91,7 +75,7 @@ impl ValidatorService {
 
                                 info!(
                                     "Validator {} built block: slot={}, parent={:?}, votes={}, state_root={:?}",
-                                    keystore.id,
+                                    keystore.validator_id,
                                     new_block.slot,
                                     new_block.parent,
                                     new_block.votes.len(),
@@ -120,7 +104,7 @@ impl ValidatorService {
 
                             let votes = self.keystores.iter().map(|keystore| {
                                 let mut vote = vote_template.clone();
-                                vote.validator_id = keystore.id;
+                                vote.validator_id = keystore.validator_id;
                                 vote
                             }).collect::<Vec<_>>();
 
@@ -147,6 +131,6 @@ impl ValidatorService {
 
         self.keystores
             .iter()
-            .find(|keystore| keystore.id == proposer_index as u64)
+            .find(|keystore| keystore.validator_id == proposer_index as u64)
     }
 }
