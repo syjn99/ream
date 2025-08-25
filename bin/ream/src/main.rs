@@ -154,11 +154,11 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
     let topics: Vec<LeanGossipTopic> = vec![
         LeanGossipTopic {
             fork: fork.clone(),
-            kind: LeanGossipTopicKind::LeanBlock,
+            kind: LeanGossipTopicKind::Block,
         },
         LeanGossipTopic {
             fork,
-            kind: LeanGossipTopicKind::LeanVote,
+            kind: LeanGossipTopicKind::Vote,
         },
     ];
 
