@@ -27,7 +27,7 @@ impl Default for LeanGossipsubConfig {
             .mesh_n_low(6)
             .mesh_n_high(12)
             .gossip_lazy(6)
-            .history_length(12)
+            .history_length(6)
             .history_gossip(3)
             .max_messages_per_rpc(Some(500))
             .duplicate_cache_time(Duration::from_secs(
