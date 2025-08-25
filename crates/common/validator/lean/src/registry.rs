@@ -30,7 +30,7 @@ pub fn load_validator_registry<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Le
         )
     })?;
 
-    let registry: ValidatorRegistryYaml = serde_yaml::from_str(&content)
+    let registry = serde_yaml::from_str::<ValidatorRegistryYaml>(&content)
         .map_err(|err| anyhow::anyhow!("Failed to parse validator registry YAML: {}", err))?;
 
     Ok(registry
