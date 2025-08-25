@@ -3,12 +3,15 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use anyhow::anyhow;
 use ream_consensus_lean::{
-    block::Block, checkpoint::Checkpoint, get_fork_choice_head, get_latest_justified_hash,
-    is_justifiable_slot, process_block, state::LeanState, vote::Vote,
+    block::{Block, BlockBody},
+    checkpoint::Checkpoint,
+    get_fork_choice_head, get_latest_justified_hash, is_justifiable_slot, process_block,
+    state::LeanState,
+    vote::Vote,
 };
 use ream_metrics::{PROPOSE_BLOCK_TIME, start_timer_vec, stop_timer};
+use ream_network_spec::networks::lean_network_spec;
 use ream_sync::rwlock::{Reader, Writer};
-use ssz_types::VariableList;
 use tree_hash::TreeHash;
 
 use crate::slot::get_current_slot;
@@ -108,10 +111,11 @@ impl LeanChain {
             .ok_or_else(|| anyhow!("Post state not found for head: {}", self.head))?;
         let mut new_block = Block {
             slot,
-            parent: self.head,
-            votes: VariableList::empty(),
+            proposer_index: slot % lean_network_spec().num_validators,
+            parent_root: self.head,
             // Diverged from Python implementation: Using `B256::ZERO` instead of `None`)
             state_root: B256::ZERO,
+            body: BlockBody::default(),
         };
         stop_timer(initialize_block_timer);
 
@@ -127,7 +131,7 @@ impl LeanChain {
                 .clone()
                 .into_iter()
                 .filter(|vote| vote.source.root == state.latest_justified.root)
-                .filter(|vote| !new_block.votes.contains(vote))
+                .filter(|vote| !new_block.body.votes.contains(vote))
                 .collect::<Vec<_>>();
 
             if new_votes_to_add.is_empty() {
@@ -136,6 +140,7 @@ impl LeanChain {
 
             for vote in new_votes_to_add {
                 new_block
+                    .body
                     .votes
                     .push(vote)
                     .map_err(|err| anyhow!("Failed to add vote to new_block: {err:?}"))?;
@@ -169,10 +174,10 @@ impl LeanChain {
                 anyhow!("Block not found for safe target hash: {}", self.safe_target)
             })?;
             if target_block.slot > safe_target_block.slot {
-                target_block = self.chain.get(&target_block.parent).ok_or_else(|| {
+                target_block = self.chain.get(&target_block.parent_root).ok_or_else(|| {
                     anyhow!(
                         "Block not found for target block's parent hash: {}",
-                        target_block.parent
+                        target_block.parent_root
                     )
                 })?;
             }
@@ -181,10 +186,10 @@ impl LeanChain {
         // If the latest finalized slot is very far back, then only some slots are
         // valid to justify, make sure the target is one of those
         while !is_justifiable_slot(&state.latest_finalized.slot, &target_block.slot) {
-            target_block = self.chain.get(&target_block.parent).ok_or_else(|| {
+            target_block = self.chain.get(&target_block.parent_root).ok_or_else(|| {
                 anyhow!(
                     "Block not found for target block's parent hash: {}",
-                    target_block.parent
+                    target_block.parent_root
                 )
             })?;
         }

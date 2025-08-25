@@ -9,7 +9,7 @@ use crate::vote::Vote;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct SignedBlock {
-    pub data: Block,
+    pub message: Block,
     pub signature: PQSignature,
 }
 
@@ -18,9 +18,17 @@ pub struct SignedBlock {
 )]
 pub struct Block {
     pub slot: u64,
+    pub proposer_index: u64,
     // Diverged from Python implementation: Disallow `None` (uses `B256::ZERO` instead)
-    pub parent: B256,
-    pub votes: VariableList<Vote, U4096>,
+    pub parent_root: B256,
     // Diverged from Python implementation: Disallow `None` (uses `B256::ZERO` instead)
     pub state_root: B256,
+    pub body: BlockBody,
+}
+
+#[derive(
+    Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash,
+)]
+pub struct BlockBody {
+    pub votes: VariableList<Vote, U4096>,
 }

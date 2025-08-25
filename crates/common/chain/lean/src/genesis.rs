@@ -1,15 +1,19 @@
 use alloy_primitives::B256;
-use ream_consensus_lean::{block::Block, state::LeanState};
+use ream_consensus_lean::{
+    block::{Block, BlockBody},
+    state::LeanState,
+};
 use ream_network_spec::networks::lean_network_spec;
-use ssz_types::VariableList;
 use tree_hash::TreeHash;
 
 fn genesis_block(state_root: B256) -> Block {
     Block {
         slot: 1,
-        parent: B256::ZERO,
-        votes: VariableList::empty(),
+        // Round-robin proposer selection for genesis
+        proposer_index: 1,
+        parent_root: B256::ZERO,
         state_root,
+        body: BlockBody::default(),
     }
 }
 

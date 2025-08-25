@@ -302,12 +302,12 @@ impl LeanNetworkService {
                     if let Err(err) =
                         self.chain_message_sender
                             .send(LeanChainServiceMessage::QueueItem(QueueItem::Block(
-                                (signed_block).data.clone(),
+                                (signed_block).message.clone(),
                             )))
                     {
                         warn!(
                             "failed to send block for slot {} item to chain: {err:?}",
-                            signed_block.data.slot
+                            signed_block.message.slot
                         );
                     }
                 }
