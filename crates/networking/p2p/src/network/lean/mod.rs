@@ -19,7 +19,7 @@ use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
     lean_chain::LeanChainReader,
-    messages::{LeanChainServiceMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem},
 };
 use ream_consensus_lean::VoteItem;
 use ream_executor::ReamExecutor;
@@ -82,7 +82,7 @@ pub struct LeanNetworkService {
     network_config: Arc<LeanNetworkConfig>,
     swarm: Swarm<ReamBehaviour>,
     peer_table: ParkingRwLock<HashMap<PeerId, ConnectionState>>,
-    chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
+    chain_message_sender: UnboundedSender<LeanChainMessage>,
     outbound_p2p_request: UnboundedReceiver<QueueItem>,
 }
 
@@ -91,7 +91,7 @@ impl LeanNetworkService {
         network_config: Arc<LeanNetworkConfig>,
         lean_chain: LeanChainReader,
         executor: ReamExecutor,
-        chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
+        chain_message_sender: UnboundedSender<LeanChainMessage>,
         outbound_p2p_request: UnboundedReceiver<QueueItem>,
     ) -> anyhow::Result<Self> {
         let connection_limits = {
@@ -299,12 +299,9 @@ impl LeanNetworkService {
         if let GossipsubEvent::Message { message, .. } = event {
             match LeanGossipsubMessage::decode(&message.topic, &message.data) {
                 Ok(LeanGossipsubMessage::Block(signed_block)) => {
-                    if let Err(err) =
-                        self.chain_message_sender
-                            .send(LeanChainServiceMessage::QueueItem(QueueItem::Block(
-                                (signed_block).message.clone(),
-                            )))
-                    {
+                    if let Err(err) = self.chain_message_sender.send(LeanChainMessage::QueueItem(
+                        QueueItem::Block((signed_block).message.clone()),
+                    )) {
                         warn!(
                             "failed to send block for slot {} item to chain: {err:?}",
                             signed_block.message.slot
@@ -312,12 +309,9 @@ impl LeanNetworkService {
                     }
                 }
                 Ok(LeanGossipsubMessage::Vote(signed_vote)) => {
-                    if let Err(err) =
-                        self.chain_message_sender
-                            .send(LeanChainServiceMessage::QueueItem(QueueItem::Vote(
-                                VoteItem::Signed((*signed_vote).clone()),
-                            )))
-                    {
+                    if let Err(err) = self.chain_message_sender.send(LeanChainMessage::QueueItem(
+                        QueueItem::Vote(VoteItem::Signed((*signed_vote).clone())),
+                    )) {
                         warn!(
                             "failed to send vote for slot {} to chain: {err:?}",
                             signed_vote.data.slot
@@ -396,7 +390,7 @@ mod tests {
             socket_address: Ipv4Addr::new(127, 0, 0, 1).into(),
             socket_port,
         });
-        let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
+        let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
             mpsc::unbounded_channel::<QueueItem>();
         let node = LeanNetworkService::new(

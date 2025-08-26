@@ -11,7 +11,7 @@ use tree_hash::TreeHash;
 use crate::{
     clock::create_lean_clock_interval,
     lean_chain::LeanChainWriter,
-    messages::{LeanChainServiceMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem},
     slot::get_current_slot,
 };
 
@@ -22,8 +22,8 @@ use crate::{
 /// NOTE: This service will be the core service to implement `receive()` function.
 pub struct LeanChainService {
     lean_chain: LeanChainWriter,
-    receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
-    sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+    receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
+    sender: mpsc::UnboundedSender<LeanChainMessage>,
     outbound_gossip: mpsc::UnboundedSender<QueueItem>,
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
@@ -32,8 +32,8 @@ pub struct LeanChainService {
 impl LeanChainService {
     pub async fn new(
         lean_chain: LeanChainWriter,
-        receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
-        sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+        receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
+        sender: mpsc::UnboundedSender<LeanChainMessage>,
         outbound_gossip: mpsc::UnboundedSender<QueueItem>,
     ) -> Self {
         LeanChainService {
@@ -81,12 +81,12 @@ impl LeanChainService {
                 }
                 Some(message) = self.receiver.recv() => {
                     match message {
-                        LeanChainServiceMessage::ProduceBlock { slot, response } => {
+                        LeanChainMessage::ProduceBlock { slot, response } => {
                             if let Err(err) = self.handle_produce_block(slot, response).await {
                                 error!("Failed to handle produce block message: {err}");
                             }
                         }
-                        LeanChainServiceMessage::QueueItem(queue_item) => {
+                        LeanChainMessage::QueueItem(queue_item) => {
                             match self.handle_queue_item(queue_item.clone()).await {
                                 Ok(()) => {
                                     if let Err(err) = self.outbound_gossip.send(queue_item) {
@@ -190,7 +190,7 @@ impl LeanChainService {
                 // by sending them to this service itself.
                 if let Some(queue_items) = self.dependencies.remove(&block_hash) {
                     for item in queue_items {
-                        self.sender.send(LeanChainServiceMessage::QueueItem(item))?;
+                        self.sender.send(LeanChainMessage::QueueItem(item))?;
                     }
                 }
             }

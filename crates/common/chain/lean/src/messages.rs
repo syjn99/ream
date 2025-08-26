@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
-pub enum LeanChainServiceMessage {
+pub enum LeanChainMessage {
     ProduceBlock {
         slot: u64,
         response: oneshot::Sender<Block>,

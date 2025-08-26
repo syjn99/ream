@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use ream_chain_lean::{
     clock::create_lean_clock_interval,
     lean_chain::LeanChainReader,
-    messages::{LeanChainServiceMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem},
 };
 use ream_consensus_lean::VoteItem;
 use ream_network_spec::networks::lean_network_spec;
@@ -22,14 +22,14 @@ use crate::registry::LeanKeystore;
 pub struct ValidatorService {
     lean_chain: LeanChainReader,
     keystores: Vec<LeanKeystore>,
-    chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+    chain_sender: mpsc::UnboundedSender<LeanChainMessage>,
 }
 
 impl ValidatorService {
     pub async fn new(
         lean_chain: LeanChainReader,
         keystores: Vec<LeanKeystore>,
-        chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+        chain_sender: mpsc::UnboundedSender<LeanChainMessage>,
     ) -> Self {
         ValidatorService {
             lean_chain,
@@ -66,7 +66,7 @@ impl ValidatorService {
 
                                 let (tx, rx) = oneshot::channel();
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::ProduceBlock { slot, response: tx })
+                                    .send(LeanChainMessage::ProduceBlock { slot, response: tx })
                                     .expect("Failed to send vote to LeanChainService");
 
 
@@ -86,7 +86,7 @@ impl ValidatorService {
 
                                 // Send block to the LeanChainService.
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::QueueItem(QueueItem::Block(new_block)))
+                                    .send(LeanChainMessage::QueueItem(QueueItem::Block(new_block)))
                                     .expect("Failed to send vote to LeanChainService");
                             } else {
                                 let proposer_index = slot % lean_network_spec().num_validators;
@@ -111,7 +111,7 @@ impl ValidatorService {
                             // TODO 1: Sign the votes with the keystore.
                             for vote in votes {
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::QueueItem(QueueItem::Vote(VoteItem::Unsigned(vote))))
+                                    .send(LeanChainMessage::QueueItem(QueueItem::Vote(VoteItem::Unsigned(vote))))
                                     .expect("Failed to send vote to LeanChainService");
                             }
                         }

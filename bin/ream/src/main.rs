@@ -20,7 +20,7 @@ use ream_api_types_beacon::id::{ID, ValidatorID};
 use ream_chain_lean::{
     genesis as lean_genesis,
     lean_chain::LeanChain,
-    messages::{LeanChainServiceMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem},
     service::LeanChainService,
 };
 use ream_checkpoint_sync::initialize_db_from_checkpoint;
@@ -140,7 +140,7 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor) {
         Writer::new(LeanChain::new(genesis_block, genesis_state));
 
     // Initialize the services that will run in the lean node.
-    let (chain_sender, chain_receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
+    let (chain_sender, chain_receiver) = mpsc::unbounded_channel::<LeanChainMessage>();
     let (outbound_p2p_sender, outbound_p2p_receiver) = mpsc::unbounded_channel::<QueueItem>();
 
     let chain_service = LeanChainService::new(
