@@ -18,8 +18,7 @@ use libp2p::{
 use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
-    gossip_request::LeanGossipRequest, lean_chain::LeanChainReader,
-    messages::LeanChainServiceMessage,
+    lean_chain::LeanChainReader, messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest,
 };
 use ream_executor::ReamExecutor;
 use ssz::Encode;
@@ -82,7 +81,7 @@ pub struct LeanNetworkService {
     swarm: Swarm<ReamBehaviour>,
     peer_table: ParkingRwLock<HashMap<PeerId, ConnectionState>>,
     chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
-    outbound_p2p_request: UnboundedReceiver<LeanGossipRequest>,
+    outbound_p2p_request: UnboundedReceiver<LeanP2PRequest>,
 }
 
 impl LeanNetworkService {
@@ -91,7 +90,7 @@ impl LeanNetworkService {
         lean_chain: LeanChainReader,
         executor: ReamExecutor,
         chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
-        outbound_p2p_request: UnboundedReceiver<LeanGossipRequest>,
+        outbound_p2p_request: UnboundedReceiver<LeanP2PRequest>,
     ) -> anyhow::Result<Self> {
         let connection_limits = {
             let limits = ConnectionLimits::default()
@@ -196,7 +195,7 @@ impl LeanNetworkService {
             tokio::select! {
                 Some(item) = self.outbound_p2p_request.recv() => {
                     match item {
-                        LeanGossipRequest::Block(signed_block) => {
+                        LeanP2PRequest::GossipBlock(signed_block) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -216,7 +215,7 @@ impl LeanNetworkService {
                                 info!("broadcasted block for slot {}", signed_block.message.slot);
                             }
                         }
-                        LeanGossipRequest::Vote(signed_vote) => {
+                        LeanP2PRequest::GossipVote(signed_vote) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -394,7 +393,7 @@ mod tests {
         });
         let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
-            mpsc::unbounded_channel::<LeanGossipRequest>();
+            mpsc::unbounded_channel::<LeanP2PRequest>();
         let node = LeanNetworkService::new(
             config.clone(),
             lean_chain_reader,

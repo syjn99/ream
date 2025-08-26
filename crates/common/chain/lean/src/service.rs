@@ -14,8 +14,8 @@ use tracing::{error, info, warn};
 use tree_hash::TreeHash;
 
 use crate::{
-    clock::create_lean_clock_interval, gossip_request::LeanGossipRequest,
-    lean_chain::LeanChainWriter, messages::LeanChainServiceMessage, queue_item::QueueItem,
+    clock::create_lean_clock_interval, lean_chain::LeanChainWriter,
+    messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest, queue_item::QueueItem,
     slot::get_current_slot,
 };
 
@@ -28,7 +28,7 @@ pub struct LeanChainService {
     lean_chain: LeanChainWriter,
     receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
     sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
-    outbound_gossip: mpsc::UnboundedSender<LeanGossipRequest>,
+    outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
 }
@@ -38,7 +38,7 @@ impl LeanChainService {
         lean_chain: LeanChainWriter,
         receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
         sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
-        outbound_gossip: mpsc::UnboundedSender<LeanGossipRequest>,
+        outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     ) -> Self {
         LeanChainService {
             lean_chain,
@@ -108,7 +108,7 @@ impl LeanChainService {
                                 warn!("Failed to handle process block message: {err}");
                             }
 
-                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanGossipRequest::Block(signed_block)) {
+                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanP2PRequest::GossipBlock(signed_block)) {
                                 warn!("Failed to send item to outbound gossip channel: {err}");
                             }
                         }
@@ -117,7 +117,7 @@ impl LeanChainService {
                                 warn!("Failed to handle process block message: {err}");
                             }
 
-                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanGossipRequest::Vote(signed_vote)) {
+                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanP2PRequest::GossipVote(signed_vote)) {
                                 warn!("Failed to send item to outbound gossip channel: {err}");
                             }
                         }
