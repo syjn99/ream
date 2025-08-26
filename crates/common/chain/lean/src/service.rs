@@ -64,6 +64,19 @@ impl LeanChainService {
             tokio::select! {
                 _ = interval.tick() => {
                     match tick_count % 4 {
+                        0 => {
+                            // First tick (t=0/4): Log current head state, including its justification/finalization status.
+                            let current_slot = get_current_slot();
+                            let lean_chain = self.lean_chain.read().await;
+                            let head_state = lean_chain.post_states.get(&lean_chain.head)
+                                .ok_or_else(|| anyhow!("Post state not found for head: {}", lean_chain.head))?;
+
+                            info!(
+                                "Current head state of slot {current_slot}: latest_justified.slot: {}, latest_finalized.slot: {}",
+                                head_state.latest_justified.slot,
+                                head_state.latest_finalized.slot
+                            );
+                        }
                         2 => {
                             // Third tick (t=2/4): Compute the safe target.
                             let current_slot = get_current_slot();
