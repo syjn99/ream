@@ -9,19 +9,8 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use anyhow::anyhow;
 use ream_metrics::{FINALIZED_SLOT, HEAD_SLOT, JUSTIFIED_SLOT, set_int_gauge_vec};
-use serde::{Deserialize, Serialize};
 
-use crate::{
-    block::Block,
-    state::LeanState,
-    vote::{SignedVote, Vote},
-};
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum VoteItem {
-    Signed(SignedVote),
-    Unsigned(Vote),
-}
+use crate::{block::Block, state::LeanState, vote::Vote};
 
 /// We allow justification of slots either <= 5 or a perfect square or oblong after
 /// the latest finalized slot. This gives us a backoff technique and ensures

@@ -2,16 +2,20 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use ream_consensus_lean::{VoteItem, block::Block, process_block};
+use ream_consensus_lean::{
+    block::{Block, SignedBlock},
+    process_block,
+    vote::SignedVote,
+};
 use ream_network_spec::networks::lean_network_spec;
-use tokio::sync::mpsc;
+use ream_post_quantum_crypto::PQSignature;
+use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
 use tree_hash::TreeHash;
 
 use crate::{
-    clock::create_lean_clock_interval,
-    lean_chain::LeanChainWriter,
-    messages::{LeanChainServiceMessage, ProduceBlockMessage, QueueItem},
+    clock::create_lean_clock_interval, lean_chain::LeanChainWriter,
+    messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest, queue_item::QueueItem,
     slot::get_current_slot,
 };
 
@@ -24,7 +28,7 @@ pub struct LeanChainService {
     lean_chain: LeanChainWriter,
     receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
     sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
-    outbound_gossip: mpsc::UnboundedSender<QueueItem>,
+    outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
 }
@@ -34,7 +38,7 @@ impl LeanChainService {
         lean_chain: LeanChainWriter,
         receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
         sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
-        outbound_gossip: mpsc::UnboundedSender<QueueItem>,
+        outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     ) -> Self {
         LeanChainService {
             lean_chain,
@@ -60,6 +64,19 @@ impl LeanChainService {
             tokio::select! {
                 _ = interval.tick() => {
                     match tick_count % 4 {
+                        0 => {
+                            // First tick (t=0/4): Log current head state, including its justification/finalization status.
+                            let current_slot = get_current_slot();
+                            let lean_chain = self.lean_chain.read().await;
+                            let head_state = lean_chain.post_states.get(&lean_chain.head)
+                                .ok_or_else(|| anyhow!("Post state not found for head: {}", lean_chain.head))?;
+
+                            info!(
+                                "Current head state of slot {current_slot}: latest_justified.slot: {}, latest_finalized.slot: {}",
+                                head_state.latest_justified.slot,
+                                head_state.latest_finalized.slot
+                            );
+                        }
                         2 => {
                             // Third tick (t=2/4): Compute the safe target.
                             let current_slot = get_current_slot();
@@ -81,21 +98,27 @@ impl LeanChainService {
                 }
                 Some(message) = self.receiver.recv() => {
                     match message {
-                        LeanChainServiceMessage::ProduceBlock(produce_block_message) => {
-                            if let Err(err) = self.handle_produce_block(produce_block_message).await {
+                        LeanChainServiceMessage::ProduceBlock { slot, sender } => {
+                            if let Err(err) = self.handle_produce_block(slot, sender).await {
                                 error!("Failed to handle produce block message: {err}");
                             }
                         }
-                        LeanChainServiceMessage::QueueItem(queue_item) => {
-                            match self.handle_queue_item(queue_item.clone()).await {
-                                Ok(()) => {
-                                    if let Err(err) = self.outbound_gossip.send(queue_item) {
-                                        warn!("Failed to send item to outbound gossip channel: {err:?}");
-                                    }
-                                }
-                                Err(err) => {
-                                    warn!("Could not publish: processing failed {err:?}");
-                                }
+                        LeanChainServiceMessage::ProcessBlock { signed_block, is_trusted, need_gossip } => {
+                            if let Err(err) = self.handle_process_block(signed_block.clone(), is_trusted).await {
+                                warn!("Failed to handle process block message: {err}");
+                            }
+
+                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanP2PRequest::GossipBlock(signed_block)) {
+                                warn!("Failed to send item to outbound gossip channel: {err}");
+                            }
+                        }
+                        LeanChainServiceMessage::ProcessVote { signed_vote, is_trusted, need_gossip } => {
+                            if let Err(err) = self.handle_process_vote(signed_vote.clone(), is_trusted).await {
+                                warn!("Failed to handle process block message: {err}");
+                            }
+
+                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanP2PRequest::GossipVote(signed_vote)) {
+                                warn!("Failed to send item to outbound gossip channel: {err}");
                             }
                         }
                     }
@@ -106,9 +129,9 @@ impl LeanChainService {
 
     async fn handle_produce_block(
         &mut self,
-        produce_block_message: ProduceBlockMessage,
+        slot: u64,
+        response: oneshot::Sender<Block>,
     ) -> anyhow::Result<()> {
-        let slot = produce_block_message.slot;
         let new_block = {
             let mut lean_chain = self.lean_chain.write().await;
 
@@ -120,47 +143,23 @@ impl LeanChainService {
         };
 
         // Send the produced block back to the requester
-        produce_block_message
-            .response
+        response
             .send(new_block)
             .map_err(|err| anyhow!("Failed to send produced block: {err:?}"))?;
 
         Ok(())
     }
 
-    async fn handle_queue_item(&mut self, item: QueueItem) -> anyhow::Result<()> {
-        match item {
-            QueueItem::Block(block) => {
-                let block_hash = block.tree_hash_root();
-                info!(
-                    "Received block at slot {} with hash {block_hash:?} from parent {:?}",
-                    block.slot, block.parent_root
-                );
-                self.handle_block(block).await
-            }
-            QueueItem::Vote(vote_item) => {
-                match &vote_item {
-                    VoteItem::Signed(signed_vote) => {
-                        let vote = &signed_vote.data;
-                        info!(
-                            "Received signed vote from validator {} for head {:?} / source_slot {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.source.slot, vote.slot
-                        );
-                    }
-                    VoteItem::Unsigned(vote) => {
-                        info!(
-                            "Received unsigned vote from validator {} for head {:?} / source_slot {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.source.slot, vote.slot
-                        );
-                    }
-                }
-
-                self.handle_vote(vote_item).await
-            }
+    async fn handle_process_block(
+        &mut self,
+        signed_block: SignedBlock,
+        is_trusted: bool,
+    ) -> anyhow::Result<()> {
+        if !is_trusted {
+            // TODO: Validate the signature.
         }
-    }
 
-    async fn handle_block(&mut self, block: Block) -> anyhow::Result<()> {
+        let block = signed_block.message;
         let block_hash = block.tree_hash_root();
 
         let mut lean_chain = self.lean_chain.write().await;
@@ -189,9 +188,32 @@ impl LeanChainService {
 
                 // Once we have received a block, also process all of its dependencies
                 // by sending them to this service itself.
+                // NOTE 1: As we already verified all QueueItems before appending them, we can trust
+                // their validity.
+                // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
+                // only.
                 if let Some(queue_items) = self.dependencies.remove(&block_hash) {
                     for item in queue_items {
-                        self.sender.send(LeanChainServiceMessage::QueueItem(item))?;
+                        let message = match item {
+                            QueueItem::Block(block) => LeanChainServiceMessage::ProcessBlock {
+                                signed_block: SignedBlock {
+                                    message: block,
+                                    signature: PQSignature::default(),
+                                },
+                                is_trusted: true,
+                                need_gossip: false,
+                            },
+                            QueueItem::Vote(vote) => LeanChainServiceMessage::ProcessVote {
+                                signed_vote: SignedVote {
+                                    data: vote,
+                                    signature: PQSignature::default(),
+                                },
+                                is_trusted: true,
+                                need_gossip: false,
+                            },
+                        };
+
+                        self.sender.send(message)?;
                     }
                 }
             }
@@ -208,14 +230,16 @@ impl LeanChainService {
         Ok(())
     }
 
-    async fn handle_vote(&mut self, vote_item: VoteItem) -> anyhow::Result<()> {
-        let vote = match vote_item {
-            VoteItem::Signed(vote) => {
-                // TODO: Validate the signature.
-                vote.data
-            }
-            VoteItem::Unsigned(vote) => vote,
-        };
+    async fn handle_process_vote(
+        &mut self,
+        signed_vote: SignedVote,
+        is_trusted: bool,
+    ) -> anyhow::Result<()> {
+        if !is_trusted {
+            // TODO: Validate the signature.
+        }
+
+        let vote = signed_vote.data;
 
         let lean_chain = self.lean_chain.read().await;
         let is_known_vote = lean_chain.known_votes.contains(&vote);
@@ -233,7 +257,7 @@ impl LeanChainService {
             self.dependencies
                 .entry(vote.head.root)
                 .or_default()
-                .push(QueueItem::Vote(VoteItem::Unsigned(vote)));
+                .push(QueueItem::Vote(vote));
         }
 
         Ok(())

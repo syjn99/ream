@@ -18,10 +18,8 @@ use libp2p::{
 use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
-    lean_chain::LeanChainReader,
-    messages::{LeanChainServiceMessage, QueueItem},
+    lean_chain::LeanChainReader, messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest,
 };
-use ream_consensus_lean::VoteItem;
 use ream_executor::ReamExecutor;
 use ssz::Encode;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -83,7 +81,7 @@ pub struct LeanNetworkService {
     swarm: Swarm<ReamBehaviour>,
     peer_table: ParkingRwLock<HashMap<PeerId, ConnectionState>>,
     chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
-    outbound_p2p_request: UnboundedReceiver<QueueItem>,
+    outbound_p2p_request: UnboundedReceiver<LeanP2PRequest>,
 }
 
 impl LeanNetworkService {
@@ -92,7 +90,7 @@ impl LeanNetworkService {
         lean_chain: LeanChainReader,
         executor: ReamExecutor,
         chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
-        outbound_p2p_request: UnboundedReceiver<QueueItem>,
+        outbound_p2p_request: UnboundedReceiver<LeanP2PRequest>,
     ) -> anyhow::Result<Self> {
         let connection_limits = {
             let limits = ConnectionLimits::default()
@@ -197,7 +195,7 @@ impl LeanNetworkService {
             tokio::select! {
                 Some(item) = self.outbound_p2p_request.recv() => {
                     match item {
-                        QueueItem::Block(block) => {
+                        LeanP2PRequest::GossipBlock(signed_block) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -209,20 +207,15 @@ impl LeanNetworkService {
                                         .find(|block_topic| matches!(block_topic.kind, LeanGossipTopicKind::Block))
                                         .map(|block_topic| IdentTopic::from(block_topic.clone()))
                                         .expect("LeanBlock topic configured"),
-                                    block.as_ssz_bytes(),
+                                    signed_block.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish block for slot {} failed: {err:?}", block.slot);
+                                warn!("publish block for slot {} failed: {err:?}", signed_block.message.slot);
                             } else {
-                                info!("broadcasted block for slot {}", block.slot);
+                                info!("broadcasted block for slot {}", signed_block.message.slot);
                             }
                         }
-                        QueueItem::Vote(vote) => {
-                            let (bytes, slot) = match &vote {
-                                VoteItem::Signed(signed) => (signed.as_ssz_bytes(), signed.data.slot),
-                                VoteItem::Unsigned(unsigned) => (unsigned.as_ssz_bytes(), unsigned.slot),
-                            };
-
+                        LeanP2PRequest::GossipVote(signed_vote) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -234,12 +227,12 @@ impl LeanNetworkService {
                                         .find(|vote_topic| matches!(vote_topic.kind, LeanGossipTopicKind::Vote))
                                         .map(|vote_topic| IdentTopic::from(vote_topic.clone()))
                                         .expect("LeanVote topic configured"),
-                                    bytes,
+                                    signed_vote.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish vote for slot {slot} failed: {err:?}");
+                                warn!("publish vote for slot {} failed: {err:?}", signed_vote.data.slot);
                             } else {
-                                info!("broadcasted vote for slot {slot}");
+                                info!("broadcasted vote for slot {}", signed_vote.data.slot);
                             }
                         }
                     }
@@ -299,29 +292,31 @@ impl LeanNetworkService {
         if let GossipsubEvent::Message { message, .. } = event {
             match LeanGossipsubMessage::decode(&message.topic, &message.data) {
                 Ok(LeanGossipsubMessage::Block(signed_block)) => {
+                    let slot = signed_block.message.slot;
+
                     if let Err(err) =
                         self.chain_message_sender
-                            .send(LeanChainServiceMessage::QueueItem(QueueItem::Block(
-                                (signed_block).message.clone(),
-                            )))
+                            .send(LeanChainServiceMessage::ProcessBlock {
+                                signed_block: *signed_block,
+                                is_trusted: false,
+                                need_gossip: true,
+                            })
                     {
-                        warn!(
-                            "failed to send block for slot {} item to chain: {err:?}",
-                            signed_block.message.slot
-                        );
+                        warn!("failed to send block for slot {slot} item to chain: {err:?}");
                     }
                 }
                 Ok(LeanGossipsubMessage::Vote(signed_vote)) => {
+                    let slot = signed_vote.data.slot;
+
                     if let Err(err) =
                         self.chain_message_sender
-                            .send(LeanChainServiceMessage::QueueItem(QueueItem::Vote(
-                                VoteItem::Signed((*signed_vote).clone()),
-                            )))
+                            .send(LeanChainServiceMessage::ProcessVote {
+                                signed_vote: *signed_vote,
+                                is_trusted: false,
+                                need_gossip: true,
+                            })
                     {
-                        warn!(
-                            "failed to send vote for slot {} to chain: {err:?}",
-                            signed_vote.data.slot
-                        );
+                        warn!("failed to send vote for slot {slot} to chain: {err:?}");
                     }
                 }
                 Err(err) => warn!("gossip decode failed: {err:?}"),
@@ -398,7 +393,7 @@ mod tests {
         });
         let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
-            mpsc::unbounded_channel::<QueueItem>();
+            mpsc::unbounded_channel::<LeanP2PRequest>();
         let node = LeanNetworkService::new(
             config.clone(),
             lean_chain_reader,

@@ -1,11 +1,11 @@
 use anyhow::anyhow;
 use ream_chain_lean::{
-    clock::create_lean_clock_interval,
-    lean_chain::LeanChainReader,
-    messages::{LeanChainServiceMessage, QueueItem},
+    clock::create_lean_clock_interval, lean_chain::LeanChainReader,
+    messages::LeanChainServiceMessage,
 };
-use ream_consensus_lean::VoteItem;
+use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
 use ream_network_spec::networks::lean_network_spec;
+use ream_post_quantum_crypto::PQSignature;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
 
@@ -66,7 +66,7 @@ impl ValidatorService {
 
                                 let (tx, rx) = oneshot::channel();
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::produce_block(slot, tx))
+                                    .send(LeanChainServiceMessage::ProduceBlock { slot, sender: tx })
                                     .expect("Failed to send vote to LeanChainService");
 
 
@@ -82,12 +82,16 @@ impl ValidatorService {
                                     new_block.state_root
                                 );
 
-                                // TODO 1: Sign the block with the keystore.
+                                // TODO: Sign the block with the keystore.
+                                let signed_block = SignedBlock {
+                                    message: new_block,
+                                    signature: PQSignature::default(),
+                                };
 
                                 // Send block to the LeanChainService.
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::QueueItem(QueueItem::Block(new_block)))
-                                    .expect("Failed to send vote to LeanChainService");
+                                    .send(LeanChainServiceMessage::ProcessBlock { signed_block, is_trusted: true, need_gossip: true })
+                                    .expect("Failed to send block to LeanChainService");
                             } else {
                                 let proposer_index = slot % lean_network_spec().num_validators;
                                 info!("Not proposer for slot {slot} (proposer is validator {proposer_index}), skipping");
@@ -102,16 +106,19 @@ impl ValidatorService {
 
                             info!("Built vote template for head {:?} at slot {} with target {:?}", vote_template.head, vote_template.slot, vote_template.target.slot);
 
-                            let votes = self.keystores.iter().map(|keystore| {
+                            // TODO: Sign the vote with the keystore.
+                            let signed_votes = self.keystores.iter().map(|keystore| {
                                 let mut vote = vote_template.clone();
                                 vote.validator_id = keystore.validator_id;
-                                vote
+                                SignedVote {
+                                    data: vote,
+                                    signature: PQSignature::default(),
+                                }
                             }).collect::<Vec<_>>();
 
-                            // TODO 1: Sign the votes with the keystore.
-                            for vote in votes {
+                            for signed_vote in signed_votes {
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::QueueItem(QueueItem::Vote(VoteItem::Unsigned(vote))))
+                                    .send(LeanChainServiceMessage::ProcessVote { signed_vote, is_trusted: true, need_gossip: true })
                                     .expect("Failed to send vote to LeanChainService");
                             }
                         }
