@@ -19,7 +19,7 @@ use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
     lean_chain::LeanChainReader,
-    messages::{LeanChainMessage, QueueItem, VoteItem},
+    messages::{LeanChainMessage, QueueItem, SignedChainItem, VoteItem},
 };
 use ream_executor::ReamExecutor;
 use ssz::Encode;
@@ -82,7 +82,7 @@ pub struct LeanNetworkService {
     swarm: Swarm<ReamBehaviour>,
     peer_table: ParkingRwLock<HashMap<PeerId, ConnectionState>>,
     chain_message_sender: UnboundedSender<LeanChainMessage>,
-    outbound_p2p_request: UnboundedReceiver<QueueItem>,
+    outbound_p2p_request: UnboundedReceiver<SignedChainItem>,
 }
 
 impl LeanNetworkService {
@@ -91,7 +91,7 @@ impl LeanNetworkService {
         lean_chain: LeanChainReader,
         executor: ReamExecutor,
         chain_message_sender: UnboundedSender<LeanChainMessage>,
-        outbound_p2p_request: UnboundedReceiver<QueueItem>,
+        outbound_p2p_request: UnboundedReceiver<SignedChainItem>,
     ) -> anyhow::Result<Self> {
         let connection_limits = {
             let limits = ConnectionLimits::default()
@@ -196,7 +196,7 @@ impl LeanNetworkService {
             tokio::select! {
                 Some(item) = self.outbound_p2p_request.recv() => {
                     match item {
-                        QueueItem::Block(block) => {
+                        SignedChainItem::Block(signed_block) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -208,20 +208,15 @@ impl LeanNetworkService {
                                         .find(|block_topic| matches!(block_topic.kind, LeanGossipTopicKind::Block))
                                         .map(|block_topic| IdentTopic::from(block_topic.clone()))
                                         .expect("LeanBlock topic configured"),
-                                    block.as_ssz_bytes(),
+                                    signed_block.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish block for slot {} failed: {err:?}", block.slot);
+                                warn!("publish block for slot {} failed: {err:?}", signed_block.message.slot);
                             } else {
-                                info!("broadcasted block for slot {}", block.slot);
+                                info!("broadcasted block for slot {}", signed_block.message.slot);
                             }
                         }
-                        QueueItem::Vote(vote) => {
-                            let (bytes, slot) = match &vote {
-                                VoteItem::Signed(signed) => (signed.as_ssz_bytes(), signed.data.slot),
-                                VoteItem::Unsigned(unsigned) => (unsigned.as_ssz_bytes(), unsigned.slot),
-                            };
-
+                        SignedChainItem::Vote(signed_vote) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -233,12 +228,12 @@ impl LeanNetworkService {
                                         .find(|vote_topic| matches!(vote_topic.kind, LeanGossipTopicKind::Vote))
                                         .map(|vote_topic| IdentTopic::from(vote_topic.clone()))
                                         .expect("LeanVote topic configured"),
-                                    bytes,
+                                    signed_vote.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish vote for slot {slot} failed: {err:?}");
+                                warn!("publish vote for slot {} failed: {err:?}", signed_vote.data.slot);
                             } else {
-                                info!("broadcasted vote for slot {slot}");
+                                info!("broadcasted vote for slot {}", signed_vote.data.slot);
                             }
                         }
                     }
@@ -391,7 +386,7 @@ mod tests {
         });
         let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
-            mpsc::unbounded_channel::<QueueItem>();
+            mpsc::unbounded_channel::<SignedChainItem>();
         let node = LeanNetworkService::new(
             config.clone(),
             lean_chain_reader,

@@ -11,7 +11,7 @@ use tree_hash::TreeHash;
 use crate::{
     clock::create_lean_clock_interval,
     lean_chain::LeanChainWriter,
-    messages::{LeanChainMessage, QueueItem, VoteItem},
+    messages::{LeanChainMessage, QueueItem, SignedChainItem, VoteItem},
     slot::get_current_slot,
 };
 
@@ -24,7 +24,7 @@ pub struct LeanChainService {
     lean_chain: LeanChainWriter,
     receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
     sender: mpsc::UnboundedSender<LeanChainMessage>,
-    outbound_gossip: mpsc::UnboundedSender<QueueItem>,
+    outbound_gossip: mpsc::UnboundedSender<SignedChainItem>,
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
 }
@@ -34,7 +34,7 @@ impl LeanChainService {
         lean_chain: LeanChainWriter,
         receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
         sender: mpsc::UnboundedSender<LeanChainMessage>,
-        outbound_gossip: mpsc::UnboundedSender<QueueItem>,
+        outbound_gossip: mpsc::UnboundedSender<SignedChainItem>,
     ) -> Self {
         LeanChainService {
             lean_chain,

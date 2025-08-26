@@ -1,5 +1,5 @@
 use ream_consensus_lean::{
-    block::Block,
+    block::{Block, SignedBlock},
     vote::{SignedVote, Vote},
 };
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,12 @@ pub enum LeanChainMessage {
 pub enum QueueItem {
     Block(Block),
     Vote(VoteItem),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SignedChainItem {
+    Block(SignedBlock),
+    Vote(SignedVote),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
