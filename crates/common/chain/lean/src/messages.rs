@@ -25,7 +25,7 @@ use tokio::sync::oneshot;
 pub enum LeanChainServiceMessage {
     ProduceBlock {
         slot: u64,
-        response: oneshot::Sender<Block>,
+        sender: oneshot::Sender<Block>,
     },
     ProcessBlock {
         signed_block: SignedBlock,

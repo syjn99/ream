@@ -98,8 +98,8 @@ impl LeanChainService {
                 }
                 Some(message) = self.receiver.recv() => {
                     match message {
-                        LeanChainServiceMessage::ProduceBlock { slot, response } => {
-                            if let Err(err) = self.handle_produce_block(slot, response).await {
+                        LeanChainServiceMessage::ProduceBlock { slot, sender } => {
+                            if let Err(err) = self.handle_produce_block(slot, sender).await {
                                 error!("Failed to handle produce block message: {err}");
                             }
                         }
@@ -155,12 +155,11 @@ impl LeanChainService {
         signed_block: SignedBlock,
         is_trusted: bool,
     ) -> anyhow::Result<()> {
-        let block = if is_trusted {
-            signed_block.message
-        } else {
+        if !is_trusted {
             // TODO: Validate the signature.
-            signed_block.message
-        };
+        }
+
+        let block = signed_block.message;
         let block_hash = block.tree_hash_root();
 
         let mut lean_chain = self.lean_chain.write().await;
@@ -236,12 +235,11 @@ impl LeanChainService {
         signed_vote: SignedVote,
         is_trusted: bool,
     ) -> anyhow::Result<()> {
-        let vote = if is_trusted {
-            signed_vote.data
-        } else {
+        if !is_trusted {
             // TODO: Validate the signature.
-            signed_vote.data
-        };
+        }
+
+        let vote = signed_vote.data;
 
         let lean_chain = self.lean_chain.read().await;
         let is_known_vote = lean_chain.known_votes.contains(&vote);
