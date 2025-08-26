@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use ream_consensus_lean::{VoteItem, block::Block, process_block};
+use ream_consensus_lean::{block::Block, process_block};
 use ream_network_spec::networks::lean_network_spec;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
@@ -11,7 +11,7 @@ use tree_hash::TreeHash;
 use crate::{
     clock::create_lean_clock_interval,
     lean_chain::LeanChainWriter,
-    messages::{LeanChainMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem, VoteItem},
     slot::get_current_slot,
 };
 

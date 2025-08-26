@@ -19,9 +19,8 @@ use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
     lean_chain::LeanChainReader,
-    messages::{LeanChainMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem, VoteItem},
 };
-use ream_consensus_lean::VoteItem;
 use ream_executor::ReamExecutor;
 use ssz::Encode;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};

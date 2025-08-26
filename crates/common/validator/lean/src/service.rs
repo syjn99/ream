@@ -2,9 +2,8 @@ use anyhow::anyhow;
 use ream_chain_lean::{
     clock::create_lean_clock_interval,
     lean_chain::LeanChainReader,
-    messages::{LeanChainMessage, QueueItem},
+    messages::{LeanChainMessage, QueueItem, VoteItem},
 };
-use ream_consensus_lean::VoteItem;
 use ream_network_spec::networks::lean_network_spec;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
