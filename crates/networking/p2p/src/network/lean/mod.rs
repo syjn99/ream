@@ -18,8 +18,7 @@ use libp2p::{
 use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
-    lean_chain::LeanChainReader,
-    messages::{LeanChainMessage, QueueItem, SignedChainItem, VoteItem},
+    gossip_request::LeanGossipRequest, lean_chain::LeanChainReader, messages::LeanChainMessage,
 };
 use ream_executor::ReamExecutor;
 use ssz::Encode;
@@ -82,7 +81,7 @@ pub struct LeanNetworkService {
     swarm: Swarm<ReamBehaviour>,
     peer_table: ParkingRwLock<HashMap<PeerId, ConnectionState>>,
     chain_message_sender: UnboundedSender<LeanChainMessage>,
-    outbound_p2p_request: UnboundedReceiver<SignedChainItem>,
+    outbound_p2p_request: UnboundedReceiver<LeanGossipRequest>,
 }
 
 impl LeanNetworkService {
@@ -91,7 +90,7 @@ impl LeanNetworkService {
         lean_chain: LeanChainReader,
         executor: ReamExecutor,
         chain_message_sender: UnboundedSender<LeanChainMessage>,
-        outbound_p2p_request: UnboundedReceiver<SignedChainItem>,
+        outbound_p2p_request: UnboundedReceiver<LeanGossipRequest>,
     ) -> anyhow::Result<Self> {
         let connection_limits = {
             let limits = ConnectionLimits::default()
@@ -196,7 +195,7 @@ impl LeanNetworkService {
             tokio::select! {
                 Some(item) = self.outbound_p2p_request.recv() => {
                     match item {
-                        SignedChainItem::Block(signed_block) => {
+                        LeanGossipRequest::Block(signed_block) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -216,7 +215,7 @@ impl LeanNetworkService {
                                 info!("broadcasted block for slot {}", signed_block.message.slot);
                             }
                         }
-                        SignedChainItem::Vote(signed_vote) => {
+                        LeanGossipRequest::Vote(signed_vote) => {
                             if let Err(err) = self.swarm
                                 .behaviour_mut()
                                 .gossipsub
@@ -293,23 +292,31 @@ impl LeanNetworkService {
         if let GossipsubEvent::Message { message, .. } = event {
             match LeanGossipsubMessage::decode(&message.topic, &message.data) {
                 Ok(LeanGossipsubMessage::Block(signed_block)) => {
-                    if let Err(err) = self.chain_message_sender.send(LeanChainMessage::QueueItem(
-                        QueueItem::Block((signed_block).message.clone()),
-                    )) {
-                        warn!(
-                            "failed to send block for slot {} item to chain: {err:?}",
-                            signed_block.message.slot
-                        );
+                    let slot = signed_block.message.slot;
+
+                    if let Err(err) =
+                        self.chain_message_sender
+                            .send(LeanChainMessage::ProcessBlock {
+                                signed_block: *signed_block,
+                                is_trusted: false,
+                                need_gossip: true,
+                            })
+                    {
+                        warn!("failed to send block for slot {slot} item to chain: {err:?}");
                     }
                 }
                 Ok(LeanGossipsubMessage::Vote(signed_vote)) => {
-                    if let Err(err) = self.chain_message_sender.send(LeanChainMessage::QueueItem(
-                        QueueItem::Vote(VoteItem::Signed((*signed_vote).clone())),
-                    )) {
-                        warn!(
-                            "failed to send vote for slot {} to chain: {err:?}",
-                            signed_vote.data.slot
-                        );
+                    let slot = signed_vote.data.slot;
+
+                    if let Err(err) =
+                        self.chain_message_sender
+                            .send(LeanChainMessage::ProcessVote {
+                                signed_vote: *signed_vote,
+                                is_trusted: false,
+                                need_gossip: true,
+                            })
+                    {
+                        warn!("failed to send vote for slot {slot} to chain: {err:?}");
                     }
                 }
                 Err(err) => warn!("gossip decode failed: {err:?}"),
@@ -386,7 +393,7 @@ mod tests {
         });
         let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
-            mpsc::unbounded_channel::<SignedChainItem>();
+            mpsc::unbounded_channel::<LeanGossipRequest>();
         let node = LeanNetworkService::new(
             config.clone(),
             lean_chain_reader,

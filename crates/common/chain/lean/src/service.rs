@@ -2,16 +2,20 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use ream_consensus_lean::{block::Block, process_block};
+use ream_consensus_lean::{
+    block::{Block, SignedBlock},
+    process_block,
+    vote::SignedVote,
+};
 use ream_network_spec::networks::lean_network_spec;
+use ream_post_quantum_crypto::PQSignature;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
 use tree_hash::TreeHash;
 
 use crate::{
-    clock::create_lean_clock_interval,
-    lean_chain::LeanChainWriter,
-    messages::{LeanChainMessage, QueueItem, SignedChainItem, VoteItem},
+    clock::create_lean_clock_interval, gossip_request::LeanGossipRequest,
+    lean_chain::LeanChainWriter, messages::LeanChainMessage, queue_item::QueueItem,
     slot::get_current_slot,
 };
 
@@ -24,7 +28,7 @@ pub struct LeanChainService {
     lean_chain: LeanChainWriter,
     receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
     sender: mpsc::UnboundedSender<LeanChainMessage>,
-    outbound_gossip: mpsc::UnboundedSender<SignedChainItem>,
+    outbound_gossip: mpsc::UnboundedSender<LeanGossipRequest>,
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
 }
@@ -34,7 +38,7 @@ impl LeanChainService {
         lean_chain: LeanChainWriter,
         receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
         sender: mpsc::UnboundedSender<LeanChainMessage>,
-        outbound_gossip: mpsc::UnboundedSender<SignedChainItem>,
+        outbound_gossip: mpsc::UnboundedSender<LeanGossipRequest>,
     ) -> Self {
         LeanChainService {
             lean_chain,
@@ -86,16 +90,22 @@ impl LeanChainService {
                                 error!("Failed to handle produce block message: {err}");
                             }
                         }
-                        LeanChainMessage::QueueItem(queue_item) => {
-                            match self.handle_queue_item(queue_item.clone()).await {
-                                Ok(()) => {
-                                    if let Err(err) = self.outbound_gossip.send(queue_item) {
-                                        warn!("Failed to send item to outbound gossip channel: {err:?}");
-                                    }
-                                }
-                                Err(err) => {
-                                    warn!("Could not publish: processing failed {err:?}");
-                                }
+                        LeanChainMessage::ProcessBlock { signed_block, is_trusted, need_gossip } => {
+                            if let Err(err) = self.handle_process_block(signed_block.clone(), is_trusted).await {
+                                warn!("Failed to handle process block message: {err}");
+                            }
+
+                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanGossipRequest::Block(signed_block)) {
+                                warn!("Failed to send item to outbound gossip channel: {err}");
+                            }
+                        }
+                        LeanChainMessage::ProcessVote { signed_vote, is_trusted, need_gossip } => {
+                            if let Err(err) = self.handle_process_vote(signed_vote.clone(), is_trusted).await {
+                                warn!("Failed to handle process block message: {err}");
+                            }
+
+                            if need_gossip && let Err(err) = self.outbound_gossip.send(LeanGossipRequest::Vote(signed_vote)) {
+                                warn!("Failed to send item to outbound gossip channel: {err}");
                             }
                         }
                     }
@@ -127,39 +137,17 @@ impl LeanChainService {
         Ok(())
     }
 
-    async fn handle_queue_item(&mut self, item: QueueItem) -> anyhow::Result<()> {
-        match item {
-            QueueItem::Block(block) => {
-                let block_hash = block.tree_hash_root();
-                info!(
-                    "Received block at slot {} with hash {block_hash:?} from parent {:?}",
-                    block.slot, block.parent_root
-                );
-                self.handle_block(block).await
-            }
-            QueueItem::Vote(vote_item) => {
-                match &vote_item {
-                    VoteItem::Signed(signed_vote) => {
-                        let vote = &signed_vote.data;
-                        info!(
-                            "Received signed vote from validator {} for head {:?} / source_slot {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.source.slot, vote.slot
-                        );
-                    }
-                    VoteItem::Unsigned(vote) => {
-                        info!(
-                            "Received unsigned vote from validator {} for head {:?} / source_slot {:?} at slot {}",
-                            vote.validator_id, vote.head, vote.source.slot, vote.slot
-                        );
-                    }
-                }
-
-                self.handle_vote(vote_item).await
-            }
-        }
-    }
-
-    async fn handle_block(&mut self, block: Block) -> anyhow::Result<()> {
+    async fn handle_process_block(
+        &mut self,
+        signed_block: SignedBlock,
+        is_trusted: bool,
+    ) -> anyhow::Result<()> {
+        let block = if is_trusted {
+            signed_block.message
+        } else {
+            // TODO: Validate the signature.
+            signed_block.message
+        };
         let block_hash = block.tree_hash_root();
 
         let mut lean_chain = self.lean_chain.write().await;
@@ -188,9 +176,32 @@ impl LeanChainService {
 
                 // Once we have received a block, also process all of its dependencies
                 // by sending them to this service itself.
+                // NOTE 1: As we already verified all QueueItems before appending them, we can trust
+                // their validity.
+                // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
+                // only.
                 if let Some(queue_items) = self.dependencies.remove(&block_hash) {
                     for item in queue_items {
-                        self.sender.send(LeanChainMessage::QueueItem(item))?;
+                        let message = match item {
+                            QueueItem::Block(block) => LeanChainMessage::ProcessBlock {
+                                signed_block: SignedBlock {
+                                    message: block,
+                                    signature: PQSignature::default(),
+                                },
+                                is_trusted: true,
+                                need_gossip: false,
+                            },
+                            QueueItem::Vote(vote) => LeanChainMessage::ProcessVote {
+                                signed_vote: SignedVote {
+                                    data: vote,
+                                    signature: PQSignature::default(),
+                                },
+                                is_trusted: true,
+                                need_gossip: false,
+                            },
+                        };
+
+                        self.sender.send(message)?;
                     }
                 }
             }
@@ -207,13 +218,16 @@ impl LeanChainService {
         Ok(())
     }
 
-    async fn handle_vote(&mut self, vote_item: VoteItem) -> anyhow::Result<()> {
-        let vote = match vote_item {
-            VoteItem::Signed(vote) => {
-                // TODO: Validate the signature.
-                vote.data
-            }
-            VoteItem::Unsigned(vote) => vote,
+    async fn handle_process_vote(
+        &mut self,
+        signed_vote: SignedVote,
+        is_trusted: bool,
+    ) -> anyhow::Result<()> {
+        let vote = if is_trusted {
+            signed_vote.data
+        } else {
+            // TODO: Validate the signature.
+            signed_vote.data
         };
 
         let lean_chain = self.lean_chain.read().await;
@@ -232,7 +246,7 @@ impl LeanChainService {
             self.dependencies
                 .entry(vote.head.root)
                 .or_default()
-                .push(QueueItem::Vote(VoteItem::Unsigned(vote)));
+                .push(QueueItem::Vote(vote));
         }
 
         Ok(())

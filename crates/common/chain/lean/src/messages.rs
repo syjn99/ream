@@ -1,8 +1,7 @@
 use ream_consensus_lean::{
     block::{Block, SignedBlock},
-    vote::{SignedVote, Vote},
+    vote::SignedVote,
 };
-use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
@@ -11,23 +10,14 @@ pub enum LeanChainMessage {
         slot: u64,
         response: oneshot::Sender<Block>,
     },
-    QueueItem(QueueItem),
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum QueueItem {
-    Block(Block),
-    Vote(VoteItem),
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum SignedChainItem {
-    Block(SignedBlock),
-    Vote(SignedVote),
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum VoteItem {
-    Signed(SignedVote),
-    Unsigned(Vote),
+    ProcessBlock {
+        signed_block: SignedBlock,
+        is_trusted: bool,
+        need_gossip: bool,
+    },
+    ProcessVote {
+        signed_vote: SignedVote,
+        is_trusted: bool,
+        need_gossip: bool,
+    },
 }
