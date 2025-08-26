@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use ream_chain_lean::{
-    clock::create_lean_clock_interval, lean_chain::LeanChainReader, messages::LeanChainMessage,
+    clock::create_lean_clock_interval, lean_chain::LeanChainReader,
+    messages::LeanChainServiceMessage,
 };
 use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
 use ream_network_spec::networks::lean_network_spec;
@@ -21,14 +22,14 @@ use crate::registry::LeanKeystore;
 pub struct ValidatorService {
     lean_chain: LeanChainReader,
     keystores: Vec<LeanKeystore>,
-    chain_sender: mpsc::UnboundedSender<LeanChainMessage>,
+    chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
 }
 
 impl ValidatorService {
     pub async fn new(
         lean_chain: LeanChainReader,
         keystores: Vec<LeanKeystore>,
-        chain_sender: mpsc::UnboundedSender<LeanChainMessage>,
+        chain_sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     ) -> Self {
         ValidatorService {
             lean_chain,
@@ -65,7 +66,7 @@ impl ValidatorService {
 
                                 let (tx, rx) = oneshot::channel();
                                 self.chain_sender
-                                    .send(LeanChainMessage::ProduceBlock { slot, response: tx })
+                                    .send(LeanChainServiceMessage::ProduceBlock { slot, response: tx })
                                     .expect("Failed to send vote to LeanChainService");
 
 
@@ -89,7 +90,7 @@ impl ValidatorService {
 
                                 // Send block to the LeanChainService.
                                 self.chain_sender
-                                    .send(LeanChainMessage::ProcessBlock { signed_block, is_trusted: true, need_gossip: true })
+                                    .send(LeanChainServiceMessage::ProcessBlock { signed_block, is_trusted: true, need_gossip: true })
                                     .expect("Failed to send block to LeanChainService");
                             } else {
                                 let proposer_index = slot % lean_network_spec().num_validators;
@@ -117,7 +118,7 @@ impl ValidatorService {
 
                             for signed_vote in signed_votes {
                                 self.chain_sender
-                                    .send(LeanChainMessage::ProcessVote { signed_vote, is_trusted: true, need_gossip: true })
+                                    .send(LeanChainServiceMessage::ProcessVote { signed_vote, is_trusted: true, need_gossip: true })
                                     .expect("Failed to send vote to LeanChainService");
                             }
                         }

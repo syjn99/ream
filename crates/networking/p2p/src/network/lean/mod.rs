@@ -18,7 +18,8 @@ use libp2p::{
 use libp2p_identity::{Keypair, PeerId};
 use parking_lot::RwLock as ParkingRwLock;
 use ream_chain_lean::{
-    gossip_request::LeanGossipRequest, lean_chain::LeanChainReader, messages::LeanChainMessage,
+    gossip_request::LeanGossipRequest, lean_chain::LeanChainReader,
+    messages::LeanChainServiceMessage,
 };
 use ream_executor::ReamExecutor;
 use ssz::Encode;
@@ -80,7 +81,7 @@ pub struct LeanNetworkService {
     network_config: Arc<LeanNetworkConfig>,
     swarm: Swarm<ReamBehaviour>,
     peer_table: ParkingRwLock<HashMap<PeerId, ConnectionState>>,
-    chain_message_sender: UnboundedSender<LeanChainMessage>,
+    chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
     outbound_p2p_request: UnboundedReceiver<LeanGossipRequest>,
 }
 
@@ -89,7 +90,7 @@ impl LeanNetworkService {
         network_config: Arc<LeanNetworkConfig>,
         lean_chain: LeanChainReader,
         executor: ReamExecutor,
-        chain_message_sender: UnboundedSender<LeanChainMessage>,
+        chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
         outbound_p2p_request: UnboundedReceiver<LeanGossipRequest>,
     ) -> anyhow::Result<Self> {
         let connection_limits = {
@@ -296,7 +297,7 @@ impl LeanNetworkService {
 
                     if let Err(err) =
                         self.chain_message_sender
-                            .send(LeanChainMessage::ProcessBlock {
+                            .send(LeanChainServiceMessage::ProcessBlock {
                                 signed_block: *signed_block,
                                 is_trusted: false,
                                 need_gossip: true,
@@ -310,7 +311,7 @@ impl LeanNetworkService {
 
                     if let Err(err) =
                         self.chain_message_sender
-                            .send(LeanChainMessage::ProcessVote {
+                            .send(LeanChainServiceMessage::ProcessVote {
                                 signed_vote: *signed_vote,
                                 is_trusted: false,
                                 need_gossip: true,
@@ -391,7 +392,7 @@ mod tests {
             socket_address: Ipv4Addr::new(127, 0, 0, 1).into(),
             socket_port,
         });
-        let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainMessage>();
+        let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
             mpsc::unbounded_channel::<LeanGossipRequest>();
         let node = LeanNetworkService::new(

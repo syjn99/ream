@@ -15,7 +15,7 @@ use tree_hash::TreeHash;
 
 use crate::{
     clock::create_lean_clock_interval, gossip_request::LeanGossipRequest,
-    lean_chain::LeanChainWriter, messages::LeanChainMessage, queue_item::QueueItem,
+    lean_chain::LeanChainWriter, messages::LeanChainServiceMessage, queue_item::QueueItem,
     slot::get_current_slot,
 };
 
@@ -26,8 +26,8 @@ use crate::{
 /// NOTE: This service will be the core service to implement `receive()` function.
 pub struct LeanChainService {
     lean_chain: LeanChainWriter,
-    receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
-    sender: mpsc::UnboundedSender<LeanChainMessage>,
+    receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
+    sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     outbound_gossip: mpsc::UnboundedSender<LeanGossipRequest>,
     // Objects that we will process once we have processed their parents
     dependencies: HashMap<B256, Vec<QueueItem>>,
@@ -36,8 +36,8 @@ pub struct LeanChainService {
 impl LeanChainService {
     pub async fn new(
         lean_chain: LeanChainWriter,
-        receiver: mpsc::UnboundedReceiver<LeanChainMessage>,
-        sender: mpsc::UnboundedSender<LeanChainMessage>,
+        receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
+        sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
         outbound_gossip: mpsc::UnboundedSender<LeanGossipRequest>,
     ) -> Self {
         LeanChainService {
@@ -98,12 +98,12 @@ impl LeanChainService {
                 }
                 Some(message) = self.receiver.recv() => {
                     match message {
-                        LeanChainMessage::ProduceBlock { slot, response } => {
+                        LeanChainServiceMessage::ProduceBlock { slot, response } => {
                             if let Err(err) = self.handle_produce_block(slot, response).await {
                                 error!("Failed to handle produce block message: {err}");
                             }
                         }
-                        LeanChainMessage::ProcessBlock { signed_block, is_trusted, need_gossip } => {
+                        LeanChainServiceMessage::ProcessBlock { signed_block, is_trusted, need_gossip } => {
                             if let Err(err) = self.handle_process_block(signed_block.clone(), is_trusted).await {
                                 warn!("Failed to handle process block message: {err}");
                             }
@@ -112,7 +112,7 @@ impl LeanChainService {
                                 warn!("Failed to send item to outbound gossip channel: {err}");
                             }
                         }
-                        LeanChainMessage::ProcessVote { signed_vote, is_trusted, need_gossip } => {
+                        LeanChainServiceMessage::ProcessVote { signed_vote, is_trusted, need_gossip } => {
                             if let Err(err) = self.handle_process_vote(signed_vote.clone(), is_trusted).await {
                                 warn!("Failed to handle process block message: {err}");
                             }
@@ -196,7 +196,7 @@ impl LeanChainService {
                 if let Some(queue_items) = self.dependencies.remove(&block_hash) {
                     for item in queue_items {
                         let message = match item {
-                            QueueItem::Block(block) => LeanChainMessage::ProcessBlock {
+                            QueueItem::Block(block) => LeanChainServiceMessage::ProcessBlock {
                                 signed_block: SignedBlock {
                                     message: block,
                                     signature: PQSignature::default(),
@@ -204,7 +204,7 @@ impl LeanChainService {
                                 is_trusted: true,
                                 need_gossip: false,
                             },
-                            QueueItem::Vote(vote) => LeanChainMessage::ProcessVote {
+                            QueueItem::Vote(vote) => LeanChainServiceMessage::ProcessVote {
                                 signed_vote: SignedVote {
                                     data: vote,
                                     signature: PQSignature::default(),

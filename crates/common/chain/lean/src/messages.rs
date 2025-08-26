@@ -5,7 +5,7 @@ use ream_consensus_lean::{
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
-pub enum LeanChainMessage {
+pub enum LeanChainServiceMessage {
     ProduceBlock {
         slot: u64,
         response: oneshot::Sender<Block>,
