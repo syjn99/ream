@@ -66,7 +66,7 @@ impl ValidatorService {
 
                                 let (tx, rx) = oneshot::channel();
                                 self.chain_sender
-                                    .send(LeanChainServiceMessage::produce_block(slot, tx))
+                                    .send(LeanChainServiceMessage::ProduceBlock { slot, response: tx })
                                     .expect("Failed to send vote to LeanChainService");
 
 

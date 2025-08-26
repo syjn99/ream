@@ -4,14 +4,14 @@ use alloy_primitives::B256;
 use anyhow::anyhow;
 use ream_consensus_lean::{VoteItem, block::Block, process_block};
 use ream_network_spec::networks::lean_network_spec;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
 use tree_hash::TreeHash;
 
 use crate::{
     clock::create_lean_clock_interval,
     lean_chain::LeanChainWriter,
-    messages::{LeanChainServiceMessage, ProduceBlockMessage, QueueItem},
+    messages::{LeanChainServiceMessage, QueueItem},
     slot::get_current_slot,
 };
 
@@ -81,8 +81,8 @@ impl LeanChainService {
                 }
                 Some(message) = self.receiver.recv() => {
                     match message {
-                        LeanChainServiceMessage::ProduceBlock(produce_block_message) => {
-                            if let Err(err) = self.handle_produce_block(produce_block_message).await {
+                        LeanChainServiceMessage::ProduceBlock { slot, response } => {
+                            if let Err(err) = self.handle_produce_block(slot, response).await {
                                 error!("Failed to handle produce block message: {err}");
                             }
                         }
@@ -106,9 +106,9 @@ impl LeanChainService {
 
     async fn handle_produce_block(
         &mut self,
-        produce_block_message: ProduceBlockMessage,
+        slot: u64,
+        response: oneshot::Sender<Block>,
     ) -> anyhow::Result<()> {
-        let slot = produce_block_message.slot;
         let new_block = {
             let mut lean_chain = self.lean_chain.write().await;
 
@@ -120,8 +120,7 @@ impl LeanChainService {
         };
 
         // Send the produced block back to the requester
-        produce_block_message
-            .response
+        response
             .send(new_block)
             .map_err(|err| anyhow!("Failed to send produced block: {err:?}"))?;
 
