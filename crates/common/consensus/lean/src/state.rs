@@ -9,7 +9,7 @@ use ssz_types::{
 };
 use tree_hash_derive::TreeHash;
 
-use crate::{checkpoint::Checkpoint, config::Config};
+use crate::{block::BlockHeader, checkpoint::Checkpoint, config::Config};
 
 /// Represents the state of the Lean chain.
 ///
@@ -18,6 +18,8 @@ use crate::{checkpoint::Checkpoint, config::Config};
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash)]
 pub struct LeanState {
     pub config: Config,
+    pub slot: u64,
+    pub latest_block_header: BlockHeader,
 
     pub latest_justified: Checkpoint,
     pub latest_finalized: Checkpoint,
@@ -36,6 +38,8 @@ impl LeanState {
                 num_validators,
                 genesis_time,
             },
+            slot: 0,
+            latest_block_header: BlockHeader::default(),
 
             latest_justified: Checkpoint::default(),
             latest_finalized: Checkpoint::default(),
