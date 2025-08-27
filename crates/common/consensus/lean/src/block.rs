@@ -34,6 +34,21 @@ pub struct Block {
     pub body: BlockBody,
 }
 
+/// Represents a block header in the Lean chain.
+///
+/// See the [Lean specification](https://github.com/leanEthereum/leanSpec/blob/main/docs/client/containers.md#blockheader)
+/// for detailed protocol information.
+#[derive(
+    Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize, Encode, Decode, TreeHash,
+)]
+pub struct BlockHeader {
+    pub slot: u64,
+    pub proposer_index: u64,
+    pub parent_root: B256,
+    pub state_root: B256,
+    pub body_root: B256,
+}
+
 /// Represents the body of a block in the Lean chain.
 ///
 /// See the [Lean specification](https://github.com/leanEthereum/leanSpec/blob/main/docs/client/containers.md#blockbody)
