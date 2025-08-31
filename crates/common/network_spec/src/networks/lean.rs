@@ -12,6 +12,7 @@ pub static LEAN_NETWORK_SPEC: OnceLock<Arc<LeanNetworkSpec>> = OnceLock::new();
 #[serde(rename_all = "UPPERCASE")]
 pub struct LeanNetworkSpec {
     pub genesis_time: u64,
+    pub justification_lookback_slots: u64,
     pub seconds_per_slot: u64,
     pub num_validators: u64,
 }
@@ -27,6 +28,7 @@ impl LeanNetworkSpec {
 
         Arc::new(Self {
             genesis_time: current_timestamp + 3,
+            justification_lookback_slots: 3,
             seconds_per_slot: 4,
             num_validators: 4,
         })
