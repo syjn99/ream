@@ -29,8 +29,7 @@ pub async fn get_block(
                     ApiError::InternalError(format!("Failed to get latest justified hash")),
                 )?)
             }
-            // TODO: Implement fetching block by slot
-            BlockID::Slot(_slot) => None,
+            BlockID::Slot(slot) => lean_chain.get_block_by_slot(slot),
             BlockID::Root(root) => lean_chain.get_block_by_root(root),
         }
         .ok_or_else(|| ApiError::NotFound(format!("Block not found")))?,
