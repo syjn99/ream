@@ -5741,6 +5741,7 @@ dependencies = [
  "ream-api-types-beacon",
  "ream-api-types-lean",
  "ream-chain-lean",
+ "ream-consensus-lean",
  "ream-p2p",
  "ream-rpc-beacon",
  "tokio",
