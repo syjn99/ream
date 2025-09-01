@@ -3,13 +3,13 @@ use actix_web::{
     web::{Data, Path},
 };
 use ream_api_types_beacon::error::ApiError;
-use ream_api_types_common::id::ID;
+use ream_api_types_lean::block_id::BlockID;
 use ream_chain_lean::lean_chain::LeanChainReader;
 
 // GET /lean/v0/blocks/{block_id}
 #[get("/blocks/{block_id}")]
 pub async fn get_block(
-    block_id: Path<ID>,
+    block_id: Path<BlockID>,
     lean_chain: Data<LeanChainReader>,
 ) -> Result<impl Responder, ApiError> {
     // Obtain read guard first from the reader.
@@ -17,21 +17,22 @@ pub async fn get_block(
 
     Ok(HttpResponse::Ok().json(
         match block_id.into_inner() {
-            ID::Finalized => {
+            BlockID::Finalized => {
                 lean_chain.get_block_by_root(lean_chain.latest_finalized_hash().ok_or(
-                    ApiError::InternalError("Failed to get latest finalized hash".to_string()),
+                    ApiError::InternalError(format!("Failed to get latest finalized hash")),
                 )?)
             }
-            ID::Genesis => lean_chain.get_block_by_root(lean_chain.genesis_hash),
-            ID::Head => lean_chain.get_block_by_root(lean_chain.head),
-            ID::Justified => {
+            BlockID::Genesis => lean_chain.get_block_by_root(lean_chain.genesis_hash),
+            BlockID::Head => lean_chain.get_block_by_root(lean_chain.head),
+            BlockID::Justified => {
                 lean_chain.get_block_by_root(lean_chain.latest_justified_hash().ok_or(
-                    ApiError::InternalError("Failed to get latest justified hash".to_string()),
+                    ApiError::InternalError(format!("Failed to get latest justified hash")),
                 )?)
             }
-            ID::Slot(slot) => lean_chain.get_block_by_slot(slot),
-            ID::Root(root) => lean_chain.get_block_by_root(root),
+            // TODO: Implement fetching block by slot
+            BlockID::Slot(_slot) => None,
+            BlockID::Root(root) => lean_chain.get_block_by_root(root),
         }
-        .ok_or_else(|| ApiError::NotFound("Block not found".to_string()))?,
+        .ok_or_else(|| ApiError::NotFound(format!("Block not found")))?,
     ))
 }
