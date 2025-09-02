@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::collections::{HashMap, HashSet};
 
 use alloy_primitives::B256;
 use anyhow::{bail, ensure};
@@ -256,7 +253,7 @@ pub enum DataToFetch {
     Finished,
 }
 
-impl Display for DataToFetch {
+impl std::fmt::Display for DataToFetch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DataToFetch::BlockRange(range) => write!(f, "BlockRange({range:?})"),
