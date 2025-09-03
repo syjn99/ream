@@ -5,14 +5,11 @@ use actix_web::{
     web::{Data, Path},
 };
 use hashbrown::HashMap;
-use ream_api_types_beacon::{
-    error::ApiError,
-    responses::{
-        BeaconHeadResponse, BeaconResponse, DataResponse, ForkChoiceNode, ForkChoiceResponse,
-        ForkChoiceValidity,
-    },
+use ream_api_types_beacon::responses::{
+    BeaconHeadResponse, BeaconResponse, DataResponse, ForkChoiceNode, ForkChoiceResponse,
+    ForkChoiceValidity,
 };
-use ream_api_types_common::id::ID;
+use ream_api_types_common::{error::ApiError, id::ID};
 use ream_fork_choice::store::{BlockWithEpochInfo, Store};
 use ream_operation_pool::OperationPool;
 use ream_storage::{db::ReamDB, tables::field::Field};

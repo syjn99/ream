@@ -1,5 +1,5 @@
 use actix_web::{HttpResponse, Responder, get, web::Data};
-use ream_api_types_beacon::error::ApiError;
+use ream_api_types_common::error::ApiError;
 use ream_api_types_lean::head::Head;
 use ream_chain_lean::lean_chain::LeanChainReader;
 
