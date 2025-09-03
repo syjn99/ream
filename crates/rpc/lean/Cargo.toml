@@ -17,7 +17,6 @@ tokio.workspace = true
 tracing.workspace = true
 
 #ream-dependencies
-ream-api-types-beacon.workspace = true
 ream-api-types-common.workspace = true
 ream-api-types-lean.workspace = true
 ream-chain-lean.workspace = true

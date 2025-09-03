@@ -3,13 +3,11 @@ use actix_web::{
     web::{Data, Path, Query},
 };
 use alloy_primitives::B256;
-use ream_api_types_beacon::{
-    error::ApiError,
-    responses::{
-        DataVersionedResponse, ETH_CONSENSUS_VERSION_HEADER, JSON_CONTENT_TYPE, SSZ_CONTENT_TYPE,
-        VERSION,
-    },
+use ream_api_types_beacon::responses::{
+    DataVersionedResponse, ETH_CONSENSUS_VERSION_HEADER, JSON_CONTENT_TYPE, SSZ_CONTENT_TYPE,
+    VERSION,
 };
+use ream_api_types_common::error::ApiError;
 use ream_consensus_misc::constants::beacon::{EPOCHS_PER_SYNC_COMMITTEE_PERIOD, SLOTS_PER_EPOCH};
 use ream_light_client::{
     bootstrap::LightClientBootstrap, finality_update::LightClientFinalityUpdate,

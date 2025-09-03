@@ -5239,6 +5239,7 @@ dependencies = [
  "ethereum_serde_utils",
  "ethereum_ssz",
  "ethereum_ssz_derive",
+ "ream-api-types-common",
  "ream-bls",
  "ream-consensus-beacon",
  "ream-consensus-misc",
@@ -5253,8 +5254,10 @@ dependencies = [
 name = "ream-api-types-common"
 version = "0.1.0"
 dependencies = [
+ "actix-web",
  "alloy-primitives",
  "serde",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -5748,7 +5751,6 @@ dependencies = [
  "actix-web",
  "libp2p",
  "parking_lot",
- "ream-api-types-beacon",
  "ream-api-types-common",
  "ream-api-types-lean",
  "ream-chain-lean",

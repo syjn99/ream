@@ -2,8 +2,7 @@ use actix_web::{
     HttpResponse, Responder, get,
     web::{Data, Path},
 };
-use ream_api_types_beacon::error::ApiError;
-use ream_api_types_common::id::ID;
+use ream_api_types_common::{error::ApiError, id::ID};
 use ream_chain_lean::lean_chain::LeanChainReader;
 
 // GET /lean/v0/blocks/{block_id}
