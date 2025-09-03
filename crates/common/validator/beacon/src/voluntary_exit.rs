@@ -1,11 +1,8 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, bail};
-use ream_api_types_beacon::{
-    error::ValidatorError,
-    id::{ID, ValidatorID},
-    validator::ValidatorStatus,
-};
+use ream_api_types_beacon::{error::ValidatorError, id::ValidatorID, validator::ValidatorStatus};
+use ream_api_types_common::id::ID;
 use ream_bls::{PrivateKey, traits::Signable};
 use ream_consensus_beacon::voluntary_exit::{SignedVoluntaryExit, VoluntaryExit};
 use ream_consensus_misc::{

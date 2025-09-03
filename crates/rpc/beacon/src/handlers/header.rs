@@ -5,10 +5,10 @@ use actix_web::{
 use alloy_primitives::B256;
 use ream_api_types_beacon::{
     error::ApiError,
-    id::ID,
     query::{ParentRootQuery, SlotQuery},
     responses::BeaconResponse,
 };
+use ream_api_types_common::id::ID;
 use ream_consensus_misc::beacon_block_header::SignedBeaconBlockHeader;
 use ream_storage::{db::ReamDB, tables::table::Table};
 use serde::{Deserialize, Serialize};

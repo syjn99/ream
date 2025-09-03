@@ -6,10 +6,10 @@ use actix_web::{
 };
 use ream_api_types_beacon::{
     error::ApiError,
-    id::ID,
     query::{EpochQuery, IndexQuery, SlotQuery},
     responses::BeaconResponse,
 };
+use ream_api_types_common::id::ID;
 use ream_consensus_misc::{constants::beacon::SLOTS_PER_EPOCH, misc::compute_start_slot_at_epoch};
 use ream_storage::db::ReamDB;
 use serde::Serialize;

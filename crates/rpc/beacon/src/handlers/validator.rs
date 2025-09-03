@@ -6,12 +6,13 @@ use actix_web::{
 };
 use ream_api_types_beacon::{
     error::ApiError,
-    id::{ID, ValidatorID},
+    id::ValidatorID,
     query::{AttestationQuery, IdQuery, StatusQuery},
     request::ValidatorsPostRequest,
     responses::{BeaconResponse, DataResponse},
     validator::{ValidatorBalance, ValidatorData, ValidatorStatus},
 };
+use ream_api_types_common::id::ID;
 use ream_bls::PublicKey;
 use ream_consensus_beacon::electra::beacon_state::BeaconState;
 use ream_consensus_misc::{

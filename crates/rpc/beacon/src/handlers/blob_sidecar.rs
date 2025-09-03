@@ -4,8 +4,9 @@ use actix_web::{
 };
 use actix_web_lab::extract::Query;
 use ream_api_types_beacon::{
-    error::ApiError, id::ID, query::BlobSidecarQuery, responses::BeaconVersionedResponse,
+    error::ApiError, query::BlobSidecarQuery, responses::BeaconVersionedResponse,
 };
+use ream_api_types_common::id::ID;
 use ream_consensus_beacon::blob_sidecar::BlobIdentifier;
 use ream_storage::{db::ReamDB, tables::table::Table};
 use tree_hash::TreeHash;

@@ -5190,6 +5190,7 @@ dependencies = [
  "rand_chacha 0.9.0",
  "ream-account-manager",
  "ream-api-types-beacon",
+ "ream-api-types-common",
  "ream-chain-lean",
  "ream-checkpoint-sync",
  "ream-consensus-beacon",
@@ -5246,6 +5247,14 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.12",
  "url",
+]
+
+[[package]]
+name = "ream-api-types-common"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "serde",
 ]
 
 [[package]]
@@ -5711,6 +5720,7 @@ dependencies = [
  "libp2p",
  "parking_lot",
  "ream-api-types-beacon",
+ "ream-api-types-common",
  "ream-bls",
  "ream-consensus-beacon",
  "ream-consensus-misc",
@@ -5739,8 +5749,10 @@ dependencies = [
  "libp2p",
  "parking_lot",
  "ream-api-types-beacon",
+ "ream-api-types-common",
  "ream-api-types-lean",
  "ream-chain-lean",
+ "ream-consensus-lean",
  "ream-p2p",
  "ream-rpc-beacon",
  "tokio",
@@ -5819,6 +5831,7 @@ dependencies = [
  "eventsource-client",
  "futures",
  "ream-api-types-beacon",
+ "ream-api-types-common",
  "ream-bls",
  "ream-consensus-beacon",
  "ream-consensus-misc",

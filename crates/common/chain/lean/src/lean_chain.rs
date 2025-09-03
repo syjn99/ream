@@ -220,5 +220,14 @@ impl LeanChain {
         })
     }
 
-    // TODO: Add necessary methods for receive.
+    pub fn get_block_by_root(&self, root: B256) -> Option<Block> {
+        self.chain.get(&root).cloned()
+    }
+
+    pub fn get_block_by_slot(&self, slot: u64) -> Option<Block> {
+        self.chain
+            .values()
+            .find(|block| block.slot == slot)
+            .cloned()
+    }
 }

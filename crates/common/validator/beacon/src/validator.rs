@@ -12,9 +12,10 @@ use futures::future::try_join_all;
 use ream_api_types_beacon::{
     block::{BroadcastValidation, ProduceBlockData},
     duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
-    id::{ID, ValidatorID},
+    id::ValidatorID,
     request::SyncCommitteeRequestItem,
 };
+use ream_api_types_common::id::ID;
 use ream_bls::{BLSSignature, PublicKey, traits::Signable};
 use ream_consensus_beacon::{
     electra::beacon_state::BeaconState, single_attestation::SingleAttestation,
