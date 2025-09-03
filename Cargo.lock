@@ -5233,7 +5233,6 @@ dependencies = [
 name = "ream-api-types-beacon"
 version = "0.1.0"
 dependencies = [
- "actix-web",
  "alloy-primitives",
  "anyhow",
  "ethereum_serde_utils",
