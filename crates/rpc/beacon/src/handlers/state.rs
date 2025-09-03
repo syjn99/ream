@@ -5,10 +5,10 @@ use actix_web::{
 use alloy_primitives::B256;
 use ream_api_types_beacon::{
     error::ApiError,
-    id::ID,
     query::EpochQuery,
     responses::{BeaconResponse, BeaconVersionedResponse},
 };
+use ream_api_types_common::id::ID;
 use ream_consensus_beacon::electra::beacon_state::BeaconState;
 use ream_consensus_misc::{
     checkpoint::Checkpoint, constants::beacon::SYNC_COMMITTEE_SIZE,

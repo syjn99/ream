@@ -14,7 +14,7 @@ use ream_api_types_beacon::{
     committee::BeaconCommitteeSubscription,
     duties::{AttesterDuty, ProposerDuty, SyncCommitteeDuty},
     error::ValidatorError,
-    id::{ID, ValidatorID},
+    id::ValidatorID,
     request::{SyncCommitteeRequestItem, ValidatorsPostRequest},
     responses::{
         BeaconResponse, DataResponse, DataVersionedResponse, DutiesResponse,
@@ -23,6 +23,7 @@ use ream_api_types_beacon::{
     sync::SyncStatus,
     validator::{ValidatorData, ValidatorStatus},
 };
+use ream_api_types_common::id::ID;
 use ream_bls::BLSSignature;
 use ream_consensus_beacon::{
     attestation::Attestation,

@@ -5,11 +5,12 @@ use actix_web::{
 use alloy_primitives::B256;
 use ream_api_types_beacon::{
     error::ApiError,
-    id::{ID, ValidatorID},
+    id::ValidatorID,
     responses::{
         BeaconResponse, BeaconVersionedResponse, DataResponse, RootResponse, SSZ_CONTENT_TYPE,
     },
 };
+use ream_api_types_common::id::ID;
 use ream_consensus_beacon::{
     electra::{beacon_block::SignedBeaconBlock, beacon_state::BeaconState},
     genesis::Genesis,

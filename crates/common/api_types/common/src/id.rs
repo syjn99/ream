@@ -4,7 +4,7 @@ use alloy_primitives::{B256, hex};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BlockID {
+pub enum ID {
     Finalized,
     Genesis,
     Head,
@@ -14,7 +14,7 @@ pub enum BlockID {
     Root(B256),
 }
 
-impl Serialize for BlockID {
+impl Serialize for ID {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -23,25 +23,25 @@ impl Serialize for BlockID {
     }
 }
 
-impl<'de> Deserialize<'de> for BlockID {
+impl<'de> Deserialize<'de> for ID {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         match s.to_lowercase().as_str() {
-            "finalized" => Ok(BlockID::Finalized),
-            "genesis" => Ok(BlockID::Genesis),
-            "head" => Ok(BlockID::Head),
-            "justified" => Ok(BlockID::Justified),
+            "finalized" => Ok(ID::Finalized),
+            "genesis" => Ok(ID::Genesis),
+            "head" => Ok(ID::Head),
+            "justified" => Ok(ID::Justified),
             _ => {
                 if s.starts_with("0x") {
                     B256::from_str(&s)
-                        .map(BlockID::Root)
+                        .map(ID::Root)
                         .map_err(|_| serde::de::Error::custom(format!("Invalid hex root: {s}")))
                 } else if s.chars().all(|c| c.is_ascii_digit()) {
                     s.parse::<u64>()
-                        .map(BlockID::Slot)
+                        .map(ID::Slot)
                         .map_err(|_| serde::de::Error::custom(format!("Invalid slot number: {s}")))
                 } else {
                     Err(serde::de::Error::custom(format!("Invalid state ID: {s}")))
@@ -51,15 +51,15 @@ impl<'de> Deserialize<'de> for BlockID {
     }
 }
 
-impl std::fmt::Display for BlockID {
+impl std::fmt::Display for ID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BlockID::Finalized => write!(f, "finalized"),
-            BlockID::Genesis => write!(f, "genesis"),
-            BlockID::Head => write!(f, "head"),
-            BlockID::Justified => write!(f, "justified"),
-            BlockID::Slot(slot) => write!(f, "{slot}"),
-            BlockID::Root(root) => write!(f, "0x{}", hex::encode(root)),
+            ID::Finalized => write!(f, "finalized"),
+            ID::Genesis => write!(f, "genesis"),
+            ID::Head => write!(f, "head"),
+            ID::Justified => write!(f, "justified"),
+            ID::Slot(slot) => write!(f, "{slot}"),
+            ID::Root(root) => write!(f, "0x{}", hex::encode(root)),
         }
     }
 }

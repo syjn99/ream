@@ -32,6 +32,7 @@ url.workspace = true
 # ream dependencies
 ream-account-manager.workspace = true
 ream-api-types-beacon.workspace = true
+ream-api-types-common.workspace = true
 ream-chain-lean.workspace = true
 ream-checkpoint-sync.workspace = true
 ream-consensus-beacon.workspace = true

@@ -16,7 +16,8 @@ use ream::cli::{
     validator_node::ValidatorNodeConfig,
     voluntary_exit::VoluntaryExitConfig,
 };
-use ream_api_types_beacon::id::{ID, ValidatorID};
+use ream_api_types_beacon::id::ValidatorID;
+use ream_api_types_common::id::ID;
 use ream_chain_lean::{
     genesis as lean_genesis, lean_chain::LeanChain, messages::LeanChainServiceMessage,
     p2p_request::LeanP2PRequest, service::LeanChainService,

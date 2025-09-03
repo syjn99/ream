@@ -6,9 +6,9 @@ use actix_web::{
 };
 use ream_api_types_beacon::{
     error::ApiError,
-    id::ID,
     responses::{DataResponse, DataVersionedResponse},
 };
+use ream_api_types_common::id::ID;
 use ream_consensus_beacon::{
     attester_slashing::AttesterSlashing, bls_to_execution_change::SignedBLSToExecutionChange,
     voluntary_exit::SignedVoluntaryExit,
