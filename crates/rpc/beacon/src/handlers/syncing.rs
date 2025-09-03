@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use actix_web::{HttpResponse, Responder, get, web::Data};
 use ream_api_types_beacon::{
-    error::ApiError,
     responses::{DataResponse, EXECUTION_OPTIMISTIC},
     sync::SyncStatus,
 };
+use ream_api_types_common::error::ApiError;
 use ream_execution_engine::ExecutionEngine;
 use ream_fork_choice::store::Store;
 use ream_operation_pool::OperationPool;

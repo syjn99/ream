@@ -1,5 +1,6 @@
 use actix_web::{HttpResponse, Responder, get};
-use ream_api_types_beacon::{error::ApiError, responses::DataResponse};
+use ream_api_types_beacon::responses::DataResponse;
+use ream_api_types_common::error::ApiError;
 use ream_node::version::ream_node_version;
 use serde::{Deserialize, Serialize};
 

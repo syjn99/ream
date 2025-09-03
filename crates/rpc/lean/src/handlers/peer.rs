@@ -3,9 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::{HttpResponse, Responder, get, web::Data};
 use libp2p::PeerId;
 use parking_lot::Mutex;
-use ream_api_types_beacon::error::ApiError;
-use ream_p2p::network::peer::ConnectionState;
-use ream_rpc_beacon::handlers::peers::PeerCount;
+use ream_api_types_common::error::ApiError;
+use ream_p2p::network::peer::{ConnectionState, PeerCount};
 
 // /lean/v0/node/peers
 #[get("/node/peers")]
