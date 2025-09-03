@@ -3,6 +3,7 @@ use std::str::FromStr;
 use alloy_primitives::{B256, hex};
 use serde::{Deserialize, Serialize};
 
+/// [ID] can be used to identify a specific state (`state_id`) or block (`block_id`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ID {
     Finalized,
