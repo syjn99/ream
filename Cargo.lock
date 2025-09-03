@@ -5630,6 +5630,7 @@ dependencies = [
  "delay_map",
  "discv5",
  "enr",
+ "ethereum_serde_utils",
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "futures",
@@ -5756,7 +5757,6 @@ dependencies = [
  "ream-chain-lean",
  "ream-consensus-lean",
  "ream-p2p",
- "ream-rpc-beacon",
  "tokio",
  "tracing",
 ]

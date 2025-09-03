@@ -10,7 +10,7 @@ use ream_api_types_beacon::responses::DataResponse;
 use ream_api_types_common::error::ApiError;
 use ream_p2p::network::{
     beacon::network_state::NetworkState,
-    peer::{ConnectionState, Direction},
+    peer::{ConnectionState, Direction, PeerCount},
 };
 use serde::Serialize;
 
@@ -55,18 +55,6 @@ pub async fn get_peer_count(
         }
     }
     Ok(HttpResponse::Ok().json(DataResponse::new(peer_count)))
-}
-
-#[derive(Default, Debug, Clone, Serialize)]
-pub struct PeerCount {
-    #[serde(with = "serde_utils::quoted_u64")]
-    pub disconnected: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
-    pub connecting: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
-    pub connected: u64,
-    #[serde(with = "serde_utils::quoted_u64")]
-    pub disconnecting: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]
