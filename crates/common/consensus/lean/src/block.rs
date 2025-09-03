@@ -3,6 +3,7 @@ use ream_post_quantum_crypto::PQSignature;
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{VariableList, typenum::U4096};
+use tree_hash::TreeHash;
 use tree_hash_derive::TreeHash;
 
 use crate::vote::Vote;
@@ -47,6 +48,18 @@ pub struct BlockHeader {
     pub parent_root: B256,
     pub state_root: B256,
     pub body_root: B256,
+}
+
+impl From<Block> for BlockHeader {
+    fn from(block: Block) -> Self {
+        BlockHeader {
+            slot: block.slot,
+            proposer_index: block.proposer_index,
+            parent_root: block.parent_root,
+            state_root: block.state_root,
+            body_root: block.body.tree_hash_root(),
+        }
+    }
 }
 
 /// Represents the body of a block in the Lean chain.
