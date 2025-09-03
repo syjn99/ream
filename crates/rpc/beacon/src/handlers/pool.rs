@@ -8,7 +8,7 @@ use ream_api_types_beacon::responses::{DataResponse, DataVersionedResponse};
 use ream_api_types_common::{error::ApiError, id::ID};
 use ream_consensus_beacon::{
     attester_slashing::AttesterSlashing, bls_to_execution_change::SignedBLSToExecutionChange,
-    voluntary_exit::SignedVoluntaryExit,
+    proposer_slashing::ProposerSlashing, voluntary_exit::SignedVoluntaryExit,
 };
 use ream_network_manager::service::NetworkManagerService;
 use ream_operation_pool::OperationPool;
@@ -130,7 +130,7 @@ pub async fn post_voluntary_exits(
 
 /// GET /eth/v2/beacon/pool/attester_slashings
 #[get("/beacon/pool/attester_slashings")]
-pub async fn get_pool_attester_slashings(
+pub async fn get_attester_slashings(
     operation_pool: Data<Arc<OperationPool>>,
 ) -> Result<impl Responder, ApiError> {
     Ok(HttpResponse::Ok().json(DataVersionedResponse::new(
@@ -140,7 +140,7 @@ pub async fn get_pool_attester_slashings(
 
 /// POST /eth/v2/beacon/pool/attester_slashings
 #[post("/beacon/pool/attester_slashings")]
-pub async fn post_pool_attester_slashings(
+pub async fn post_attester_slashings(
     db: Data<ReamDB>,
     operation_pool: Data<Arc<OperationPool>>,
     network_manager: Data<Arc<NetworkManagerService>>,
@@ -175,6 +175,59 @@ pub async fn post_pool_attester_slashings(
     });
 
     operation_pool.insert_attester_slashing(attester_slashing);
+
+    Ok(HttpResponse::Ok())
+}
+
+/// GET /eth/v2/beacon/pool/proposer_slashings
+#[get("/beacon/pool/prposer_slashings")]
+pub async fn get_proposer_slashings(
+    operation_pool: Data<Arc<OperationPool>>,
+) -> Result<impl Responder, ApiError> {
+    Ok(HttpResponse::Ok().json(DataVersionedResponse::new(
+        operation_pool.get_all_proposer_slahsings(),
+    )))
+}
+
+/// POST /eth/v2/beacon/pool/proposer_slashing
+#[post("/beacon/pool/proposer_slashings")]
+pub async fn post_proposer_slashings(
+    db: Data<ReamDB>,
+    operation_pool: Data<Arc<OperationPool>>,
+    network_manager: Data<Arc<NetworkManagerService>>,
+    proposer_slashing: Json<ProposerSlashing>,
+) -> Result<impl Responder, ApiError> {
+    let proposer_slashing = proposer_slashing.into_inner();
+
+    let highest_slot = db
+        .slot_index_provider()
+        .get_highest_slot()
+        .map_err(|err| {
+            ApiError::InternalError(format!("Failed to get_highest_slot, error: {err:?}"))
+        })?
+        .ok_or(ApiError::NotFound(
+            "Failed to find highest slot".to_string(),
+        ))?;
+    let beacon_state = get_state_from_id(ID::Slot(highest_slot), &db).await?;
+
+    beacon_state
+        .validate_proposer_slashing(&proposer_slashing)
+        .map_err(|err| {
+            ApiError::BadRequest(format!(
+                "Invalid proposer slashing, it will never pass validation so it's rejected: {err:?}"
+            ))
+        })?;
+
+    network_manager.p2p_sender.send_gossip(GossipMessage {
+        topic: {
+            GossipTopic {
+                fork: beacon_state.fork.current_version,
+                kind: GossipTopicKind::ProposerSlashing,
+            }
+        },
+        data: proposer_slashing.as_ssz_bytes(),
+    });
+    operation_pool.insert_proposer_slashing(proposer_slashing);
 
     Ok(HttpResponse::Ok())
 }
