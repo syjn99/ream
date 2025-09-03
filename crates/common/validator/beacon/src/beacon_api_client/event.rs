@@ -1,4 +1,4 @@
-use std::{fmt::Display, str::FromStr};
+use std::str::FromStr;
 
 use alloy_rpc_types_beacon::events::{
     AttestationEvent, BlobSidecarEvent, BlockEvent, BlsToExecutionChangeEvent, ChainReorgEvent,
@@ -46,7 +46,7 @@ impl FromStr for EventTopic {
     }
 }
 
-impl Display for EventTopic {
+impl std::fmt::Display for EventTopic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

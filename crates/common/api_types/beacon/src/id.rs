@@ -1,5 +1,4 @@
-use core::fmt;
-use std::{fmt::Display, str::FromStr};
+use std::str::FromStr;
 
 use alloy_primitives::{B256, hex};
 use ream_bls::PublicKey;
@@ -53,8 +52,8 @@ impl<'de> Deserialize<'de> for ID {
     }
 }
 
-impl fmt::Display for ID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for ID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ID::Finalized => write!(f, "finalized"),
             ID::Genesis => write!(f, "genesis"),
@@ -104,7 +103,7 @@ impl<'de> Deserialize<'de> for ValidatorID {
     }
 }
 
-impl Display for ValidatorID {
+impl std::fmt::Display for ValidatorID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidatorID::Index(i) => write!(f, "{i}"),
