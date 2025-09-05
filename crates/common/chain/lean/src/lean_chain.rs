@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::B256;
 use anyhow::anyhow;
@@ -11,7 +11,9 @@ use ream_consensus_lean::{
 };
 use ream_metrics::{PROPOSE_BLOCK_TIME, start_timer_vec, stop_timer};
 use ream_network_spec::networks::lean_network_spec;
+use ream_storage::db::lean::LeanDB;
 use ream_sync::rwlock::{Reader, Writer};
+use tokio::sync::Mutex;
 use tree_hash::TreeHash;
 
 use crate::slot::get_current_slot;
@@ -23,38 +25,42 @@ pub type LeanChainReader = Reader<LeanChain>;
 ///
 /// Most of the fields are based on the Python implementation of [`Staker`](https://github.com/ethereum/research/blob/d225a6775a9b184b5c1fd6c830cc58a375d9535f/3sf-mini/p2p.py#L15-L42),
 /// but doesn't include `validator_id` as a node should manage multiple validators.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct LeanChain {
+    /// Database.
+    pub store: Arc<Mutex<LeanDB>>,
+    /// {block_hash: block} for all blocks that we know about.
     pub chain: HashMap<B256, Block>,
+    /// {block_hash: post_state} for all blocks that we know about.
     pub post_states: HashMap<B256, LeanState>,
+    /// Votes that we have received and taken into account.
     pub known_votes: Vec<Vote>,
+    /// Votes that we have received but not yet taken into account.
     pub new_votes: Vec<Vote>,
+    /// Initialize the chain with the genesis block.
     pub genesis_hash: B256,
+    /// Number of validators.
     pub num_validators: u64,
+    /// Block that it is safe to use to vote as the target.
+    /// Diverge from Python implementation: Use genesis hash instead of `None`.
     pub safe_target: B256,
+    /// Head of the chain.
     pub head: B256,
 }
 
 impl LeanChain {
-    pub fn new(genesis_block: Block, genesis_state: LeanState) -> LeanChain {
+    pub fn new(genesis_block: Block, genesis_state: LeanState, db: LeanDB) -> LeanChain {
         let genesis_hash = genesis_block.tree_hash_root();
 
         LeanChain {
-            // Votes that we have received and taken into account
+            store: Arc::new(Mutex::new(db)),
             known_votes: Vec::new(),
-            // Votes that we have received but not yet taken into account
             new_votes: Vec::new(),
-            // Initialize the chain with the genesis block
             genesis_hash,
             num_validators: genesis_state.config.num_validators,
-            // Block that it is safe to use to vote as the target
-            // Diverge from Python implementation: Use genesis hash instead of `None`
             safe_target: genesis_hash,
-            // Head of the chain
             head: genesis_hash,
-            // {block_hash: block} for all blocks that we know about
             chain: HashMap::from([(genesis_hash, genesis_block)]),
-            // {block_hash: post_state} for all blocks that we know about
             post_states: HashMap::from([(genesis_hash, genesis_state)]),
         }
     }
