@@ -8,9 +8,12 @@ use std::collections::HashMap;
 
 use alloy_primitives::B256;
 use anyhow::anyhow;
-use ream_metrics::{FINALIZED_SLOT, HEAD_SLOT, JUSTIFIED_SLOT, set_int_gauge_vec};
 
-use crate::{block::Block, state::LeanState, vote::Vote};
+use crate::{
+    block::Block,
+    state::LeanState,
+    vote::{SignedVote, Vote},
+};
 
 /// We allow justification of slots either <= 5 or a perfect square or oblong after
 /// the latest finalized slot. This gives us a backoff technique and ensures
@@ -18,7 +21,7 @@ use crate::{block::Block, state::LeanState, vote::Vote};
 pub fn is_justifiable_slot(finalized_slot: &u64, candidate_slot: &u64) -> bool {
     assert!(
         candidate_slot >= finalized_slot,
-        "Candidate slot ({candidate_slot}) is less than finalized slot ({finalized_slot})"
+        "Candidate slot ({candidate_slot}) must be more than or equal to finalized slot ({finalized_slot})"
     );
 
     let delta = candidate_slot - finalized_slot;
@@ -26,82 +29,6 @@ pub fn is_justifiable_slot(finalized_slot: &u64, candidate_slot: &u64) -> bool {
     delta <= 5
     || (delta as f64).sqrt().fract() == 0.0 // any x^2
     || (delta as f64 + 0.25).sqrt() % 1.0 == 0.5 // any x^2+x
-}
-
-/// Given a state, output the new state after processing that block
-pub fn process_block(pre_state: &LeanState, block: &Block) -> anyhow::Result<LeanState> {
-    set_int_gauge_vec(&HEAD_SLOT, block.slot as i64, &[]);
-
-    let mut state = pre_state.clone();
-
-    // Track historical blocks in the state
-    state
-        .historical_block_hashes
-        .push(block.parent_root)
-        .map_err(|err| {
-            anyhow!("Failed to add block.parent_root to historical_block_hashes: {err:?}")
-        })?;
-    state
-        .justified_slots
-        .push(false)
-        .map_err(|err| anyhow!("Failed to add to justified_slots: {err:?}"))?;
-
-    while state.historical_block_hashes.len() < block.slot as usize {
-        state
-            .justified_slots
-            .push(false)
-            .map_err(|err| anyhow!("Failed to prefill justified_slots: {err:?}"))?;
-
-        state
-            .historical_block_hashes
-            // Diverged from Python implementation: uses `B256::ZERO` instead of `None`
-            .push(B256::ZERO)
-            .map_err(|err| anyhow!("Failed to prefill historical_block_hashes: {err:?}"))?;
-    }
-
-    // Process votes
-    for vote in &block.body.votes {
-        // Ignore votes whose source is not already justified,
-        // or whose target is not in the history, or whose target is not a
-        // valid justifiable slot
-        if !state.justified_slots[vote.source.slot as usize]
-            || vote.source.root != state.historical_block_hashes[vote.source.slot as usize]
-            || vote.target.root != state.historical_block_hashes[vote.target.slot as usize]
-            || vote.target.slot <= vote.source.slot
-            || !is_justifiable_slot(&state.latest_finalized.slot, &vote.target.slot)
-        {
-            continue;
-        }
-
-        // Track attempts to justify new hashes
-        state.initialize_justifications_for_root(&vote.target.root)?;
-        state.set_justification(&vote.target.root, &vote.validator_id, true)?;
-
-        let count = state.count_justifications(&vote.target.root)?;
-
-        // If 2/3 voted for the same new valid hash to justify
-        if count == (2 * state.config.num_validators) / 3 {
-            state.latest_justified.root = vote.target.root;
-            state.latest_justified.slot = vote.target.slot;
-            state.justified_slots[vote.target.slot as usize] = true;
-            set_int_gauge_vec(&JUSTIFIED_SLOT, state.latest_justified.slot as i64, &[]);
-
-            state.remove_justifications(&vote.target.root)?;
-
-            // Finalization: if the target is the next valid justifiable
-            // hash after the source
-            let is_target_next_valid_justifiable_slot = !((vote.source.slot + 1)..vote.target.slot)
-                .any(|slot| is_justifiable_slot(&state.latest_finalized.slot, &slot));
-
-            if is_target_next_valid_justifiable_slot {
-                state.latest_finalized.root = vote.source.root;
-                state.latest_finalized.slot = vote.source.slot;
-                set_int_gauge_vec(&FINALIZED_SLOT, state.latest_finalized.slot as i64, &[]);
-            }
-        }
-    }
-
-    Ok(state)
 }
 
 /// Get the highest-slot justified block that we know about
@@ -117,7 +44,7 @@ pub fn get_latest_justified_hash(post_states: &HashMap<B256, LeanState>) -> Opti
 pub fn get_fork_choice_head(
     blocks: &HashMap<B256, Block>,
     provided_root: &B256,
-    votes: &[Vote],
+    votes: &[SignedVote],
     min_score: u64,
 ) -> anyhow::Result<B256> {
     let mut root = *provided_root;
@@ -135,14 +62,14 @@ pub fn get_fork_choice_head(
 
     // Sort votes by ascending slots to ensure that new votes are inserted last
     let mut sorted_votes = votes.to_owned();
-    sorted_votes.sort_by_key(|vote| vote.slot);
+    sorted_votes.sort_by_key(|signed_vote| signed_vote.message.slot);
 
     // Prepare a map of validator_id -> their vote
     let mut latest_votes = HashMap::<u64, Vote>::new();
 
-    for vote in sorted_votes {
-        let validator_id = vote.validator_id;
-        latest_votes.insert(validator_id, vote.clone());
+    for signed_vote in sorted_votes {
+        let validator_id = signed_vote.validator_id;
+        latest_votes.insert(validator_id, signed_vote.message.clone());
     }
 
     // For each block, count the number of votes for that block. A vote

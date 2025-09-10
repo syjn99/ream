@@ -249,9 +249,9 @@ impl LeanNetworkService {
                                     signed_vote.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish vote for slot {} failed: {err:?}", signed_vote.data.slot);
+                                warn!("publish vote for slot {} failed: {err:?}", signed_vote.message.slot);
                             } else {
-                                info!("broadcasted vote for slot {}", signed_vote.data.slot);
+                                info!("broadcasted vote for slot {}", signed_vote.message.slot);
                             }
                         }
                     }
@@ -318,7 +318,7 @@ impl LeanNetworkService {
                     if let Err(err) =
                         self.chain_message_sender
                             .send(LeanChainServiceMessage::ProcessBlock {
-                                signed_block: *signed_block,
+                                signed_block,
                                 is_trusted: false,
                                 need_gossip: true,
                             })
@@ -327,12 +327,12 @@ impl LeanNetworkService {
                     }
                 }
                 Ok(LeanGossipsubMessage::Vote(signed_vote)) => {
-                    let slot = signed_vote.data.slot;
+                    let slot = signed_vote.message.slot;
 
                     if let Err(err) =
                         self.chain_message_sender
                             .send(LeanChainServiceMessage::ProcessVote {
-                                signed_vote: *signed_vote,
+                                signed_vote,
                                 is_trusted: false,
                                 need_gossip: true,
                             })
