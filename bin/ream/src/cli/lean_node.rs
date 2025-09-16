@@ -34,6 +34,7 @@ pub struct LeanNodeConfig {
 
     #[arg(
         default_value = "ream",
+        long,
         help = "Node identifier for validator registry (e.g., 'ream_0', 'zeam_0')"
     )]
     pub node_id: String,

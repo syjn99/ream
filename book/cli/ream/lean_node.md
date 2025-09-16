@@ -6,10 +6,7 @@ Start the lean node
 $ ream lean_node --help
 ```
 ```txt
-Usage: ream lean_node [OPTIONS] --network <NETWORK> --validator-registry-path <VALIDATOR_REGISTRY_PATH> [NODE_ID]
-
-Arguments:
-  [NODE_ID]  Node identifier for validator registry (e.g., 'ream_0', 'zeam_0') [default: ream]
+Usage: ream lean_node [OPTIONS] --network <NETWORK> --validator-registry-path <VALIDATOR_REGISTRY_PATH>
 
 Options:
   -v, --verbosity <VERBOSITY>
@@ -20,6 +17,8 @@ Options:
           Bootnodes configuration: Use 'default' for network defaults, 'none' to disable, '/path/to/nodes.yaml' for a YAML file with ENRs, or comma-delimited base64-encoded ENRs [default: default]
       --validator-registry-path <VALIDATOR_REGISTRY_PATH>
           The path to the validator registry
+      --node-id <NODE_ID>
+          Node identifier for validator registry (e.g., 'ream_0', 'zeam_0') [default: ream]
       --private-key-path <PRIVATE_KEY_PATH>
           The path to the hex encoded secp256k1 libp2p key
       --socket-address <SOCKET_ADDRESS>
