@@ -6,8 +6,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use alloy_primitives::hex;
 use clap::Parser;
-use libp2p_identity::Keypair;
+use libp2p_identity::secp256k1;
 use ream::cli::{
     Cli, Commands,
     account_manager::AccountManagerConfig,
@@ -479,7 +480,7 @@ fn get_current_epoch(genesis_time: u64) -> u64 {
     )
 }
 
-/// Generates a new secp256k1 keypair and saves it to the specified path in protobuf encoding.
+/// Generates a new secp256k1 keypair and saves it to the specified path in hex encoding.
 ///
 /// This allows the lean node to reuse the same network identity across restarts by loading
 /// the saved key with the --private-key-path flag.
@@ -498,9 +499,7 @@ pub async fn run_generate_private_key(config: GeneratePrivateKeyConfig) {
 
     fs::write(
         &config.output_path,
-        Keypair::generate_secp256k1()
-            .to_protobuf_encoding()
-            .expect("Failed to encode keypair"),
+        hex::encode(secp256k1::Keypair::generate().secret().to_bytes()),
     )
     .expect("Failed to write keypair to file");
 

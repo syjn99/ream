@@ -18,7 +18,7 @@ Options:
       --validator-registry-path <VALIDATOR_REGISTRY_PATH>
           The path to the validator registry
       --private-key-path <PRIVATE_KEY_PATH>
-          The path to the protobuf encoded secp256k1 libp2p key
+          The path to the hex encoded secp256k1 libp2p key
       --socket-address <SOCKET_ADDRESS>
           Set P2P socket address [default: 0.0.0.0]
       --socket-port <SOCKET_PORT>

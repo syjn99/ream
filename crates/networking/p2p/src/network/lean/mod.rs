@@ -6,7 +6,8 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, ensure};
+use alloy_primitives::hex;
+use anyhow::anyhow;
 use discv5::multiaddr::Protocol;
 use futures::StreamExt;
 use libp2p::{
@@ -16,7 +17,7 @@ use libp2p::{
     identify,
     swarm::{Config, NetworkBehaviour, Swarm, SwarmEvent},
 };
-use libp2p_identity::{KeyType, Keypair, PeerId};
+use libp2p_identity::{Keypair, PeerId, secp256k1};
 use parking_lot::Mutex;
 use ream_chain_lean::{
     lean_chain::LeanChainReader, messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest,
@@ -104,20 +105,21 @@ impl LeanNetworkService {
         };
 
         let local_key = if let Some(ref path) = network_config.private_key_path {
-            let bytes = fs::read(path).map_err(|err| {
+            let private_key_hex = fs::read_to_string(path).map_err(|err| {
                 anyhow!("failed to read secret key file {}: {err}", path.display())
             })?;
-
-            let keypair = Keypair::from_protobuf_encoding(&bytes).map_err(|err| {
-                anyhow!("failed to decode protobuf encoded libp2p keypair: {err}")
+            let private_key_bytes = hex::decode(private_key_hex.trim()).map_err(|err| {
+                anyhow!(
+                    "failed to decode hex from private key file {}: {err}",
+                    path.display()
+                )
             })?;
+            let private_key =
+                secp256k1::SecretKey::try_from_bytes(private_key_bytes).map_err(|err| {
+                    anyhow!("failed to decode secp256k1 secret key from bytes: {err}")
+                })?;
 
-            ensure!(
-                keypair.key_type() == KeyType::Secp256k1,
-                "provided keypair that is not secp256k1"
-            );
-
-            keypair
+            Keypair::from(secp256k1::Keypair::from(private_key))
         } else {
             Keypair::generate_secp256k1()
         };
