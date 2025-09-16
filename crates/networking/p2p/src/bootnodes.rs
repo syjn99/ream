@@ -5,7 +5,7 @@ use discv5::{Enr, multiaddr::Protocol};
 use libp2p::Multiaddr;
 use ream_network_spec::networks::Network;
 
-use crate::network::misc::peer_id_from_enr;
+use crate::{network::misc::peer_id_from_enr, utils::quic_from_enr};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum Bootnodes {
@@ -107,13 +107,21 @@ pub fn to_multiaddrs(enrs: &[Enr]) -> Vec<Multiaddr> {
     let mut multiaddrs: Vec<Multiaddr> = Vec::new();
     for enr in enrs {
         if let Some(peer_id) = peer_id_from_enr(enr) {
-            if let Some(ip) = enr.ip4()
-                && let Some(tcp) = enr.tcp4()
-            {
-                let mut multiaddr: Multiaddr = ip.into();
-                multiaddr.push(Protocol::Tcp(tcp));
-                multiaddr.push(Protocol::P2p(peer_id));
-                multiaddrs.push(multiaddr);
+            if let Some(ip) = enr.ip4() {
+                if let Some(quic) = quic_from_enr(enr) {
+                    let mut multiaddr: Multiaddr = ip.into();
+                    multiaddr.push(Protocol::Udp(quic));
+                    multiaddr.push(Protocol::QuicV1);
+                    multiaddr.push(Protocol::P2p(peer_id));
+                    multiaddrs.push(multiaddr);
+                }
+
+                if let Some(tcp) = enr.tcp4() {
+                    let mut multiaddr: Multiaddr = ip.into();
+                    multiaddr.push(Protocol::Tcp(tcp));
+                    multiaddr.push(Protocol::P2p(peer_id));
+                    multiaddrs.push(multiaddr);
+                }
             }
             if let Some(ip6) = enr.ip6()
                 && let Some(tcp6) = enr.tcp6()
