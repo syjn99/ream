@@ -205,7 +205,7 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor, ream_
 
     let peer_table = network_service.peer_table();
 
-    let keystores = load_validator_registry(&config.validator_registry_path)
+    let keystores = load_validator_registry(&config.validator_registry_path, &config.node_id)
         .expect("Failed to load validator registry");
     let validator_service =
         LeanValidatorService::new(lean_chain_reader.clone(), keystores, chain_sender).await;

@@ -6,7 +6,10 @@ Start the lean node
 $ ream lean_node --help
 ```
 ```txt
-Usage: ream lean_node [OPTIONS] --network <NETWORK> --validator-registry-path <VALIDATOR_REGISTRY_PATH>
+Usage: ream lean_node [OPTIONS] --network <NETWORK> --validator-registry-path <VALIDATOR_REGISTRY_PATH> [NODE_ID]
+
+Arguments:
+  [NODE_ID]  Node identifier for validator registry (e.g., 'ream_0', 'zeam_0') [default: ream]
 
 Options:
   -v, --verbosity <VERBOSITY>

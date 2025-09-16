@@ -32,6 +32,12 @@ pub struct LeanNodeConfig {
     #[arg(long, help = "The path to the validator registry")]
     pub validator_registry_path: PathBuf,
 
+    #[arg(
+        default_value = "ream",
+        help = "Node identifier for validator registry (e.g., 'ream_0', 'zeam_0')"
+    )]
+    pub node_id: String,
+
     #[arg(long, help = "The path to the hex encoded secp256k1 libp2p key")]
     pub private_key_path: Option<PathBuf>,
 
