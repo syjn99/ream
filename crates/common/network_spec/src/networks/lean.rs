@@ -14,6 +14,7 @@ pub struct LeanNetworkSpec {
     pub genesis_time: u64,
     pub justification_lookback_slots: u64,
     pub seconds_per_slot: u64,
+    #[serde(alias = "VALIDATOR_COUNT")]
     pub num_validators: u64,
 }
 
