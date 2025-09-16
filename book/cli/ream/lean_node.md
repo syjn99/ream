@@ -14,7 +14,7 @@ Options:
       --network <NETWORK>
           Provide a path to a YAML config file, or use 'ephemery' for the Ephemery network
       --bootnodes <BOOTNODES>
-          One or more comma-delimited base64-encoded ENR's of peers to initially connect to. Use 'default' to use the default bootnodes for the network. Use 'none' to disable bootnodes. [default: default]
+          Bootnodes configuration: Use 'default' for network defaults, 'none' to disable, '/path/to/nodes.yaml' for a YAML file with ENRs, or comma-delimited base64-encoded ENRs [default: default]
       --validator-registry-path <VALIDATOR_REGISTRY_PATH>
           The path to the validator registry
       --private-key-path <PRIVATE_KEY_PATH>

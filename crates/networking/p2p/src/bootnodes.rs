@@ -24,6 +24,17 @@ impl FromStr for Bootnodes {
             "default" => Ok(Bootnodes::Default),
             "none" => Ok(Bootnodes::None),
             _ => {
+                // Check if it's a file path ending with .yaml or .yml
+                if (s.ends_with(".yaml") || s.ends_with(".yml")) && std::path::Path::new(s).exists()
+                {
+                    let yaml_content = std::fs::read_to_string(s)?;
+                    return Ok(Bootnodes::Custom(
+                        serde_yaml::from_str(&yaml_content)
+                            .map_err(|err| anyhow!("Failed to deserialize ENRs from {s}: {err}"))?,
+                    ));
+                }
+
+                // Try parsing as comma-separated ENRs
                 if let Ok(enrs) = s
                     .split(',')
                     .map(Enr::from_str)
@@ -32,6 +43,7 @@ impl FromStr for Bootnodes {
                     return Ok(Bootnodes::Custom(enrs));
                 }
 
+                // Try parsing as comma-separated multiaddrs
                 if let Ok(addresses) = s
                     .split(',')
                     .map(Multiaddr::from_str)
@@ -40,7 +52,9 @@ impl FromStr for Bootnodes {
                     return Ok(Bootnodes::Multiaddr(addresses));
                 }
 
-                Err(anyhow!("Failed to parse {s} as ENR or Multiaddr"))
+                Err(anyhow!(
+                    "Failed to parse {s} as ENR, Multiaddr, or YAML file path"
+                ))
             }
         }
     }

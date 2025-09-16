@@ -25,7 +25,7 @@ pub struct LeanNodeConfig {
     #[arg(
         default_value = "default",
         long,
-        help = "One or more comma-delimited base64-encoded ENR's of peers to initially connect to. Use 'default' to use the default bootnodes for the network. Use 'none' to disable bootnodes."
+        help = "Bootnodes configuration: Use 'default' for network defaults, 'none' to disable, '/path/to/nodes.yaml' for a YAML file with ENRs, or comma-delimited base64-encoded ENRs"
     )]
     pub bootnodes: Bootnodes,
 
