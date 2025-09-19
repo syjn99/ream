@@ -72,7 +72,7 @@ alloy-rpc-types-beacon = "1.0.8"
 alloy-rpc-types-eth = "1.0.7"
 anyhow = "1.0"
 async-trait = "0.1.86"
-bip32 = "0.5.3"
+bip39 = "2.2.0"
 clap = "4"
 delay_map = "0.4.1"
 directories = { version = "6.0.0" }
@@ -86,6 +86,7 @@ eventsource-client = "0.15.0"
 futures = "0.3"
 hashbrown = "0.15.3"
 hashsig = { git = "https://github.com/b-wagn/hash-sig", rev = "287517a763edba7e518b0c1ee5beb868f26f1f66" }
+hex = "0.4"
 itertools = "0.14"
 jsonwebtoken = "9.3.1"
 kzg = { git = "https://github.com/grandinetech/rust-kzg" }

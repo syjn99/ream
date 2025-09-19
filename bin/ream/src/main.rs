@@ -1,6 +1,7 @@
 use std::{
     env, fs,
     net::SocketAddr,
+    path::{Path, PathBuf},
     process,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -19,6 +20,7 @@ use ream::cli::{
     validator_node::ValidatorNodeConfig,
     voluntary_exit::VoluntaryExitConfig,
 };
+use ream_account_manager::{keystore::Keystore, message_types::MessageType};
 use ream_api_types_beacon::id::ValidatorID;
 use ream_api_types_common::id::ID;
 use ream_chain_lean::{
@@ -87,7 +89,7 @@ fn main() {
         reset_db(&ream_dir).expect("Unable to delete database");
     }
 
-    let ream_db = ReamDB::new(ream_dir).expect("unable to init Ream Database");
+    let ream_db = ReamDB::new(ream_dir.clone()).expect("unable to init Ream Database");
 
     match cli.command {
         Commands::LeanNode(config) => {
@@ -100,7 +102,7 @@ fn main() {
             executor_clone.spawn(async move { run_validator_node(*config, executor).await });
         }
         Commands::AccountManager(config) => {
-            executor_clone.spawn(async move { run_account_manager(*config).await });
+            executor_clone.spawn(async move { run_account_manager(*config, ream_dir).await });
         }
         Commands::VoluntaryExit(config) => {
             executor_clone.spawn(async move { run_voluntary_exit(*config).await });
@@ -384,8 +386,8 @@ pub async fn run_validator_node(config: ValidatorNodeConfig, executor: ReamExecu
 ///
 /// This function initializes the account manager by validating the configuration,
 /// generating keys, and starting the account manager service.
-pub async fn run_account_manager(mut config: AccountManagerConfig) {
-    info!("starting up account manager...");
+pub async fn run_account_manager(mut config: AccountManagerConfig, ream_dir: PathBuf) {
+    info!("Starting account manager...");
 
     // Validate the configuration
     config
@@ -399,17 +401,65 @@ pub async fn run_account_manager(mut config: AccountManagerConfig) {
 
     let seed_phrase = config.get_seed_phrase();
 
+    // Create keystore directory as subdirectory of data directory
+    let keystore_dir = match &config.keystore_path {
+        Some(custom_path) => {
+            let path = Path::new(custom_path);
+            if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                ream_dir.join(custom_path)
+            }
+        }
+        None => ream_dir.join("keystores"),
+    };
+
+    if !keystore_dir.exists() {
+        fs::create_dir_all(&keystore_dir).expect("Failed to create keystore directory");
+        info!(
+            "Created keystore directory: {path}",
+            path = keystore_dir.display()
+        );
+    }
+
     // Measure key generation time
     let start_time = Instant::now();
-    let (_public_key, _private_key) = ream_account_manager::generate_keys(
-        &seed_phrase,
-        config.activation_epoch,
-        config.num_active_epochs,
-    );
+
+    // Generate keys sequentially for each message type
+    for (index, message_type) in MessageType::iter().enumerate() {
+        let (_public_key, _private_key) = ream_account_manager::generate_key_pair_with_salt(
+            &seed_phrase,
+            index as u32,
+            config.activation_epoch,
+            config.num_active_epochs,
+            config.passphrase.as_deref().unwrap_or(""),
+        );
+
+        // Create keystore file using Keystore
+        let keystore = Keystore::from_seed_phrase(
+            &seed_phrase,
+            config.lifetime,
+            config.activation_epoch,
+            Some(format!("Ream validator keystore for {message_type}")),
+            Some(format!("m/44'/60'/0'/0/{index}")),
+        );
+
+        // Write keystore to file with enum name
+        let filename = message_type.to_string();
+        let keystore_file_path = keystore_dir.join(filename);
+        let keystore_json =
+            ::serde_json::to_string_pretty(&keystore).expect("Failed to serialize keystore");
+
+        fs::write(&keystore_file_path, keystore_json).expect("Failed to write keystore file");
+
+        info!("Keystore written to path: {}", keystore_file_path.display());
+    }
     let duration = start_time.elapsed();
     info!("Key generation complete, took {:?}", duration);
 
     info!("Account manager completed successfully");
+
+    process::exit(0);
 }
 
 /// Runs the voluntary exit process.

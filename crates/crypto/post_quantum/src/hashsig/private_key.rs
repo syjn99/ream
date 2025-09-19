@@ -16,7 +16,7 @@ impl PrivateKey {
         Self { inner }
     }
 
-    pub fn generate<R: Rng>(
+    pub fn generate_key_pair<R: Rng>(
         rng: &mut R,
         activation_epoch: usize,
         num_active_epochs: usize,
@@ -53,7 +53,7 @@ mod tests {
         let num_active_epochs = 10; // Test for 10 epochs for quick key generation
 
         let (public_key, private_key) =
-            PrivateKey::generate(&mut rng, activation_epoch, num_active_epochs);
+            PrivateKey::generate_key_pair(&mut rng, activation_epoch, num_active_epochs);
 
         let epoch = 5;
 
