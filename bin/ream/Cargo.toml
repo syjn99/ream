@@ -49,6 +49,7 @@ ream-network-spec.workspace = true
 ream-node.workspace = true
 ream-operation-pool.workspace = true
 ream-p2p.workspace = true
+ream-post-quantum-crypto.workspace = true
 ream-rpc-beacon.workspace = true
 ream-rpc-lean.workspace = true
 ream-storage.workspace = true

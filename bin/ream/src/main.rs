@@ -10,6 +10,8 @@ use std::{
 use alloy_primitives::hex;
 use clap::Parser;
 use libp2p_identity::secp256k1;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use ream::cli::{
     Cli, Commands,
     account_manager::AccountManagerConfig,
@@ -20,7 +22,9 @@ use ream::cli::{
     validator_node::ValidatorNodeConfig,
     voluntary_exit::VoluntaryExitConfig,
 };
-use ream_account_manager::{keystore::Keystore, message_types::MessageType};
+use ream_account_manager::{
+    keystore::Keystore, message_types::MessageType, seed::derive_seed_with_user_input,
+};
 use ream_api_types_beacon::id::ValidatorID;
 use ream_api_types_common::id::ID;
 use ream_chain_lean::{
@@ -44,6 +48,7 @@ use ream_p2p::{
     },
     network::lean::{LeanNetworkConfig, LeanNetworkService},
 };
+use ream_post_quantum_crypto::hashsig::private_key::PrivateKey as HashSigPrivateKey;
 use ream_rpc_beacon::{config::RpcServerConfig, start_server};
 use ream_rpc_lean::{config::LeanRpcServerConfig, start_lean_server};
 use ream_storage::{
@@ -427,12 +432,26 @@ pub async fn run_account_manager(mut config: AccountManagerConfig, ream_dir: Pat
 
     // Generate keys sequentially for each message type
     for (index, message_type) in MessageType::iter().enumerate() {
-        let (_public_key, _private_key) = ream_account_manager::generate_key_pair_with_salt(
+        info!(
+            "Generating lean consensus validator keys for index {index}, message type: {message_type}..."
+        );
+
+        let seed = derive_seed_with_user_input(
             &seed_phrase,
             index as u32,
-            config.activation_epoch,
-            config.num_active_epochs,
             config.passphrase.as_deref().unwrap_or(""),
+        );
+
+        let (public_key, _private_key) = HashSigPrivateKey::generate_key_pair(
+            &mut <ChaCha20Rng as SeedableRng>::from_seed(seed),
+            config.activation_epoch as usize,
+            config.num_active_epochs as usize,
+        );
+
+        info!(
+            "Public key for {message_type}: {}",
+            // This should never panic
+            serde_json::to_string_pretty(&public_key).expect("Failed to serialize public key")
         );
 
         // Create keystore file using Keystore
