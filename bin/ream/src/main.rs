@@ -8,6 +8,7 @@ use std::{
 };
 
 use alloy_primitives::hex;
+use bip39::Mnemonic;
 use clap::Parser;
 use libp2p_identity::secp256k1;
 use rand::SeedableRng;
@@ -391,20 +392,23 @@ pub async fn run_validator_node(config: ValidatorNodeConfig, executor: ReamExecu
 ///
 /// This function initializes the account manager by validating the configuration,
 /// generating keys, and starting the account manager service.
-pub async fn run_account_manager(mut config: AccountManagerConfig, ream_dir: PathBuf) {
+pub async fn run_account_manager(config: AccountManagerConfig, ream_dir: PathBuf) {
     info!("Starting account manager...");
-
-    // Validate the configuration
-    config
-        .validate()
-        .expect("Invalid account manager configuration");
 
     info!(
         "Account manager configuration: lifetime={}, chunk_size={}, activation_epoch={}, num_active_epochs={}",
         config.lifetime, config.chunk_size, config.activation_epoch, config.num_active_epochs
     );
 
-    let seed_phrase = config.get_seed_phrase();
+    // Get seed phrase or generate a new one
+    let seed_phrase = config.seed_phrase.unwrap_or_else(|| {
+        let mnemonic = Mnemonic::generate(24).expect("Failed to generate mnemonic");
+        let seed_phrase = mnemonic.words().collect::<Vec<_>>().join(" ");
+        info!("{}", "=".repeat(89));
+        info!("Generated new seed phrase (KEEP SAFE): {seed_phrase}");
+        info!("{}", "=".repeat(89));
+        seed_phrase
+    });
 
     // Create keystore directory as subdirectory of data directory
     let keystore_dir = match &config.keystore_path {
