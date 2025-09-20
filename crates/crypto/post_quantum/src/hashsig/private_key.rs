@@ -1,5 +1,6 @@
 use hashsig::{MESSAGE_LENGTH, signature::SignatureScheme};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 use crate::hashsig::{
     HashSigScheme, errors::SigningError, public_key::PublicKey, signature::Signature,
@@ -7,6 +8,7 @@ use crate::hashsig::{
 
 pub type HashSigPrivateKey = <HashSigScheme as SignatureScheme>::SecretKey;
 
+#[derive(Serialize, Deserialize)]
 pub struct PrivateKey {
     inner: HashSigPrivateKey,
 }

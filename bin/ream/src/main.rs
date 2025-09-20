@@ -8,8 +8,11 @@ use std::{
 };
 
 use alloy_primitives::hex;
+use bip39::Mnemonic;
 use clap::Parser;
 use libp2p_identity::secp256k1;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use ream::cli::{
     Cli, Commands,
     account_manager::AccountManagerConfig,
@@ -20,7 +23,9 @@ use ream::cli::{
     validator_node::ValidatorNodeConfig,
     voluntary_exit::VoluntaryExitConfig,
 };
-use ream_account_manager::{keystore::Keystore, message_types::MessageType};
+use ream_account_manager::{
+    keystore::Keystore, message_types::MessageType, seed::derive_seed_with_user_input,
+};
 use ream_api_types_beacon::id::ValidatorID;
 use ream_api_types_common::id::ID;
 use ream_chain_lean::{
@@ -44,6 +49,7 @@ use ream_p2p::{
     },
     network::lean::{LeanNetworkConfig, LeanNetworkService},
 };
+use ream_post_quantum_crypto::hashsig::private_key::PrivateKey as HashSigPrivateKey;
 use ream_rpc_beacon::{config::RpcServerConfig, start_server};
 use ream_rpc_lean::{config::LeanRpcServerConfig, start_lean_server};
 use ream_storage::{
@@ -386,20 +392,23 @@ pub async fn run_validator_node(config: ValidatorNodeConfig, executor: ReamExecu
 ///
 /// This function initializes the account manager by validating the configuration,
 /// generating keys, and starting the account manager service.
-pub async fn run_account_manager(mut config: AccountManagerConfig, ream_dir: PathBuf) {
+pub async fn run_account_manager(config: AccountManagerConfig, ream_dir: PathBuf) {
     info!("Starting account manager...");
-
-    // Validate the configuration
-    config
-        .validate()
-        .expect("Invalid account manager configuration");
 
     info!(
         "Account manager configuration: lifetime={}, chunk_size={}, activation_epoch={}, num_active_epochs={}",
         config.lifetime, config.chunk_size, config.activation_epoch, config.num_active_epochs
     );
 
-    let seed_phrase = config.get_seed_phrase();
+    // Get seed phrase or generate a new one
+    let seed_phrase = config.seed_phrase.unwrap_or_else(|| {
+        let mnemonic = Mnemonic::generate(24).expect("Failed to generate mnemonic");
+        let seed_phrase = mnemonic.words().collect::<Vec<_>>().join(" ");
+        info!("{}", "=".repeat(89));
+        info!("Generated new seed phrase (KEEP SAFE): {seed_phrase}");
+        info!("{}", "=".repeat(89));
+        seed_phrase
+    });
 
     // Create keystore directory as subdirectory of data directory
     let keystore_dir = match &config.keystore_path {
@@ -427,12 +436,26 @@ pub async fn run_account_manager(mut config: AccountManagerConfig, ream_dir: Pat
 
     // Generate keys sequentially for each message type
     for (index, message_type) in MessageType::iter().enumerate() {
-        let (_public_key, _private_key) = ream_account_manager::generate_key_pair_with_salt(
+        info!(
+            "Generating lean consensus validator keys for index {index}, message type: {message_type}..."
+        );
+
+        let seed = derive_seed_with_user_input(
             &seed_phrase,
             index as u32,
-            config.activation_epoch,
-            config.num_active_epochs,
             config.passphrase.as_deref().unwrap_or(""),
+        );
+
+        let (public_key, _private_key) = HashSigPrivateKey::generate_key_pair(
+            &mut <ChaCha20Rng as SeedableRng>::from_seed(seed),
+            config.activation_epoch as usize,
+            config.num_active_epochs as usize,
+        );
+
+        info!(
+            "Public key for {message_type}: {}",
+            // This should never panic
+            serde_json::to_string_pretty(&public_key).expect("Failed to serialize public key")
         );
 
         // Create keystore file using Keystore
