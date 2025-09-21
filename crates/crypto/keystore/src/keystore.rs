@@ -12,9 +12,10 @@ use crate::{decrypt::aes128_ctr, hex_serde, pbkdf2::pbkdf2, scrypt::scrypt};
 pub struct EncryptedKeystore<C = CryptoV4> {
     pub crypto: C,
     pub description: String,
-    #[serde(rename = "pubkey")]
-    pub public_key: PublicKey,
-    pub path: String,
+    #[serde(rename = "pubkey", skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<PublicKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     pub uuid: String,
     pub version: u64,
 }
@@ -24,7 +25,10 @@ pub struct Keystore {
     pub private_key: PrivateKey,
 }
 
-impl EncryptedKeystore {
+impl<C> EncryptedKeystore<C>
+where
+    C: for<'de> Deserialize<'de> + Serialize,
+{
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         Ok(serde_json::from_str(fs::read_to_string(path)?.as_str())?)
     }
@@ -33,7 +37,9 @@ impl EncryptedKeystore {
         fs::write(path, serde_json::to_string(self)?)?;
         Ok(())
     }
+}
 
+impl EncryptedKeystore {
     pub fn validate_password(&self, password: &[u8]) -> anyhow::Result<bool> {
         let derived_key = self.crypto.kdf.params.derive_key(password)?;
         let derived_key_slice = &derived_key[16..32];
@@ -53,6 +59,11 @@ impl EncryptedKeystore {
             "Password provided is invalid!"
         );
 
+        let public_key = self
+            .public_key
+            .clone()
+            .ok_or_else(|| anyhow!("No public key found in keystore"))?;
+
         let mut private_key = PrivateKey {
             inner: B256::from_slice(self.crypto.cipher.message.as_slice()),
         };
@@ -69,7 +80,7 @@ impl EncryptedKeystore {
             CipherParams::Aes256Gcm { .. } => todo!(),
         };
         Ok(Keystore {
-            public_key: self.public_key.clone(),
+            public_key,
             private_key,
         })
     }
@@ -217,10 +228,10 @@ mod tests {
                 },
             },
             description: "Test Keystore".to_string(),
-            public_key: PublicKey {
+            public_key: Some(PublicKey {
                 inner: FixedVector::from(vec![0x12; 48]),
-            },
-            path: "m/44'/60'/0'/0/0".to_string(),
+            }),
+            path: Some("m/44'/60'/0'/0/0".to_string()),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 4,
         };
@@ -232,57 +243,139 @@ mod tests {
     }
 
     #[test]
+    fn test_serialization_v5() {
+        let keystore = EncryptedKeystore {
+            crypto: CryptoV5 {
+                kdf: FunctionBlock {
+                    params: KdfParams::Argon2Id {
+                        m: 65536,
+                        t: 4,
+                        p: 2,
+                        salt: vec![0x12, 0x34, 0x56, 0x78],
+                    },
+                    message: vec![0x90, 0xAB, 0xCD, 0xEF],
+                },
+                cipher: FunctionBlock {
+                    params: CipherParams::Aes256Gcm {
+                        iv: vec![0xAA, 0xBB, 0xCC, 0xDD],
+                        tag: vec![0xDE, 0xAD, 0xBE, 0xEF],
+                    },
+                    message: vec![0x11, 0x22, 0x33, 0x44],
+                },
+                keytype: FunctionBlock {
+                    params: KeyTypeParams::XmssPoseidon2OtsSeed {
+                        lifetime: 100000,
+                        activation_epoch: 10,
+                    },
+                    message: vec![],
+                },
+            },
+            description: "".to_string(),
+            public_key: None,
+            path: None,
+            uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
+            version: 5,
+        };
+
+        let keystore_as_string = r#"{"crypto":{"kdf":{"function":"argon2id","params":{"m":65536,"t":4,"p":2,"salt":"12345678"},"message":"90abcdef"},"cipher":{"function":"aes-256-gcm","params":{"iv":"aabbccdd","tag":"deadbeef"},"message":"11223344"},"keytype":{"function":"xmss-poseidon2-ots-seed","params":{"lifetime":100000,"activation_epoch":10},"message":""}},"description":"","uuid":"123e4567-e89b-12d3-a456-426614174000","version":5}"#;
+
+        let serialized = serde_json::to_string(&keystore).expect("Failed to serialize keystore");
+        assert_eq!(serialized, keystore_as_string);
+    }
+
+    #[test]
     fn test_deserialization() {
         // The keystore password here is 'password123' for future tests
         let keystore_result = EncryptedKeystore::load_from_file("./assets/ScryptKeystore.json");
-        match keystore_result {
-            Ok(keystore_deserialized) => {
-                let keystore = EncryptedKeystore {
-                    crypto: CryptoV4 {
-                        kdf: FunctionBlock {
-                            params: KdfParams::Scrypt {
-                                dklen: 32,
-                                n: 262144,
-                                p: 1,
-                                r: 8,
-                                salt: hex::decode("a8ba3c3981ec95d49c776f4959720dc04e7ac39a4d8aa26bccf419cb241efd6a")
-                                    .expect("Failed to decode salt"),
-                            },
-                            message: vec![], // Empty message
-                        },
-                        checksum: FunctionBlock {
-                            params: ChecksumParams::Sha256 {},
-                            message: hex::decode("7c6392e1b675ea50451ff356206ffe01be7b938eab3b7e2821fcfc0542d90032")
-                                .expect("Failed to decode checksum message"),
-                        },
-                        cipher: FunctionBlock {
-                            params: CipherParams::Aes128Ctr {
-                                iv: hex::decode("180742384a64fedc51147799da529dd0").expect("Failed to decode IV"),
-                            },
-                            message: hex::decode("ae3a00597d61d570b767704edb925e2fe2dd474ea1145c62ac04a2484a322e3d")
-                                .expect("Failed to decode cipher message"),
-                        },
-                    },
-                    description: "".to_string(),
-                    public_key: PublicKey {
-                        inner: FixedVector::from(
-                            hex::decode(
-                                "b69dfa082ca75d4e50ed4da8fa07d550ba9ec4019815409f42a98b79861d7ad96633a2476594b94c8a6e3048e1b2623e",
-                            )
-                            .expect("Failed to decode public_key"),
-                        ),
-                    },
-                    path: "m/12381/3600/0/0/0".to_string(),
-                    uuid: "8f6774f8-3b29-448f-b407-499fb1e98a20".to_string(),
-                    version: 4,
-                };
+        let keystore_deserialized = keystore_result.expect("Failed to deserialize keystore");
 
-                assert_eq!(keystore_deserialized, keystore);
-            }
-            Err(err) => {
-                panic!("Could not load the keystore: {err:?}");
-            }
-        }
+        let keystore = EncryptedKeystore {
+            crypto: CryptoV4 {
+                kdf: FunctionBlock {
+                    params: KdfParams::Scrypt {
+                        dklen: 32,
+                        n: 262144,
+                        p: 1,
+                        r: 8,
+                        salt: hex::decode("a8ba3c3981ec95d49c776f4959720dc04e7ac39a4d8aa26bccf419cb241efd6a")
+                            .expect("Failed to decode salt"),
+                    },
+                    message: vec![], // Empty message
+                },
+                checksum: FunctionBlock {
+                    params: ChecksumParams::Sha256 {},
+                    message: hex::decode("7c6392e1b675ea50451ff356206ffe01be7b938eab3b7e2821fcfc0542d90032")
+                        .expect("Failed to decode checksum message"),
+                },
+                cipher: FunctionBlock {
+                    params: CipherParams::Aes128Ctr {
+                        iv: hex::decode("180742384a64fedc51147799da529dd0").expect("Failed to decode IV"),
+                    },
+                    message: hex::decode("ae3a00597d61d570b767704edb925e2fe2dd474ea1145c62ac04a2484a322e3d")
+                        .expect("Failed to decode cipher message"),
+                },
+            },
+            description: "".to_string(),
+            public_key: Some(PublicKey {
+                inner: FixedVector::from(
+                    hex::decode(
+                        "b69dfa082ca75d4e50ed4da8fa07d550ba9ec4019815409f42a98b79861d7ad96633a2476594b94c8a6e3048e1b2623e",
+                    )
+                    .expect("Failed to decode public_key"),
+                ),
+            }),
+            path: Some("m/12381/3600/0/0/0".to_string()),
+            uuid: "8f6774f8-3b29-448f-b407-499fb1e98a20".to_string(),
+            version: 4,
+        };
+
+        assert_eq!(keystore_deserialized, keystore);
+    }
+
+    #[test]
+    fn test_deserialization_v5() {
+        let keystore_result =
+            EncryptedKeystore::load_from_file("./assets/PostQuantumKeystore.json");
+        let keystore_deserialized = keystore_result.expect("Failed to deserialize keystore");
+
+        let keystore = EncryptedKeystore {
+            crypto: CryptoV5 {
+                kdf: FunctionBlock {
+                    params: KdfParams::Argon2Id {
+                        m: 65536,
+                        t: 4,
+                        p: 2,
+                        salt: hex::decode("0a1b2c3d4e5f60718293a4b5c6d7e8f9")
+                            .expect("Failed to decode salt"),
+                    },
+                    message: vec![], // Empty message
+                },
+                cipher: FunctionBlock {
+                    params: CipherParams::Aes256Gcm {
+                        iv: hex::decode("cafebabefacedbaddecaf888").expect("Failed to decode IV"),
+                        tag: hex::decode("feedfacedeadbeefcafe0000").expect("Failed to decode tag"),
+                    },
+                    message: hex::decode(
+                        "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
+                    )
+                    .expect("Failed to decode cipher message"),
+                },
+                keytype: FunctionBlock {
+                    params: KeyTypeParams::XmssPoseidon2OtsSeed {
+                        lifetime: 32,
+                        activation_epoch: 28999934,
+                    },
+                    message: vec![], // Empty message
+                },
+            },
+            description: "".to_string(),
+            public_key: None,
+            path: None,
+            uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
+            version: 5,
+        };
+
+        assert_eq!(keystore_deserialized, keystore);
     }
 
     #[test]
