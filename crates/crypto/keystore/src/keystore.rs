@@ -9,8 +9,8 @@ use sha2::{Digest, Sha256};
 use crate::{decrypt::aes128_ctr, hex_serde, pbkdf2::pbkdf2, scrypt::scrypt};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct EncryptedKeystore {
-    pub crypto: Crypto,
+pub struct EncryptedKeystore<C = CryptoV4> {
+    pub crypto: C,
     pub description: String,
     #[serde(rename = "pubkey")]
     pub public_key: PublicKey,
@@ -49,6 +49,7 @@ impl EncryptedKeystore {
                 dklen,
                 salt,
             } => scrypt(password, salt, *n, *p, *r, *dklen)?,
+            KdfParams::Argon2Id { .. } => todo!(),
         };
         let derived_key_slice = &derived_key[16..32];
         let pre_image = [derived_key_slice, &self.crypto.cipher.message].concat();
@@ -72,6 +73,7 @@ impl EncryptedKeystore {
                 dklen,
                 salt,
             } => scrypt(password, salt, *n, *p, *r, *dklen)?,
+            KdfParams::Argon2Id { .. } => todo!(),
         };
         let derived_key_slice = &derived_key[16..32];
         let pre_image = [derived_key_slice, &self.crypto.cipher.message].concat();
@@ -94,6 +96,7 @@ impl EncryptedKeystore {
                 })?;
                 aes128_ctr(private_key.inner.as_mut_slice(), key_param, iv_param);
             }
+            CipherParams::Aes256Gcm { .. } => todo!(),
         };
         Ok(Keystore {
             public_key: self.public_key.clone(),
@@ -103,10 +106,17 @@ impl EncryptedKeystore {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Crypto {
+pub struct CryptoV4 {
     pub kdf: FunctionBlock<KdfParams>,
     pub checksum: FunctionBlock<ChecksumParams>,
     pub cipher: FunctionBlock<CipherParams>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CryptoV5 {
+    pub kdf: FunctionBlock<KdfParams>,
+    pub cipher: FunctionBlock<CipherParams>,
+    pub keytype: FunctionBlock<KeyTypeParams>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -135,6 +145,13 @@ pub enum KdfParams {
         #[serde(with = "hex_serde")]
         salt: Vec<u8>,
     },
+    Argon2Id {
+        m: u32,
+        t: u32,
+        p: u32,
+        #[serde(with = "hex_serde")]
+        salt: Vec<u8>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -151,12 +168,28 @@ pub enum CipherParams {
         #[serde(with = "hex_serde")]
         iv: Vec<u8>,
     },
+    #[serde(rename = "aes-256-gcm")]
+    Aes256Gcm {
+        #[serde(with = "hex_serde")]
+        iv: Vec<u8>,
+        #[serde(with = "hex_serde")]
+        tag: Vec<u8>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "function", content = "params", rename_all = "lowercase")]
 pub enum ChecksumParams {
     Sha256 {},
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(tag = "function", content = "params", rename_all = "kebab-case")]
+pub enum KeyTypeParams {
+    XmssPoseidon2OtsSeed {
+        lifetime: u32,
+        activation_epoch: u32,
+    },
 }
 
 #[cfg(test)]
@@ -170,7 +203,7 @@ mod tests {
     #[test]
     fn test_serialization() {
         let keystore = EncryptedKeystore {
-            crypto: Crypto {
+            crypto: CryptoV4 {
                 kdf: FunctionBlock {
                     params: KdfParams::Scrypt {
                         dklen: 32,
@@ -214,7 +247,7 @@ mod tests {
         match keystore_result {
             Ok(keystore_deserialized) => {
                 let keystore = EncryptedKeystore {
-                    crypto: Crypto {
+                    crypto: CryptoV4 {
                         kdf: FunctionBlock {
                             params: KdfParams::Scrypt {
                                 dklen: 32,
