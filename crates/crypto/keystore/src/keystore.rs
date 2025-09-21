@@ -14,8 +14,7 @@ pub struct EncryptedKeystore<C = CryptoV4> {
     pub description: String,
     #[serde(rename = "pubkey", skip_serializing_if = "Option::is_none")]
     pub public_key: Option<PublicKey>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
+    pub path: String,
     pub uuid: String,
     pub version: u64,
 }
@@ -231,7 +230,7 @@ mod tests {
             public_key: Some(PublicKey {
                 inner: FixedVector::from(vec![0x12; 48]),
             }),
-            path: Some("m/44'/60'/0'/0/0".to_string()),
+            path: "m/44'/60'/0'/0/0".to_string(),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 4,
         };
@@ -272,12 +271,12 @@ mod tests {
             },
             description: "".to_string(),
             public_key: None,
-            path: None,
+            path: "".to_string(),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 5,
         };
 
-        let keystore_as_string = r#"{"crypto":{"kdf":{"function":"argon2id","params":{"m":65536,"t":4,"p":2,"salt":"12345678"},"message":"90abcdef"},"cipher":{"function":"aes-256-gcm","params":{"iv":"aabbccdd","tag":"deadbeef"},"message":"11223344"},"keytype":{"function":"xmss-poseidon2-ots-seed","params":{"lifetime":100000,"activation_epoch":10},"message":""}},"description":"","uuid":"123e4567-e89b-12d3-a456-426614174000","version":5}"#;
+        let keystore_as_string = r#"{"crypto":{"kdf":{"function":"argon2id","params":{"m":65536,"t":4,"p":2,"salt":"12345678"},"message":"90abcdef"},"cipher":{"function":"aes-256-gcm","params":{"iv":"aabbccdd","tag":"deadbeef"},"message":"11223344"},"keytype":{"function":"xmss-poseidon2-ots-seed","params":{"lifetime":100000,"activation_epoch":10},"message":""}},"description":"","path":"","uuid":"123e4567-e89b-12d3-a456-426614174000","version":5}"#;
 
         let serialized = serde_json::to_string(&keystore).expect("Failed to serialize keystore");
         assert_eq!(serialized, keystore_as_string);
@@ -324,7 +323,7 @@ mod tests {
                     .expect("Failed to decode public_key"),
                 ),
             }),
-            path: Some("m/12381/3600/0/0/0".to_string()),
+            path: "m/12381/3600/0/0/0".to_string(),
             uuid: "8f6774f8-3b29-448f-b407-499fb1e98a20".to_string(),
             version: 4,
         };
@@ -370,7 +369,7 @@ mod tests {
             },
             description: "".to_string(),
             public_key: None,
-            path: None,
+            path: "".to_string(),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 5,
         };
