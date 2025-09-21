@@ -2,9 +2,11 @@ use std::{fs, path::Path};
 
 use alloy_primitives::B256;
 use anyhow::{Result, anyhow, ensure};
+use rand;
 use ream_bls::{PrivateKey, PublicKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 use crate::{decrypt::aes128_ctr, hex_serde, pbkdf2::pbkdf2, scrypt::scrypt};
 
@@ -82,6 +84,51 @@ impl EncryptedKeystore {
             public_key,
             private_key,
         })
+    }
+}
+
+impl EncryptedKeystore<CryptoV5> {
+    /// Create a new keystore from seed phrase and key parameters
+    pub fn from_seed_phrase(
+        seed_phrase: &str,
+        lifetime: u32,
+        activation_epoch: u32,
+        description: Option<String>,
+        path: Option<String>,
+    ) -> Self {
+        EncryptedKeystore {
+            crypto: CryptoV5 {
+                kdf: FunctionBlock {
+                    params: KdfParams::Argon2Id {
+                        m: 65536,
+                        t: 4,
+                        p: 2,
+                        salt: rand::random::<[u8; 32]>().to_vec(),
+                    },
+                    message: vec![], // Empty message
+                },
+                cipher: FunctionBlock {
+                    params: CipherParams::Aes256Gcm {
+                        iv: rand::random::<[u8; 12]>().to_vec(),
+                        tag: rand::random::<[u8; 16]>().to_vec(),
+                    },
+                    // TODO: actually encrypt the seed phrase
+                    message: seed_phrase.as_bytes().to_vec(),
+                },
+                keytype: FunctionBlock {
+                    params: KeyTypeParams::XmssPoseidon2OtsSeed {
+                        lifetime,
+                        activation_epoch,
+                    },
+                    message: vec![],
+                },
+            },
+            description: description.unwrap_or_default(),
+            public_key: None,
+            path: path.unwrap_or_default(),
+            uuid: Uuid::new_v4().to_string(),
+            version: 5,
+        }
     }
 }
 
