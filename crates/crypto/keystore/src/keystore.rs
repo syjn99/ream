@@ -35,22 +35,7 @@ impl EncryptedKeystore {
     }
 
     pub fn validate_password(&self, password: &[u8]) -> anyhow::Result<bool> {
-        let derived_key = match &self.crypto.kdf.params {
-            KdfParams::Pbkdf2 {
-                c,
-                dklen,
-                prf: _,
-                salt,
-            } => pbkdf2(password, salt, *c, *dklen)?,
-            KdfParams::Scrypt {
-                n,
-                p,
-                r,
-                dklen,
-                salt,
-            } => scrypt(password, salt, *n, *p, *r, *dklen)?,
-            KdfParams::Argon2Id { .. } => todo!(),
-        };
+        let derived_key = self.crypto.kdf.params.derive_key(password)?;
         let derived_key_slice = &derived_key[16..32];
         let pre_image = [derived_key_slice, &self.crypto.cipher.message].concat();
         let checksum = Sha256::digest(&pre_image);
@@ -59,22 +44,7 @@ impl EncryptedKeystore {
     }
 
     pub fn decrypt(&self, password: &[u8]) -> anyhow::Result<Keystore> {
-        let derived_key = match &self.crypto.kdf.params {
-            KdfParams::Pbkdf2 {
-                c,
-                dklen,
-                prf: _,
-                salt,
-            } => pbkdf2(password, salt, *c, *dklen)?,
-            KdfParams::Scrypt {
-                n,
-                p,
-                r,
-                dklen,
-                salt,
-            } => scrypt(password, salt, *n, *p, *r, *dklen)?,
-            KdfParams::Argon2Id { .. } => todo!(),
-        };
+        let derived_key = self.crypto.kdf.params.derive_key(password)?;
         let derived_key_slice = &derived_key[16..32];
         let pre_image = [derived_key_slice, &self.crypto.cipher.message].concat();
         let checksum = Sha256::digest(&pre_image);
@@ -152,6 +122,27 @@ pub enum KdfParams {
         #[serde(with = "hex_serde")]
         salt: Vec<u8>,
     },
+}
+
+impl KdfParams {
+    pub fn derive_key(&self, password: &[u8]) -> anyhow::Result<Vec<u8>> {
+        match self {
+            KdfParams::Pbkdf2 {
+                c,
+                dklen,
+                prf: _,
+                salt,
+            } => pbkdf2(password, salt, *c, *dklen),
+            KdfParams::Scrypt {
+                n,
+                p,
+                r,
+                dklen,
+                salt,
+            } => scrypt(password, salt, *n, *p, *r, *dklen),
+            KdfParams::Argon2Id { .. } => todo!(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
