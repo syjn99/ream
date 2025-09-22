@@ -381,7 +381,7 @@ mod tests {
     #[test]
     fn test_deserialization_v5() {
         let keystore_result =
-            EncryptedKeystore::load_from_file("./assets/PostQuantumKeystore.json");
+            EncryptedKeystore::load_from_file("./assets/PostQuantumTestKeystore.json");
         let keystore_deserialized = keystore_result.expect("Failed to deserialize keystore");
 
         let keystore = EncryptedKeystore {
