@@ -23,9 +23,7 @@ use ream::cli::{
     validator_node::ValidatorNodeConfig,
     voluntary_exit::VoluntaryExitConfig,
 };
-use ream_account_manager::{
-    keystore::Keystore, message_types::MessageType, seed::derive_seed_with_user_input,
-};
+use ream_account_manager::{message_types::MessageType, seed::derive_seed_with_user_input};
 use ream_api_types_beacon::id::ValidatorID;
 use ream_api_types_common::id::ID;
 use ream_chain_lean::{
@@ -37,6 +35,7 @@ use ream_consensus_misc::{
     constants::beacon::set_genesis_validator_root, misc::compute_epoch_at_slot,
 };
 use ream_executor::ReamExecutor;
+use ream_keystore::keystore::EncryptedKeystore;
 use ream_network_manager::service::NetworkManagerService;
 use ream_network_spec::networks::{
     beacon_network_spec, set_beacon_network_spec, set_lean_network_spec,
@@ -459,7 +458,7 @@ pub async fn run_account_manager(config: AccountManagerConfig, ream_dir: PathBuf
         );
 
         // Create keystore file using Keystore
-        let keystore = Keystore::from_seed_phrase(
+        let keystore = EncryptedKeystore::from_seed_phrase(
             &seed_phrase,
             config.lifetime,
             config.activation_epoch,
