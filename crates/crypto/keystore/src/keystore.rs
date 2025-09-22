@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::fs;
 
 use alloy_primitives::B256;
 use anyhow::{Result, anyhow, ensure};
@@ -11,11 +11,11 @@ use uuid::Uuid;
 use crate::{decrypt::aes128_ctr, hex_serde, pbkdf2::pbkdf2, scrypt::scrypt};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct EncryptedKeystore<C = CryptoV4> {
+pub struct EncryptedKeystore<P = PublicKey, C = CryptoV4> {
     pub crypto: C,
     pub description: String,
-    #[serde(rename = "pubkey", skip_serializing_if = "Option::is_none")]
-    pub public_key: Option<PublicKey>,
+    #[serde(rename = "pubkey")]
+    pub public_key: P,
     pub path: String,
     pub uuid: String,
     pub version: u64,
@@ -26,15 +26,16 @@ pub struct Keystore {
     pub private_key: PrivateKey,
 }
 
-impl<C> EncryptedKeystore<C>
+impl<P, C> EncryptedKeystore<P, C>
 where
+    P: for<'de> Deserialize<'de> + Serialize,
     C: for<'de> Deserialize<'de> + Serialize,
 {
-    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn load_from_file<Path: AsRef<std::path::Path>>(path: Path) -> Result<Self> {
         Ok(serde_json::from_str(fs::read_to_string(path)?.as_str())?)
     }
 
-    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn save_to_file<Path: AsRef<std::path::Path>>(&self, path: Path) -> Result<()> {
         fs::write(path, serde_json::to_string(self)?)?;
         Ok(())
     }
@@ -60,11 +61,6 @@ impl EncryptedKeystore {
             "Password provided is invalid!"
         );
 
-        let public_key = self
-            .public_key
-            .clone()
-            .ok_or_else(|| anyhow!("No public key found in keystore"))?;
-
         let mut private_key = PrivateKey {
             inner: B256::from_slice(self.crypto.cipher.message.as_slice()),
         };
@@ -81,13 +77,13 @@ impl EncryptedKeystore {
             CipherParams::Aes256Gcm { .. } => todo!(),
         };
         Ok(Keystore {
-            public_key,
+            public_key: self.public_key.clone(),
             private_key,
         })
     }
 }
 
-impl EncryptedKeystore<CryptoV5> {
+impl EncryptedKeystore<PublicKey, CryptoV5> {
     /// Create a new keystore from seed phrase and key parameters
     pub fn from_seed_phrase(
         seed_phrase: &str,
@@ -124,7 +120,8 @@ impl EncryptedKeystore<CryptoV5> {
                 },
             },
             description: description.unwrap_or_default(),
-            public_key: None,
+            // TODO: derive the public key from the seed phrase
+            public_key: PublicKey::default(),
             path: path.unwrap_or_default(),
             uuid: Uuid::new_v4().to_string(),
             version: 5,
@@ -274,9 +271,9 @@ mod tests {
                 },
             },
             description: "Test Keystore".to_string(),
-            public_key: Some(PublicKey {
+            public_key: PublicKey {
                 inner: FixedVector::from(vec![0x12; 48]),
-            }),
+            },
             path: "m/44'/60'/0'/0/0".to_string(),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 4,
@@ -317,13 +314,15 @@ mod tests {
                 },
             },
             description: "".to_string(),
-            public_key: None,
+            public_key: PublicKey {
+                inner: FixedVector::from(vec![0x12; 48]),
+            },
             path: "".to_string(),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 5,
         };
 
-        let keystore_as_string = r#"{"crypto":{"kdf":{"function":"argon2id","params":{"m":65536,"t":4,"p":2,"salt":"12345678"},"message":"90abcdef"},"cipher":{"function":"aes-256-gcm","params":{"iv":"aabbccdd","tag":"deadbeef"},"message":"11223344"},"keytype":{"function":"xmss-poseidon2-ots-seed","params":{"lifetime":100000,"activation_epoch":10},"message":""}},"description":"","path":"","uuid":"123e4567-e89b-12d3-a456-426614174000","version":5}"#;
+        let keystore_as_string = r#"{"crypto":{"kdf":{"function":"argon2id","params":{"m":65536,"t":4,"p":2,"salt":"12345678"},"message":"90abcdef"},"cipher":{"function":"aes-256-gcm","params":{"iv":"aabbccdd","tag":"deadbeef"},"message":"11223344"},"keytype":{"function":"xmss-poseidon2-ots-seed","params":{"lifetime":100000,"activation_epoch":10},"message":""}},"description":"","pubkey":"0x121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212","path":"","uuid":"123e4567-e89b-12d3-a456-426614174000","version":5}"#;
 
         let serialized = serde_json::to_string(&keystore).expect("Failed to serialize keystore");
         assert_eq!(serialized, keystore_as_string);
@@ -362,14 +361,14 @@ mod tests {
                 },
             },
             description: "".to_string(),
-            public_key: Some(PublicKey {
+            public_key: PublicKey {
                 inner: FixedVector::from(
                     hex::decode(
                         "b69dfa082ca75d4e50ed4da8fa07d550ba9ec4019815409f42a98b79861d7ad96633a2476594b94c8a6e3048e1b2623e",
                     )
                     .expect("Failed to decode public_key"),
                 ),
-            }),
+            },
             path: "m/12381/3600/0/0/0".to_string(),
             uuid: "8f6774f8-3b29-448f-b407-499fb1e98a20".to_string(),
             version: 4,
@@ -380,8 +379,9 @@ mod tests {
 
     #[test]
     fn test_deserialization_v5() {
-        let keystore_result =
-            EncryptedKeystore::load_from_file("./assets/PostQuantumTestKeystore.json");
+        let keystore_result = EncryptedKeystore::<PublicKey, CryptoV5>::load_from_file(
+            "./assets/PostQuantumTestKeystore.json",
+        );
         let keystore_deserialized = keystore_result.expect("Failed to deserialize keystore");
 
         let keystore = EncryptedKeystore {
@@ -415,7 +415,14 @@ mod tests {
                 },
             },
             description: "".to_string(),
-            public_key: None,
+            public_key: PublicKey {
+                inner: FixedVector::from(
+                    hex::decode(
+                        "b69dfa082ca75d4e50ed4da8fa07d550ba9ec4019815409f42a98b79861d7ad96633a2476594b94c8a6e3048e1b2623e",
+                    )
+                    .expect("Failed to decode public_key"),
+                ),
+            },
             path: "".to_string(),
             uuid: "123e4567-e89b-12d3-a456-426614174000".to_string(),
             version: 5,
