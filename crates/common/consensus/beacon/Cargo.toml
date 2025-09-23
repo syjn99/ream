@@ -13,6 +13,9 @@ version.workspace = true
 zkvm = []
 test_consensus = []
 
+[lints]
+workspace = true
+
 [dependencies]
 alloy-consensus.workspace = true
 alloy-primitives.workspace = true

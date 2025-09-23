@@ -15,6 +15,9 @@ default = ["signature-scheme-prod"]
 signature-scheme-prod = []
 signature-scheme-test = []
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 ethereum_ssz.workspace = true
