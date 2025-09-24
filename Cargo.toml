@@ -63,6 +63,7 @@ version = "0.1.0"
 
 [workspace.lints.clippy]
 uninlined_format_args = "warn"
+wildcard_imports = "warn"
 
 [workspace.dependencies]
 actix-web = "4.10.2"
