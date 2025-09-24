@@ -1,3 +1,4 @@
+#[allow(clippy::unwrap_used)]
 mod tests {
     const PATH_TO_TEST_DATA_FOLDER: &str = "./tests";
     use std::{path::PathBuf, str::FromStr};
@@ -77,7 +78,7 @@ mod tests {
         (beacon_chain, cached_db, block_root)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::unwrap_used)]
     pub async fn insert_mock_data(
         db: &mut BeaconDB,
         ancestor_beacon_block: SignedBeaconBlock,
