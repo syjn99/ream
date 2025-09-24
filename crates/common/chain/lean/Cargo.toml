@@ -25,3 +25,6 @@ ream-metrics.workspace = true
 ream-network-spec.workspace = true
 ream-storage.workspace = true
 ream-sync.workspace = true
+
+[lints]
+workspace = true

@@ -159,7 +159,7 @@ impl LeanNetworkService {
             let config = Config::with_executor(Executor(executor))
                 .with_notify_handler_buffer_size(NonZeroUsize::new(7).expect("Not zero"))
                 .with_per_connection_event_buffer_size(4)
-                .with_dial_concurrency_factor(NonZeroU8::new(1).unwrap());
+                .with_dial_concurrency_factor(NonZeroU8::new(1).expect("Not zero"));
 
             SwarmBuilder::with_existing_identity(local_key.clone())
                 .with_tokio()

@@ -403,9 +403,8 @@ impl Store {
         }
 
         // Calculate proposer score if ``proposer_boost_root`` is set
-        let mut proposer_score: u64 = 0;
         // Boost is applied if ``root`` is an ancestor of ``proposer_boost_root``
-        if self.get_ancestor(
+        let proposer_score = if self.get_ancestor(
             self.db.proposer_boost_root_provider().get()?,
             self.db
                 .beacon_block_provider()
@@ -415,8 +414,10 @@ impl Store {
                 .slot,
         )? == root
         {
-            proposer_score = self.get_proposer_score()?;
-        }
+            self.get_proposer_score()?
+        } else {
+            0
+        };
 
         Ok(attestation_score + proposer_score)
     }

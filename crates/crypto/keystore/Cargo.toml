@@ -22,3 +22,6 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # ream dependencies
 ream-bls.workspace = true
+
+[lints]
+workspace = true

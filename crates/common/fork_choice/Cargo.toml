@@ -40,3 +40,6 @@ ream-network-spec.workspace = true
 ream-operation-pool.workspace = true
 ream-polynomial-commitments.workspace = true
 ream-storage.workspace = true
+
+[lints]
+workspace = true

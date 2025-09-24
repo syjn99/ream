@@ -43,3 +43,6 @@ ream-operation-pool.workspace = true
 ream-p2p.workspace = true
 ream-rpc-common.workspace = true
 ream-storage.workspace = true
+
+[lints]
+workspace = true
