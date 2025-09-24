@@ -9,11 +9,11 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 
 [build-dependencies]
 vergen = { version = "9.0", features = ["build", "cargo", "emit_and_set", "rustc"] }
 vergen-git2 = "1.0"
+
+[lints]
+workspace = true

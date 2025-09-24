@@ -14,9 +14,6 @@ version.workspace = true
 name = "ream"
 path = "src/main.rs"
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-primitives.workspace = true
 anyhow.workspace = true
@@ -59,3 +56,6 @@ ream-storage.workspace = true
 ream-sync.workspace = true
 ream-validator-beacon.workspace = true
 ream-validator-lean.workspace = true
+
+[lints]
+workspace = true

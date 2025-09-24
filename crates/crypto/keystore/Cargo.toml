@@ -9,9 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 aes.workspace = true
 alloy-primitives.workspace = true
@@ -25,3 +22,6 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # ream dependencies
 ream-bls.workspace = true
+
+[lints]
+workspace = true

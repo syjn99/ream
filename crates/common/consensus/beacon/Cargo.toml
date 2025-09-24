@@ -13,9 +13,6 @@ version.workspace = true
 zkvm = []
 test_consensus = []
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-consensus.workspace = true
 alloy-primitives.workspace = true
@@ -43,3 +40,6 @@ ream-bls.workspace = true
 ream-consensus-misc.workspace = true
 ream-merkle.workspace = true
 ream-network-spec.workspace = true
+
+[lints]
+workspace = true

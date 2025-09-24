@@ -9,9 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-primitives.workspace = true
 alloy-rpc-types-beacon.workspace = true
@@ -43,3 +40,6 @@ ream-execution-engine.workspace = true
 ream-executor.workspace = true
 ream-keystore.workspace = true
 ream-network-spec.workspace = true
+
+[lints]
+workspace = true

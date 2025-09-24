@@ -9,9 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-primitives.workspace = true
 anyhow.workspace = true
@@ -31,4 +28,7 @@ ream-network-manager = { workspace = true, features = ["disable_ancestor_validat
 ream-network-spec.workspace = true
 ream-operation-pool.workspace = true
 ream-storage.workspace = true
+
+[lints]
+workspace = true
 

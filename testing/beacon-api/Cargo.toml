@@ -9,9 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-primitives.workspace = true
 anyhow.workspace = true
@@ -25,3 +22,6 @@ tokio.workspace = true
 # ream
 ream-consensus-beacon.workspace = true
 ream-consensus-misc.workspace = true
+
+[lints]
+workspace = true

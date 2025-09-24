@@ -13,9 +13,6 @@ version.workspace = true
 default = []
 disable_ancestor_validation = []
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-primitives.workspace = true
 anyhow.workspace = true
@@ -44,3 +41,6 @@ ream-polynomial-commitments.workspace = true
 ream-storage.workspace = true
 ream-syncer.workspace = true
 ream-validator-beacon.workspace = true
+
+[lints]
+workspace = true

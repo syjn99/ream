@@ -9,9 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 alloy-primitives.workspace = true
 alloy-rlp.workspace = true
@@ -29,3 +26,6 @@ tracing.workspace = true
 # ream dependencies
 ream-consensus-misc.workspace = true
 ream-network-spec.workspace = true
+
+[lints]
+workspace = true

@@ -9,11 +9,11 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 actix-web.workspace = true
 alloy-primitives.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -9,10 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-
-[lints]
-workspace = true
-
 [dependencies]
 actix-web.workspace = true
 actix-web-lab.workspace = true
@@ -47,3 +43,6 @@ ream-operation-pool.workspace = true
 ream-p2p.workspace = true
 ream-rpc-common.workspace = true
 ream-storage.workspace = true
+
+[lints]
+workspace = true
