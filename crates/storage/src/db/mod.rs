@@ -28,8 +28,9 @@ use crate::{
             unrealized_justified_checkpoint::UNREALIZED_JUSTIFED_CHECKPOINT_FIELD,
         },
         lean::{
-            lean_block::LEAN_BLOCK_TABLE, lean_state::LEAN_STATE_TABLE,
-            slot_index::LEAN_SLOT_INDEX_TABLE, state_root_index::LEAN_STATE_ROOT_INDEX_TABLE,
+            latest_justified::LATEST_JUSTIFIED_FIELD, lean_block::LEAN_BLOCK_TABLE,
+            lean_state::LEAN_STATE_TABLE, slot_index::LEAN_SLOT_INDEX_TABLE,
+            state_root_index::LEAN_STATE_ROOT_INDEX_TABLE,
         },
     },
 };
@@ -92,6 +93,7 @@ impl ReamDB {
     pub fn init_lean_db(&self) -> Result<LeanDB, StoreError> {
         let write_txn = self.db.begin_write()?;
 
+        write_txn.open_table(LATEST_JUSTIFIED_FIELD)?;
         write_txn.open_table(LEAN_BLOCK_TABLE)?;
         write_txn.open_table(LEAN_STATE_TABLE)?;
         write_txn.open_table(LEAN_SLOT_INDEX_TABLE)?;

@@ -1,4 +1,5 @@
 pub mod known_votes;
+pub mod latest_justified;
 pub mod lean_block;
 pub mod lean_state;
 pub mod slot_index;
