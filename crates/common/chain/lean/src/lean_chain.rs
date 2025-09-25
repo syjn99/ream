@@ -170,6 +170,59 @@ impl LeanChain {
         Ok(())
     }
 
+    /// Calculate target checkpoint for validator votes.
+    /// Determines appropriate attestation target based on head, safe target,
+    /// and finalization constraints.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/f8e8d271d8b8b6513d34c78692aff47438d6fa18/src/lean_spec/subspecs/forkchoice/store.py#L341-L366>
+    pub async fn get_vote_target(&self) -> anyhow::Result<Checkpoint> {
+        let lean_block_provider = {
+            let db = self.store.lock().await;
+            db.lean_block_provider()
+        };
+
+        // Start from current head
+        let mut target_block = lean_block_provider
+            .get(self.head)?
+            .ok_or_else(|| anyhow!("Block not found in chain for head: {}", self.head))?;
+
+        // Walk back up to 3 steps if safe target is newer
+        for _ in 0..3 {
+            let safe_target_block =
+                lean_block_provider.get(self.safe_target)?.ok_or_else(|| {
+                    anyhow!("Block not found for safe target hash: {}", self.safe_target)
+                })?;
+            if target_block.message.slot > safe_target_block.message.slot {
+                target_block = lean_block_provider
+                    .get(target_block.message.parent_root)?
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "Block not found for target block's parent hash: {}",
+                            target_block.message.parent_root
+                        )
+                    })?;
+            }
+        }
+
+        // Ensure target is in justifiable slot range
+        while !is_justifiable_slot(&self.latest_finalized.slot, &target_block.message.slot) {
+            target_block = lean_block_provider
+                .get(target_block.message.parent_root)?
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Block not found for target block's parent hash: {}",
+                        target_block.message.parent_root
+                    )
+                })?;
+        }
+
+        Ok(Checkpoint {
+            root: target_block.message.tree_hash_root(),
+            slot: target_block.message.slot,
+        })
+    }
+
     pub async fn propose_block(&self, slot: u64) -> anyhow::Result<Block> {
         let initialize_block_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["initialize_block"]);
 
@@ -237,66 +290,22 @@ impl LeanChain {
     }
 
     pub async fn build_vote(&self, slot: u64) -> anyhow::Result<Vote> {
-        let (lean_block_provider, lean_state_provider) = {
-            let db = self.store.lock().await;
-            (db.lean_block_provider(), db.lean_state_provider())
-        };
-
-        let state = lean_state_provider
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("Post state not found for head: {}", self.head))?;
-
-        let mut target_block = lean_block_provider
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("Block not found in chain for head: {}", self.head))?;
-
-        // If there is no very recent safe target, then vote for the k'th ancestor
-        // of the head
-        for _ in 0..3 {
-            let safe_target_block =
-                lean_block_provider.get(self.safe_target)?.ok_or_else(|| {
-                    anyhow!("Block not found for safe target hash: {}", self.safe_target)
-                })?;
-            if target_block.message.slot > safe_target_block.message.slot {
-                target_block = lean_block_provider
-                    .get(target_block.message.parent_root)?
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "Block not found for target block's parent hash: {}",
-                            target_block.message.parent_root
-                        )
-                    })?;
-            }
-        }
-
-        // If the latest finalized slot is very far back, then only some slots are
-        // valid to justify, make sure the target is one of those
-        while !is_justifiable_slot(&state.latest_finalized.slot, &target_block.message.slot) {
-            target_block = lean_block_provider
-                .get(target_block.message.parent_root)?
-                .ok_or_else(|| {
-                    anyhow!(
-                        "Block not found for target block's parent hash: {}",
-                        target_block.message.parent_root
-                    )
-                })?;
-        }
-
-        let head_block = lean_block_provider
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?;
-
         Ok(Vote {
             slot,
             head: Checkpoint {
                 root: self.head,
-                slot: head_block.message.slot,
+                slot: self
+                    .store
+                    .lock()
+                    .await
+                    .lean_block_provider()
+                    .get(self.head)?
+                    .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?
+                    .message
+                    .slot,
             },
-            target: Checkpoint {
-                root: target_block.message.tree_hash_root(),
-                slot: target_block.message.slot,
-            },
-            source: state.latest_justified.clone(),
+            target: self.get_vote_target().await?,
+            source: self.get_latest_justified_checkpoint().await?,
         })
     }
 }
