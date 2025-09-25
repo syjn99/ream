@@ -42,8 +42,6 @@ pub struct LeanChain {
     pub safe_target: B256,
     /// Head of the chain.
     pub head: B256,
-    /// The highest-slot known finalized checkpoint.
-    pub latest_finalized: Checkpoint,
 }
 
 impl LeanChain {
@@ -56,6 +54,9 @@ impl LeanChain {
         db.lean_state_provider()
             .insert(genesis_block_hash, genesis_state.clone())
             .expect("Failed to insert genesis state");
+        db.latest_finalized_provider()
+            .insert(genesis_state.latest_finalized.clone())
+            .expect("Failed to insert latest finalized checkpoint");
         db.latest_justified_provider()
             .insert(genesis_state.latest_justified.clone())
             .expect("Failed to insert latest justified checkpoint");
@@ -67,7 +68,6 @@ impl LeanChain {
             num_validators: no_of_validators,
             safe_target: genesis_block_hash,
             head: genesis_block_hash,
-            latest_finalized: genesis_state.latest_finalized,
         }
     }
 
@@ -158,14 +158,35 @@ impl LeanChain {
 
     /// Done upon processing new votes or a new block
     pub async fn update_head(&mut self) -> anyhow::Result<()> {
-        let latest_justified = self.get_latest_justified_checkpoint().await?;
-        let votes = {
-            let db = self.store.lock().await;
-            db.known_votes_provider().get_all_votes()?
-        };
+        // Update head.
+        self.head = get_fork_choice_head(
+            self.store.clone(),
+            &self
+                .store
+                .lock()
+                .await
+                .known_votes_provider()
+                .get_all_votes()?,
+            &self.get_latest_justified_checkpoint().await?.root,
+            0,
+        )
+        .await?;
 
-        self.head =
-            get_fork_choice_head(self.store.clone(), &votes, &latest_justified.root, 0).await?;
+        // Update latest finalized checkpoint in DB.
+        let latest_finalized_checkpoint = self
+            .store
+            .lock()
+            .await
+            .lean_state_provider()
+            .get(self.head)?
+            .ok_or_else(|| anyhow!("State not found in chain for head: {}", self.head))?
+            .latest_finalized
+            .clone();
+        self.store
+            .lock()
+            .await
+            .latest_finalized_provider()
+            .insert(latest_finalized_checkpoint.clone())?;
 
         Ok(())
     }
@@ -206,7 +227,14 @@ impl LeanChain {
         }
 
         // Ensure target is in justifiable slot range
-        while !is_justifiable_slot(self.latest_finalized.slot, target_block.message.slot) {
+        let finalized_slot = self
+            .store
+            .lock()
+            .await
+            .latest_finalized_provider()
+            .get()?
+            .slot;
+        while !is_justifiable_slot(finalized_slot, target_block.message.slot) {
             target_block = lean_block_provider
                 .get(target_block.message.parent_root)?
                 .ok_or_else(|| {
