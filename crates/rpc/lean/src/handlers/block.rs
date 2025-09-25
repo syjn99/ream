@@ -26,21 +26,24 @@ pub async fn get_block_by_id(
     lean_chain: Data<LeanChainReader>,
 ) -> Result<Option<Block>, ApiError> {
     let lean_chain = lean_chain.read().await;
-    let block_root =
-        match block_id {
-            ID::Finalized => lean_chain.latest_finalized_hash().await.map_err(|err| {
-                ApiError::InternalError(format!("No latest finalized hash: {err:?}"))
-            }),
-            ID::Genesis => Ok(lean_chain.genesis_hash),
-            ID::Head => Ok(lean_chain.head),
-            ID::Justified => lean_chain.latest_justified_hash().await.map_err(|err| {
-                ApiError::InternalError(format!("No latest justified hash: {err:?}"))
-            }),
-            ID::Slot(slot) => lean_chain.get_block_id_by_slot(slot).await.map_err(|err| {
-                ApiError::InternalError(format!("No block for slot {slot}: {err:?}"))
-            }),
-            ID::Root(root) => Ok(root),
-        };
+    let block_root = match block_id {
+        ID::Finalized => lean_chain
+            .latest_finalized_hash()
+            .await
+            .map_err(|err| ApiError::InternalError(format!("No latest finalized hash: {err:?}"))),
+        ID::Genesis => Ok(lean_chain.genesis_hash),
+        ID::Head => Ok(lean_chain.head),
+        ID::Justified => lean_chain
+            .get_latest_justified_checkpoint()
+            .await
+            .map(|checkpoint| checkpoint.root)
+            .map_err(|err| ApiError::InternalError(format!("No latest justified hash: {err:?}"))),
+        ID::Slot(slot) => lean_chain
+            .get_block_id_by_slot(slot)
+            .await
+            .map_err(|err| ApiError::InternalError(format!("No block for slot {slot}: {err:?}"))),
+        ID::Root(root) => Ok(root),
+    };
 
     let provider = lean_chain.store.clone().lock().await.lean_block_provider();
     provider

@@ -42,8 +42,6 @@ pub struct LeanChain {
     pub safe_target: B256,
     /// Head of the chain.
     pub head: B256,
-    /// The highest-slot known justified checkpoint.
-    pub latest_justified: Checkpoint,
     /// The highest-slot known finalized checkpoint.
     pub latest_finalized: Checkpoint,
 }
@@ -69,19 +67,17 @@ impl LeanChain {
             num_validators: no_of_validators,
             safe_target: genesis_block_hash,
             head: genesis_block_hash,
-            latest_justified: genesis_state.latest_justified,
             latest_finalized: genesis_state.latest_finalized,
         }
     }
 
-    pub async fn latest_justified_hash(&self) -> anyhow::Result<B256> {
-        self.store
-            .lock()
-            .await
-            .lean_state_provider()
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("State not found in chain for head: {}", self.head))
-            .map(|state| state.latest_justified.root)
+    /// Get the latest justified checkpoint from the database, which is the highest-slot known
+    /// justified checkpoint.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/f8e8d271d8b8b6513d34c78692aff47438d6fa18/src/lean_spec/subspecs/forkchoice/helpers.py#L69-L86>
+    pub async fn get_latest_justified_checkpoint(&self) -> anyhow::Result<Checkpoint> {
+        Ok(self.store.lock().await.latest_justified_provider().get()?)
     }
 
     pub async fn get_block_id_by_slot(&self, slot: u64) -> anyhow::Result<B256> {
@@ -120,7 +116,7 @@ impl LeanChain {
 
     /// Compute the latest block that the staker is allowed to choose as the target
     pub async fn compute_safe_target(&self) -> anyhow::Result<B256> {
-        let justified_hash = self.latest_justified_hash().await?;
+        let justified_hash = self.get_latest_justified_checkpoint().await?.root;
 
         get_fork_choice_head(
             self.store.clone(),
@@ -154,14 +150,14 @@ impl LeanChain {
 
     /// Done upon processing new votes or a new block
     pub async fn recompute_head(&mut self) -> anyhow::Result<()> {
-        let justified_hash = self.latest_justified_hash().await?;
-        let known_votes_provider = {
+        let latest_justified = self.get_latest_justified_checkpoint().await?;
+        let votes = {
             let db = self.store.lock().await;
-            db.known_votes_provider()
+            db.known_votes_provider().get_all_votes()?
         };
 
-        let votes = known_votes_provider.get_all_votes()?;
-        self.head = get_fork_choice_head(self.store.clone(), &votes, &justified_hash, 0).await?;
+        self.head =
+            get_fork_choice_head(self.store.clone(), &votes, &latest_justified.root, 0).await?;
 
         Ok(())
     }
