@@ -71,15 +71,6 @@ impl LeanChain {
         }
     }
 
-    /// Get the latest justified checkpoint from the database, which is the highest-slot known
-    /// justified checkpoint.
-    ///
-    /// See lean specification:
-    /// <https://github.com/leanEthereum/leanSpec/blob/f8e8d271d8b8b6513d34c78692aff47438d6fa18/src/lean_spec/subspecs/forkchoice/helpers.py#L69-L86>
-    pub async fn get_latest_justified_checkpoint(&self) -> anyhow::Result<Checkpoint> {
-        Ok(self.store.lock().await.latest_justified_provider().get()?)
-    }
-
     pub async fn get_block_id_by_slot(&self, slot: u64) -> anyhow::Result<B256> {
         self.store
             .lock()
@@ -102,16 +93,6 @@ impl LeanChain {
         lean_block_provider
             .get(block_hash)?
             .ok_or_else(|| anyhow!("Block not found in chain for head: {}", self.head))
-    }
-
-    pub async fn latest_finalized_hash(&self) -> anyhow::Result<B256> {
-        self.store
-            .lock()
-            .await
-            .lean_state_provider()
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("State not found in chain for head: {}", self.head))
-            .map(|state| state.latest_finalized.root)
     }
 
     /// Compute the latest block that the validator is allowed to choose as the target

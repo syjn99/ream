@@ -5,7 +5,7 @@ use actix_web::{
 use ream_api_types_common::{error::ApiError, id::ID};
 use ream_chain_lean::lean_chain::LeanChainReader;
 use ream_consensus_lean::block::Block;
-use ream_storage::tables::table::Table;
+use ream_storage::tables::{field::Field, table::Table};
 
 // GET /lean/v0/blocks/{block_id}
 #[get("/blocks/{block_id}")]
@@ -28,14 +28,21 @@ pub async fn get_block_by_id(
     let lean_chain = lean_chain.read().await;
     let block_root = match block_id {
         ID::Finalized => lean_chain
-            .latest_finalized_hash()
+            .store
+            .lock()
             .await
+            .latest_finalized_provider()
+            .get()
+            .map(|checkpoint| checkpoint.root)
             .map_err(|err| ApiError::InternalError(format!("No latest finalized hash: {err:?}"))),
         ID::Genesis => Ok(lean_chain.genesis_hash),
         ID::Head => Ok(lean_chain.head),
         ID::Justified => lean_chain
-            .get_latest_justified_checkpoint()
+            .store
+            .lock()
             .await
+            .latest_justified_provider()
+            .get()
             .map(|checkpoint| checkpoint.root)
             .map_err(|err| ApiError::InternalError(format!("No latest justified hash: {err:?}"))),
         ID::Slot(slot) => lean_chain
