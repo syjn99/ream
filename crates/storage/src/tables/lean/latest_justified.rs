@@ -46,14 +46,3 @@ impl Field for LatestJustifiedField {
         Ok(())
     }
 }
-
-impl LatestJustifiedField {
-    /// Insert the checkpoint if its slot is greater than the currently stored one.
-    pub fn insert_if_greater(&self, checkpoint: Checkpoint) -> Result<(), StoreError> {
-        if self.get().ok().is_none_or(|c| checkpoint.slot > c.slot) {
-            self.insert(checkpoint)?;
-        }
-
-        Ok(())
-    }
-}

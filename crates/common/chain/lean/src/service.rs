@@ -7,7 +7,7 @@ use ream_consensus_lean::{
     vote::SignedVote,
 };
 use ream_network_spec::networks::lean_network_spec;
-use ream_storage::tables::table::Table;
+use ream_storage::tables::{field::Field, table::Table};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
 use tree_hash::TreeHash;
@@ -218,7 +218,7 @@ impl LeanChainService {
                         .insert(block_hash, signed_block.clone())?;
 
                     db.latest_justified_provider()
-                        .insert_if_greater(state.latest_justified.clone())?;
+                        .insert(state.latest_justified.clone())?;
                     db.lean_state_provider().insert(block_hash, state)?;
 
                     db.known_votes_provider().batch_append(votes_to_add)?;

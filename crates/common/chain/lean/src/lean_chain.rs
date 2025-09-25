@@ -18,7 +18,6 @@ use ream_storage::{
 };
 use ream_sync::rwlock::{Reader, Writer};
 use tokio::sync::Mutex;
-use tracing::info;
 use tree_hash::TreeHash;
 
 pub type LeanChainWriter = Writer<LeanChain>;
@@ -171,7 +170,11 @@ impl LeanChain {
             (
                 db.known_votes_provider().get_all_votes()?,
                 db.latest_justified_provider().get()?.root,
-                db.latest_finalized_provider().get()?,
+                db.lean_state_provider()
+                    .get(self.head)?
+                    .ok_or_else(|| anyhow!("State not found in chain for head: {}", self.head))?
+                    .latest_finalized
+                    .clone(),
             )
         };
 
