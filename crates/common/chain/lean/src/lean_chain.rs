@@ -114,17 +114,25 @@ impl LeanChain {
             .map(|state| state.latest_finalized.root)
     }
 
-    /// Compute the latest block that the staker is allowed to choose as the target
-    pub async fn compute_safe_target(&self) -> anyhow::Result<B256> {
-        let justified_hash = self.get_latest_justified_checkpoint().await?.root;
+    /// Compute the latest block that the validator is allowed to choose as the target
+    /// and update as a safe target.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/f8e8d271d8b8b6513d34c78692aff47438d6fa18/src/lean_spec/subspecs/forkchoice/store.py#L301-L317>
+    pub async fn update_safe_target(&mut self) -> anyhow::Result<()> {
+        // 2/3rd majority min voting weight for target selection
+        // Note that we use ceiling division here.
+        let min_target_score = (self.num_validators * 2).div_ceil(3);
 
-        get_fork_choice_head(
+        self.safe_target = get_fork_choice_head(
             self.store.clone(),
             &self.new_votes,
-            &justified_hash,
-            self.num_validators * 2 / 3,
+            &self.get_latest_justified_checkpoint().await?.root,
+            min_target_score,
         )
-        .await
+        .await?;
+
+        Ok(())
     }
 
     /// Process new votes that the staker has received. Vote processing is done

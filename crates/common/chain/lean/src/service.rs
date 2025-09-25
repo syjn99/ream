@@ -84,8 +84,7 @@ impl LeanChainService {
                             // Third tick (t=2/4): Compute the safe target.
                             let current_slot = get_current_slot();
                             info!("Computing safe target at slot {current_slot} (tick {tick_count})");
-                            let mut lean_chain = self.lean_chain.write().await;
-                            lean_chain.safe_target = lean_chain.compute_safe_target().await.expect("Failed to compute safe target");
+                            self.lean_chain.write().await.update_safe_target().await.expect("Failed to update safe target");
                         }
                         3 => {
                             // Fourth tick (t=3/4): Accept new votes.
