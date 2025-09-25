@@ -206,7 +206,7 @@ impl LeanChain {
         }
 
         // Ensure target is in justifiable slot range
-        while !is_justifiable_slot(&self.latest_finalized.slot, &target_block.message.slot) {
+        while !is_justifiable_slot(self.latest_finalized.slot, target_block.message.slot) {
             target_block = lean_block_provider
                 .get(target_block.message.parent_root)?
                 .ok_or_else(|| {

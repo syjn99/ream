@@ -361,7 +361,7 @@ impl LeanState {
                 continue;
             }
 
-            if !is_justifiable_slot(&self.latest_finalized.slot, &vote.target.slot) {
+            if !is_justifiable_slot(self.latest_finalized.slot, vote.target.slot) {
                 info!(
                     "Skipping vote. Target slot not justifiable: validator_id={}, source={:?}, target={:?}",
                     signed_vote.validator_id, vote.source, vote.target
@@ -412,7 +412,7 @@ impl LeanState {
                 // hash after the source
                 let is_target_next_valid_justifiable_slot = !((vote.source.slot + 1)
                     ..vote.target.slot)
-                    .any(|slot| is_justifiable_slot(&self.latest_finalized.slot, &slot));
+                    .any(|slot| is_justifiable_slot(self.latest_finalized.slot, slot));
 
                 if is_target_next_valid_justifiable_slot {
                     self.latest_finalized = vote.source.clone();
