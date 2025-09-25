@@ -11,6 +11,9 @@ use crate::{
 /// Table definition for the Latest Justified table
 ///
 /// Value: [Checkpoint]
+///
+/// NOTE: This table enables O(1) access to the latest justified checkpoint, deviates from
+/// the original spec which derives it from state dictionary each time it is needed.
 pub const LATEST_JUSTIFIED_FIELD: TableDefinition<&str, SSZEncoding<Checkpoint>> =
     TableDefinition::new("lean_latest_justified");
 
