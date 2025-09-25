@@ -39,6 +39,10 @@ pub struct LeanChain {
     pub safe_target: B256,
     /// Head of the chain.
     pub head: B256,
+    /// The highest-slot known justified checkpoint.
+    pub latest_justified: Checkpoint,
+    /// The highest-slot known finalized checkpoint.
+    pub latest_finalized: Checkpoint,
 }
 
 impl LeanChain {
@@ -49,7 +53,7 @@ impl LeanChain {
             .insert(genesis_block_hash, genesis_block)
             .expect("Failed to insert genesis block");
         db.lean_state_provider()
-            .insert(genesis_block_hash, genesis_state)
+            .insert(genesis_block_hash, genesis_state.clone())
             .expect("Failed to insert genesis state");
 
         LeanChain {
@@ -59,6 +63,8 @@ impl LeanChain {
             num_validators: no_of_validators,
             safe_target: genesis_block_hash,
             head: genesis_block_hash,
+            latest_justified: genesis_state.latest_justified,
+            latest_finalized: genesis_state.latest_finalized,
         }
     }
 

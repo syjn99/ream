@@ -425,6 +425,8 @@ mod tests {
             new_votes: Vec::new(),
             genesis_hash: B256::default(),
             num_validators: 0,
+            latest_justified: Default::default(),
+            latest_finalized: Default::default(),
         }
     }
 
