@@ -180,7 +180,7 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor, ream_
     let chain_service = LeanChainService::new(
         lean_chain_writer,
         chain_receiver,
-        chain_sender.clone(),
+        // chain_sender.clone(),
         outbound_p2p_sender,
     )
     .await;

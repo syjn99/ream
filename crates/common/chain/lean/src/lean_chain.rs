@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::{B256, FixedBytes};
 use anyhow::anyhow;
@@ -18,6 +18,7 @@ use ream_storage::{
 };
 use ream_sync::rwlock::{Reader, Writer};
 use tokio::sync::Mutex;
+use tracing::info;
 use tree_hash::TreeHash;
 
 pub type LeanChainWriter = Writer<LeanChain>;
@@ -32,7 +33,8 @@ pub struct LeanChain {
     /// Database.
     pub store: Arc<Mutex<LeanDB>>,
     /// Votes that we have received but not yet taken into account.
-    pub new_votes: Vec<SignedVote>,
+    /// Map from validator ID to vote.
+    pub latest_new_votes: HashMap<u64, SignedVote>,
     /// Initialize the chain with the genesis block.
     pub genesis_hash: B256,
     /// Number of validators.
@@ -63,7 +65,7 @@ impl LeanChain {
 
         LeanChain {
             store: Arc::new(Mutex::new(db)),
-            new_votes: Vec::new(),
+            latest_new_votes: HashMap::new(),
             genesis_hash: genesis_block_hash,
             num_validators: no_of_validators,
             safe_target: genesis_block_hash,
@@ -133,8 +135,8 @@ impl LeanChain {
 
         self.safe_target = get_fork_choice_head(
             self.store.clone(),
-            &self.new_votes,
             &latest_justified_root,
+            &self.latest_new_votes,
             min_target_score,
         )
         .await?;
@@ -149,15 +151,7 @@ impl LeanChain {
             let db = self.store.lock().await;
             db.known_votes_provider()
         };
-
-        let mut votes_to_be_inserted = Vec::new();
-        for new_vote in self.new_votes.drain(..) {
-            if !known_votes_provider.contains(&new_vote)? {
-                votes_to_be_inserted.push(new_vote);
-            }
-        }
-
-        known_votes_provider.batch_append(votes_to_be_inserted)?;
+        known_votes_provider.batch_append(self.latest_new_votes.drain())?;
 
         self.update_head().await?;
         Ok(())
@@ -180,7 +174,7 @@ impl LeanChain {
 
         // Update head.
         self.head =
-            get_fork_choice_head(self.store.clone(), &known_votes, &latest_justified_root, 0)
+            get_fork_choice_head(self.store.clone(), &latest_justified_root, &known_votes, 0)
                 .await?;
 
         // Update latest finalized checkpoint in DB.
@@ -314,15 +308,18 @@ impl LeanChain {
     pub async fn build_vote(&self, slot: u64) -> anyhow::Result<Vote> {
         let (head, target, source) = {
             let db = self.store.lock().await;
+            info!("LOCK AC...");
+            let slot = db
+                .lean_block_provider()
+                .get(self.head)?
+                .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?
+                .message
+                .slot;
+            info!("After slot...");
             (
                 Checkpoint {
                     root: self.head,
-                    slot: db
-                        .lean_block_provider()
-                        .get(self.head)?
-                        .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?
-                        .message
-                        .slot,
+                    slot,
                 },
                 self.get_vote_target(
                     &db.lean_block_provider(),

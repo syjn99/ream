@@ -1,10 +1,13 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
 use redb::{Database, Durability, ReadableTable, ReadableTableMetadata, TableDefinition};
 
-use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
+use crate::{
+    errors::StoreError,
+    tables::{ssz_encoder::SSZEncoding, table::Table},
+};
 
 /// Table definition for the Known Votes table
 ///
@@ -17,56 +20,49 @@ pub struct KnownVotesTable {
     pub db: Arc<Database>,
 }
 
-impl KnownVotesTable {
-    /// Append a vote to the end of the table.
-    /// Returns the index at which it was inserted.
-    pub fn append(&self, value: SignedVote) -> Result<(), StoreError> {
+impl Table for KnownVotesTable {
+    type Key = u64;
+
+    type Value = SignedVote;
+
+    fn get(&self, key: Self::Key) -> Result<Option<Self::Value>, StoreError> {
+        let read_txn = self.db.begin_read()?;
+
+        let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let result = table.get(key)?;
+        Ok(result.map(|res| res.value()))
+    }
+
+    fn insert(&self, key: Self::Key, value: Self::Value) -> Result<(), StoreError> {
         let mut write_txn = self.db.begin_write()?;
         write_txn.set_durability(Durability::Immediate);
-
         let mut table = write_txn.open_table(KNOWN_VOTES_TABLE)?;
-
-        // Compute next index
-        let next_index = match table.last()? {
-            Some((k, _)) => k.value() + 1,
-            None => 0,
-        };
-
-        table.insert(next_index, value)?;
-
+        table.insert(key, value)?;
         drop(table);
         write_txn.commit()?;
         Ok(())
     }
+}
 
+impl KnownVotesTable {
     /// Append multiple votes in a single transaction.
-    /// Returns the starting index of the first inserted vote.
     pub fn batch_append(
         &self,
-        values: impl IntoIterator<Item = SignedVote>,
-    ) -> Result<u64, StoreError> {
+        values: impl IntoIterator<Item = (u64, SignedVote)>,
+    ) -> Result<(), StoreError> {
         let mut write_txn = self.db.begin_write()?;
         write_txn.set_durability(Durability::Immediate);
 
         let mut table = write_txn.open_table(KNOWN_VOTES_TABLE)?;
 
-        // Find the next free index
-        let mut next_index = match table.last()? {
-            Some((k, _)) => k.value() + 1,
-            None => 0,
-        };
-
-        let start_index = next_index;
-
-        for value in values {
-            table.insert(next_index, value)?;
-            next_index += 1;
+        for (validator_id, signed_vote) in values {
+            table.insert(validator_id, signed_vote)?;
         }
 
         drop(table);
         write_txn.commit()?;
 
-        Ok(start_index)
+        Ok(())
     }
 
     /// Check if a given vote exists in the append-only array.
@@ -99,15 +95,15 @@ impl KnownVotesTable {
     }
 
     /// Get all votes.
-    pub fn get_all_votes(&self) -> Result<Vec<SignedVote>, StoreError> {
+    pub fn get_all_votes(&self) -> Result<HashMap<u64, SignedVote>, StoreError> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
 
-        let mut votes = Vec::with_capacity(table.len()? as usize);
+        let mut votes = HashMap::with_capacity(table.len()? as usize);
 
         for entry in table.iter()? {
-            let (_, v) = entry?;
-            votes.push(v.value());
+            let (k, v) = entry?;
+            votes.insert(k.value(), v.value());
         }
 
         Ok(votes)

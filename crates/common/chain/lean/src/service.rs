@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use alloy_primitives::{B256, FixedBytes};
+// use alloy_primitives::B256;
 use anyhow::anyhow;
 use ream_consensus_lean::{
     block::{Block, SignedBlock},
@@ -26,25 +26,25 @@ use crate::{
 pub struct LeanChainService {
     lean_chain: LeanChainWriter,
     receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
-    sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+    // sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     // Objects that we will process once we have processed their parents
-    dependencies: HashMap<B256, Vec<QueueItem>>,
+    // dependencies: HashMap<B256, Vec<QueueItem>>,
 }
 
 impl LeanChainService {
     pub async fn new(
         lean_chain: LeanChainWriter,
         receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
-        sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
+        // sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
         outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     ) -> Self {
         LeanChainService {
             lean_chain,
             receiver,
-            sender,
+            // sender,
             outbound_gossip,
-            dependencies: HashMap::new(),
+            // dependencies: HashMap::new(),
         }
     }
 
@@ -85,12 +85,14 @@ impl LeanChainService {
                             let current_slot = get_current_slot();
                             info!("Computing safe target at slot {current_slot} (tick {tick_count})");
                             self.lean_chain.write().await.update_safe_target().await.expect("Failed to update safe target");
+                            info!("Updated safe target!");
                         }
                         3 => {
                             // Fourth tick (t=3/4): Accept new votes.
                             let current_slot = get_current_slot();
                             info!("Accepting new votes at slot {current_slot} (tick {tick_count})");
                             self.lean_chain.write().await.accept_new_votes().await.expect("Failed to accept new votes");
+                            info!("Accepted new votes!");
                         }
                         _ => {
                             // Other ticks (t=0, t=1/4): Do nothing.
@@ -191,82 +193,110 @@ impl LeanChainService {
             return Ok(());
         }
 
-        let state = {
+        let parent_state = {
             let lean_chain = self.lean_chain.read().await;
-            lean_chain
-                .store
-                .lock()
-                .await
-                .lean_state_provider()
+            let db = lean_chain.store.lock().await;
+            db.lean_state_provider()
                 .get(signed_block.message.parent_root)?
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Parent state not found for block {:?}",
+                        signed_block.message.parent_root
+                    )
+                })?
         };
-        match state {
-            Some(parent_state) => {
-                let mut state = parent_state.clone();
-                state.state_transition(&signed_block, true, true)?;
+        //     .await
+        //     .lean_state_provider()
+        //     .get(signed_block.message.parent_root)?
+        //     .ok_or_else(|| {
+        //         anyhow::anyhow!(
+        //             "Parent state not found for block {:?}",
+        //             signed_block.message.parent_root
+        //         )
+        //     })?;
+        // }
 
-                let mut votes_to_add = Vec::new();
-                let mut lean_chain = self.lean_chain.write().await;
-                for vote in &signed_block.message.body.attestations {
-                    if !known_votes_provider.contains(vote)? {
-                        votes_to_add.push(vote.clone());
-                    }
-                }
-                {
-                    let db = lean_chain.store.lock().await;
-                    db.lean_block_provider()
-                        .insert(block_hash, signed_block.clone())?;
+        let mut state = parent_state.clone();
+        state.state_transition(&signed_block, true, true)?;
 
-                    db.latest_justified_provider()
-                        .insert(state.latest_justified.clone())?;
-                    db.lean_state_provider().insert(block_hash, state)?;
+        let mut lean_chain = self.lean_chain.write().await;
 
-                    db.known_votes_provider().batch_append(votes_to_add)?;
-                }
-
-                lean_chain.update_head().await?;
-
-                drop(lean_chain);
-
-                // Once we have received a block, also process all of its dependencies
-                // by sending them to this service itself.
-                // NOTE 1: As we already verified all QueueItems before appending them, we can trust
-                // their validity.
-                // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
-                // only.
-                if let Some(queue_items) = self.dependencies.remove(&block_hash) {
-                    for item in queue_items {
-                        let message = match item {
-                            QueueItem::Block(block) => LeanChainServiceMessage::ProcessBlock {
-                                signed_block: SignedBlock {
-                                    message: block,
-                                    signature: FixedBytes::default(),
-                                },
-                                is_trusted: true,
-                                need_gossip: false,
-                            },
-                            QueueItem::SignedVote(signed_vote) => {
-                                LeanChainServiceMessage::ProcessVote {
-                                    signed_vote: *signed_vote,
-                                    is_trusted: true,
-                                    need_gossip: false,
-                                }
-                            }
-                        };
-
-                        self.sender.send(message)?;
-                    }
-                }
+        let mut votes_to_add = Vec::new();
+        for signed_vote in &signed_block.message.body.attestations {
+            // Update latest known votes if this is latest
+            let latest_vote = known_votes_provider.get(signed_vote.validator_id)?;
+            if let Some(latest_vote) = latest_vote
+                && latest_vote.message.slot < signed_vote.message.slot
+            {
+                votes_to_add.push((signed_vote.validator_id, signed_vote.clone()));
+            } else {
+                votes_to_add.push((signed_vote.validator_id, signed_vote.clone()));
             }
-            None => {
-                // If we have not yet seen the block's parent, ignore for now,
-                // process later once we actually see the parent
-                self.dependencies
-                    .entry(signed_block.message.parent_root)
-                    .or_default()
-                    .push(QueueItem::Block(signed_block.message));
-            }
+
+            // Clear from new votes if this is latest
+            self.lean_chain
+                .write()
+                .await
+                .latest_new_votes
+                .retain(|validator_id, latest_vote| {
+                    validator_id != &signed_vote.validator_id
+                        || latest_vote.message.slot >= signed_vote.message.slot
+                });
         }
+        {
+            let db = lean_chain.store.lock().await;
+            db.lean_block_provider()
+                .insert(block_hash, signed_block.clone())?;
+
+            db.latest_justified_provider()
+                .insert(state.latest_justified.clone())?;
+            db.lean_state_provider().insert(block_hash, state)?;
+
+            db.known_votes_provider().batch_append(votes_to_add)?;
+        }
+
+        lean_chain.update_head().await?;
+
+        // drop(lean_chain);
+
+        // Once we have received a block, also process all of its dependencies
+        // by sending them to this service itself.
+        // NOTE 1: As we already verified all QueueItems before appending them, we can trust
+        // their validity.
+        // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
+        // only.
+        // if let Some(queue_items) = self.dependencies.remove(&block_hash) {
+        //     for item in queue_items {
+        //         let message = match item {
+        //             QueueItem::Block(block) => LeanChainServiceMessage::ProcessBlock {
+        //                 signed_block: SignedBlock {
+        //                     message: block,
+        //                     signature: FixedBytes::default(),
+        //                 },
+        //                 is_trusted: true,
+        //                 need_gossip: false,
+        //             },
+        //             QueueItem::SignedVote(signed_vote) => LeanChainServiceMessage::ProcessVote {
+        //                 signed_vote: *signed_vote,
+        //                 is_trusted: true,
+        //                 need_gossip: false,
+        //             },
+        //         };
+
+        //         self.sender.send(message)?;
+        //     }
+        // }
+        // }
+        //     None => {
+        //         warn!("WHAT THE FUCK!!!!!!!");
+        //         // If we have not yet seen the block's parent, ignore for now,
+        //         // process later once we actually see the parent
+        //         self.dependencies
+        //             .entry(signed_block.message.parent_root)
+        //             .or_default()
+        //             .push(QueueItem::Block(signed_block.message));
+        //     }
+        // }
 
         Ok(())
     }
@@ -280,33 +310,47 @@ impl LeanChainService {
             // TODO: Validate the signature.
         }
 
-        let (lean_block_provider, known_votes_provider) = {
-            let lean_chain = self.lean_chain.read().await;
-            let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.known_votes_provider())
-        };
+        let mut lean_chain = self.lean_chain.write().await;
 
-        let is_known_vote = known_votes_provider.contains(&signed_vote)?;
-        let is_new_vote = {
-            self.lean_chain
-                .read()
-                .await
-                .new_votes
-                .contains(&signed_vote)
-        };
-
-        if is_known_vote || is_new_vote {
-            // Do nothing
-        } else if lean_block_provider.contains_key(signed_vote.message.head.root) {
-            // We should acquire another write lock
-            let mut lean_chain = self.lean_chain.write().await;
-            lean_chain.new_votes.push(signed_vote);
+        if let Some(latest_vote) = lean_chain.latest_new_votes.get(&signed_vote.validator_id)
+            && latest_vote.message.slot < signed_vote.message.slot
+        {
+            lean_chain
+                .latest_new_votes
+                .insert(signed_vote.validator_id, signed_vote);
         } else {
-            self.dependencies
-                .entry(signed_vote.message.head.root)
-                .or_default()
-                .push(QueueItem::SignedVote(Box::new(signed_vote)));
+            lean_chain
+                .latest_new_votes
+                .insert(signed_vote.validator_id, signed_vote);
         }
+
+        // let (lean_block_provider, known_votes_provider) = {
+        //     let lean_chain = self.lean_chain.read().await;
+        //     let db = lean_chain.store.lock().await;
+        //     (db.lean_block_provider(), db.known_votes_provider())
+        // };
+
+        // let is_known_vote = known_votes_provider.contains(&signed_vote)?;
+        // let is_new_vote = {
+        //     self.lean_chain
+        //         .read()
+        //         .await
+        //         .latest_new_votes
+        //         .contains(&signed_vote)
+        // };
+
+        // if is_known_vote || is_new_vote {
+        //     // Do nothing
+        // } else if lean_block_provider.contains_key(signed_vote.message.head.root) {
+        //     // We should acquire another write lock
+        //     let mut lean_chain = self.lean_chain.write().await;
+        //     lean_chain.latest_new_votes.push(signed_vote);
+        // } else {
+        //     self.dependencies
+        //         .entry(signed_vote.message.head.root)
+        //         .or_default()
+        //         .push(QueueItem::SignedVote(Box::new(signed_vote)));
+        // }
 
         Ok(())
     }
