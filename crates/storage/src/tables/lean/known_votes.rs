@@ -9,7 +9,7 @@ use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
 /// Table definition for the Known Votes table
 ///
 /// Key: index (u64, acts like position in an append-only array)
-/// Value: `SignedVote`
+/// Value: [SignedVote]
 pub(crate) const KNOWN_VOTES_TABLE: TableDefinition<u64, SSZEncoding<SignedVote>> =
     TableDefinition::new("known_votes");
 

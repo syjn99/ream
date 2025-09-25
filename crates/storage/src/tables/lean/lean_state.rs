@@ -12,7 +12,7 @@ use crate::{
 /// Table definition for the Lean State table
 ///
 /// Key: block_root
-/// Value: LeanState
+/// Value: [LeanState]
 pub(crate) const LEAN_STATE_TABLE: TableDefinition<SSZEncoding<B256>, SSZEncoding<LeanState>> =
     TableDefinition::new("lean_state");
 

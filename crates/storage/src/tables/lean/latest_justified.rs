@@ -10,7 +10,7 @@ use crate::{
 
 /// Table definition for the Latest Justified table
 ///
-/// Value: Checkpoint
+/// Value: [Checkpoint]
 pub const LATEST_JUSTIFIED_FIELD: TableDefinition<&str, SSZEncoding<Checkpoint>> =
     TableDefinition::new("lean_latest_justified");
 
