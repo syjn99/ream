@@ -225,7 +225,7 @@ impl LeanChainService {
                     db.known_votes_provider().batch_append(votes_to_add)?;
                 }
 
-                lean_chain.recompute_head().await?;
+                lean_chain.update_head().await?;
 
                 drop(lean_chain);
 

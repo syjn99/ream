@@ -144,12 +144,12 @@ impl LeanChain {
 
         known_votes_provider.batch_append(votes_to_be_inserted)?;
 
-        self.recompute_head().await?;
+        self.update_head().await?;
         Ok(())
     }
 
     /// Done upon processing new votes or a new block
-    pub async fn recompute_head(&mut self) -> anyhow::Result<()> {
+    pub async fn update_head(&mut self) -> anyhow::Result<()> {
         let latest_justified = self.get_latest_justified_checkpoint().await?;
         let votes = {
             let db = self.store.lock().await;
