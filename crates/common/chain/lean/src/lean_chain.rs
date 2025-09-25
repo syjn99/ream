@@ -14,10 +14,11 @@ use ream_metrics::{PROPOSE_BLOCK_TIME, start_timer_vec, stop_timer};
 use ream_network_spec::networks::lean_network_spec;
 use ream_storage::{
     db::lean::LeanDB,
-    tables::{field::Field, table::Table},
+    tables::{field::Field, lean::lean_block::LeanBlockTable, table::Table},
 };
 use ream_sync::rwlock::{Reader, Writer};
 use tokio::sync::Mutex;
+use tracing::info;
 use tree_hash::TreeHash;
 
 pub type LeanChainWriter = Writer<LeanChain>;
@@ -123,11 +124,18 @@ impl LeanChain {
         // 2/3rd majority min voting weight for target selection
         // Note that we use ceiling division here.
         let min_target_score = (self.num_validators * 2).div_ceil(3);
+        let latest_justified_root = self
+            .store
+            .lock()
+            .await
+            .latest_justified_provider()
+            .get()?
+            .root;
 
         self.safe_target = get_fork_choice_head(
             self.store.clone(),
             &self.new_votes,
-            &self.get_latest_justified_checkpoint().await?.root,
+            &latest_justified_root,
             min_target_score,
         )
         .await?;
@@ -158,30 +166,21 @@ impl LeanChain {
 
     /// Done upon processing new votes or a new block
     pub async fn update_head(&mut self) -> anyhow::Result<()> {
+        let (known_votes, latest_justified_root, latest_finalized_checkpoint) = {
+            let db = self.store.lock().await;
+            (
+                db.known_votes_provider().get_all_votes()?,
+                db.latest_justified_provider().get()?.root,
+                db.latest_finalized_provider().get()?,
+            )
+        };
+
         // Update head.
-        self.head = get_fork_choice_head(
-            self.store.clone(),
-            &self
-                .store
-                .lock()
-                .await
-                .known_votes_provider()
-                .get_all_votes()?,
-            &self.get_latest_justified_checkpoint().await?.root,
-            0,
-        )
-        .await?;
+        self.head =
+            get_fork_choice_head(self.store.clone(), &known_votes, &latest_justified_root, 0)
+                .await?;
 
         // Update latest finalized checkpoint in DB.
-        let latest_finalized_checkpoint = self
-            .store
-            .lock()
-            .await
-            .lean_state_provider()
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("State not found in chain for head: {}", self.head))?
-            .latest_finalized
-            .clone();
         self.store
             .lock()
             .await
@@ -197,12 +196,11 @@ impl LeanChain {
     ///
     /// See lean specification:
     /// <https://github.com/leanEthereum/leanSpec/blob/f8e8d271d8b8b6513d34c78692aff47438d6fa18/src/lean_spec/subspecs/forkchoice/store.py#L341-L366>
-    pub async fn get_vote_target(&self) -> anyhow::Result<Checkpoint> {
-        let lean_block_provider = {
-            let db = self.store.lock().await;
-            db.lean_block_provider()
-        };
-
+    pub async fn get_vote_target(
+        &self,
+        lean_block_provider: &LeanBlockTable,
+        finalized_slot: u64,
+    ) -> anyhow::Result<Checkpoint> {
         // Start from current head
         let mut target_block = lean_block_provider
             .get(self.head)?
@@ -227,13 +225,6 @@ impl LeanChain {
         }
 
         // Ensure target is in justifiable slot range
-        let finalized_slot = self
-            .store
-            .lock()
-            .await
-            .latest_finalized_provider()
-            .get()?
-            .slot;
         while !is_justifiable_slot(finalized_slot, target_block.message.slot) {
             target_block = lean_block_provider
                 .get(target_block.message.parent_root)?
@@ -318,22 +309,32 @@ impl LeanChain {
     }
 
     pub async fn build_vote(&self, slot: u64) -> anyhow::Result<Vote> {
+        let (head, target, source) = {
+            let db = self.store.lock().await;
+            (
+                Checkpoint {
+                    root: self.head,
+                    slot: db
+                        .lean_block_provider()
+                        .get(self.head)?
+                        .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?
+                        .message
+                        .slot,
+                },
+                self.get_vote_target(
+                    &db.lean_block_provider(),
+                    db.latest_finalized_provider().get()?.slot,
+                )
+                .await?,
+                db.latest_justified_provider().get()?,
+            )
+        };
+
         Ok(Vote {
             slot,
-            head: Checkpoint {
-                root: self.head,
-                slot: self
-                    .store
-                    .lock()
-                    .await
-                    .lean_block_provider()
-                    .get(self.head)?
-                    .ok_or_else(|| anyhow!("Block not found for head: {}", self.head))?
-                    .message
-                    .slot,
-            },
-            target: self.get_vote_target().await?,
-            source: self.get_latest_justified_checkpoint().await?,
+            head,
+            target,
+            source,
         })
     }
 }
