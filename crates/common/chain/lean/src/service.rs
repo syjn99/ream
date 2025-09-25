@@ -218,6 +218,8 @@ impl LeanChainService {
                     db.lean_block_provider()
                         .insert(block_hash, signed_block.clone())?;
 
+                    db.latest_justified_provider()
+                        .insert_if_greater(state.latest_justified.clone())?;
                     db.lean_state_provider().insert(block_hash, state)?;
 
                     db.known_votes_provider().batch_append(votes_to_add)?;

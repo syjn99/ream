@@ -12,7 +12,10 @@ use ream_consensus_lean::{
 use ream_fork_choice::lean::get_fork_choice_head;
 use ream_metrics::{PROPOSE_BLOCK_TIME, start_timer_vec, stop_timer};
 use ream_network_spec::networks::lean_network_spec;
-use ream_storage::{db::lean::LeanDB, tables::table::Table};
+use ream_storage::{
+    db::lean::LeanDB,
+    tables::{field::Field, table::Table},
+};
 use ream_sync::rwlock::{Reader, Writer};
 use tokio::sync::Mutex;
 use tree_hash::TreeHash;
@@ -55,6 +58,9 @@ impl LeanChain {
         db.lean_state_provider()
             .insert(genesis_block_hash, genesis_state.clone())
             .expect("Failed to insert genesis state");
+        db.latest_justified_provider()
+            .insert(genesis_state.latest_justified.clone())
+            .expect("Failed to insert latest justified checkpoint");
 
         LeanChain {
             store: Arc::new(Mutex::new(db)),
