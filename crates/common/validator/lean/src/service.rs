@@ -1,5 +1,5 @@
 use alloy_primitives::FixedBytes;
-use anyhow::anyhow;
+use anyhow::Context;
 use ream_chain_lean::{
     clock::create_lean_clock_interval, lean_chain::LeanChainReader,
     messages::LeanChainServiceMessage,
@@ -51,8 +51,8 @@ impl ValidatorService {
         // Start from slot 0, will be incremented for every slot boundary.
         let mut slot = 0;
 
-        let mut interval = create_lean_clock_interval()
-            .map_err(|err| anyhow!("Failed to create clock interval: {err}"))?;
+        let mut interval =
+            create_lean_clock_interval().context("Failed to create clock interval")?;
 
         loop {
             tokio::select! {
