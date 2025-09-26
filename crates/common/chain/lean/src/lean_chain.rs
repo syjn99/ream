@@ -51,15 +51,15 @@ impl LeanChain {
         db.lean_block_provider()
             .insert(genesis_block_hash, genesis_block)
             .expect("Failed to insert genesis block");
-        db.lean_state_provider()
-            .insert(genesis_block_hash, genesis_state.clone())
-            .expect("Failed to insert genesis state");
         db.latest_finalized_provider()
             .insert(genesis_state.latest_finalized.clone())
             .expect("Failed to insert latest finalized checkpoint");
         db.latest_justified_provider()
             .insert(genesis_state.latest_justified.clone())
             .expect("Failed to insert latest justified checkpoint");
+        db.lean_state_provider()
+            .insert(genesis_block_hash, genesis_state)
+            .expect("Failed to insert genesis state");
 
         LeanChain {
             store: Arc::new(Mutex::new(db)),
