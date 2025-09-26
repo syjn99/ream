@@ -7,7 +7,7 @@ use ream_consensus_lean::{
     vote::SignedVote,
 };
 use ream_network_spec::networks::lean_network_spec;
-use ream_storage::tables::table::Table;
+use ream_storage::tables::{field::Field, table::Table};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
 use tree_hash::TreeHash;
@@ -84,8 +84,7 @@ impl LeanChainService {
                             // Third tick (t=2/4): Compute the safe target.
                             let current_slot = get_current_slot();
                             info!("Computing safe target at slot {current_slot} (tick {tick_count})");
-                            let mut lean_chain = self.lean_chain.write().await;
-                            lean_chain.safe_target = lean_chain.compute_safe_target().await.expect("Failed to compute safe target");
+                            self.lean_chain.write().await.update_safe_target().await.expect("Failed to update safe target");
                         }
                         3 => {
                             // Fourth tick (t=3/4): Accept new votes.
@@ -218,12 +217,14 @@ impl LeanChainService {
                     db.lean_block_provider()
                         .insert(block_hash, signed_block.clone())?;
 
+                    db.latest_justified_provider()
+                        .insert(state.latest_justified.clone())?;
                     db.lean_state_provider().insert(block_hash, state)?;
 
                     db.known_votes_provider().batch_append(votes_to_add)?;
                 }
 
-                lean_chain.recompute_head().await?;
+                lean_chain.update_head().await?;
 
                 drop(lean_chain);
 
