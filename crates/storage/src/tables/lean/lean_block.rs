@@ -14,7 +14,7 @@ use crate::{
 /// Table definition for the Lean Block table
 ///
 /// Key: block_id
-/// Value: `Block`
+/// Value: [SignedBlock]
 pub(crate) const LEAN_BLOCK_TABLE: TableDefinition<SSZEncoding<B256>, SSZEncoding<SignedBlock>> =
     TableDefinition::new("lean_block");
 

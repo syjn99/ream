@@ -5,7 +5,7 @@ use actix_web::{
 use ream_api_types_common::{error::ApiError, id::ID};
 use ream_chain_lean::lean_chain::LeanChainReader;
 use ream_consensus_lean::block::Block;
-use ream_storage::tables::table::Table;
+use ream_storage::tables::{field::Field, table::Table};
 
 // GET /lean/v0/blocks/{block_id}
 #[get("/blocks/{block_id}")]
@@ -26,21 +26,31 @@ pub async fn get_block_by_id(
     lean_chain: Data<LeanChainReader>,
 ) -> Result<Option<Block>, ApiError> {
     let lean_chain = lean_chain.read().await;
-    let block_root =
-        match block_id {
-            ID::Finalized => lean_chain.latest_finalized_hash().await.map_err(|err| {
-                ApiError::InternalError(format!("No latest finalized hash: {err:?}"))
-            }),
-            ID::Genesis => Ok(lean_chain.genesis_hash),
-            ID::Head => Ok(lean_chain.head),
-            ID::Justified => lean_chain.latest_justified_hash().await.map_err(|err| {
-                ApiError::InternalError(format!("No latest justified hash: {err:?}"))
-            }),
-            ID::Slot(slot) => lean_chain.get_block_id_by_slot(slot).await.map_err(|err| {
-                ApiError::InternalError(format!("No block for slot {slot}: {err:?}"))
-            }),
-            ID::Root(root) => Ok(root),
-        };
+    let block_root = match block_id {
+        ID::Finalized => lean_chain
+            .store
+            .lock()
+            .await
+            .latest_finalized_provider()
+            .get()
+            .map(|checkpoint| checkpoint.root)
+            .map_err(|err| ApiError::InternalError(format!("No latest finalized hash: {err:?}"))),
+        ID::Genesis => Ok(lean_chain.genesis_hash),
+        ID::Head => Ok(lean_chain.head),
+        ID::Justified => lean_chain
+            .store
+            .lock()
+            .await
+            .latest_justified_provider()
+            .get()
+            .map(|checkpoint| checkpoint.root)
+            .map_err(|err| ApiError::InternalError(format!("No latest justified hash: {err:?}"))),
+        ID::Slot(slot) => lean_chain
+            .get_block_id_by_slot(slot)
+            .await
+            .map_err(|err| ApiError::InternalError(format!("No block for slot {slot}: {err:?}"))),
+        ID::Root(root) => Ok(root),
+    };
 
     let provider = lean_chain.store.clone().lock().await.lean_block_provider();
     provider
