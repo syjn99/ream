@@ -69,6 +69,26 @@ impl LatestKnownVotesTable {
         Ok(start_index)
     }
 
+    /// Insert multiple votes with validator id in a single transaction.
+    pub fn batch_insert(
+        &self,
+        values: impl IntoIterator<Item = (u64, SignedVote)>,
+    ) -> Result<(), StoreError> {
+        let mut write_txn = self.db.begin_write()?;
+        write_txn.set_durability(Durability::Immediate);
+
+        let mut table = write_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
+
+        for (key, value) in values {
+            table.insert(key, value)?;
+        }
+
+        drop(table);
+        write_txn.commit()?;
+
+        Ok(())
+    }
+
     /// Check if a given vote exists in the append-only array.
     pub fn contains(&self, value: &SignedVote) -> Result<bool, StoreError> {
         let read_txn = self.db.begin_read()?;

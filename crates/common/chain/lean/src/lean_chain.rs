@@ -132,14 +132,7 @@ impl LeanChain {
             db.latest_known_votes_provider()
         };
 
-        let mut votes_to_be_inserted = Vec::new();
-        for (_, new_vote) in self.latest_new_votes.drain() {
-            if !latest_known_votes_provider.contains(&new_vote)? {
-                votes_to_be_inserted.push(new_vote);
-            }
-        }
-
-        latest_known_votes_provider.batch_append(votes_to_be_inserted)?;
+        latest_known_votes_provider.batch_insert(self.latest_new_votes.drain())?;
 
         self.update_head().await?;
         Ok(())
