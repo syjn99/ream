@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
@@ -68,18 +68,17 @@ impl LatestKnownVotesTable {
     }
 
     /// Get all votes.
-    pub fn get_all_votes(&self) -> Result<Vec<SignedVote>, StoreError> {
+    pub fn get_all_votes(&self) -> Result<HashMap<u64, SignedVote>, StoreError> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
 
-        let mut votes = Vec::with_capacity(table.len()? as usize);
-
-        for entry in table.iter()? {
-            let (_, v) = entry?;
-            votes.push(v.value());
-        }
-
-        Ok(votes)
+        table
+            .iter()?
+            .map(|entry| {
+                let (k, v) = entry?;
+                Ok((k.value(), v.value()))
+            })
+            .collect()
     }
 
     /// Get all votes whose `source.root` matches `state.latest_justified.root`

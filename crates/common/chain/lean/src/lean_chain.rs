@@ -153,16 +153,10 @@ impl LeanChain {
             )
         };
 
-        // TODO: remove this temporary one.
-        let latest_known_votes_map = latest_known_votes
-            .into_iter()
-            .map(|vote| (vote.validator_id, vote))
-            .collect::<HashMap<_, _>>();
-
         // Update head.
         self.head = get_fork_choice_head(
             self.store.clone(),
-            &latest_known_votes_map,
+            &latest_known_votes,
             &latest_justified_root,
             0,
         )
