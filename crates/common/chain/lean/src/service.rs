@@ -180,10 +180,10 @@ impl LeanChainService {
 
         let block_hash = signed_block.message.tree_hash_root();
 
-        let (lean_block_provider, latest_known_votes_provider) = {
+        let lean_block_provider = {
             let lean_chain = self.lean_chain.read().await;
             let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.latest_known_votes_provider())
+            db.lean_block_provider()
         };
 
         // If the block is already known, ignore it
@@ -205,13 +205,7 @@ impl LeanChainService {
                 let mut state = parent_state.clone();
                 state.state_transition(&signed_block, true, true)?;
 
-                let mut votes_to_add = Vec::new();
                 let mut lean_chain = self.lean_chain.write().await;
-                for vote in &signed_block.message.body.attestations {
-                    if !latest_known_votes_provider.contains(vote)? {
-                        votes_to_add.push(vote.clone());
-                    }
-                }
                 {
                     let db = lean_chain.store.lock().await;
                     db.lean_block_provider()
@@ -221,8 +215,14 @@ impl LeanChainService {
                         .insert(state.latest_justified.clone())?;
                     db.lean_state_provider().insert(block_hash, state)?;
 
-                    db.latest_known_votes_provider()
-                        .batch_append(votes_to_add)?;
+                    db.latest_known_votes_provider().batch_insert(
+                        signed_block
+                            .message
+                            .body
+                            .attestations
+                            .into_iter()
+                            .map(|vote| (vote.validator_id, vote)),
+                    )?;
                 }
 
                 lean_chain.update_head().await?;
