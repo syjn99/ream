@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::{B256, FixedBytes};
 use anyhow::anyhow;
@@ -32,7 +32,8 @@ pub struct LeanChain {
     /// Database.
     pub store: Arc<Mutex<LeanDB>>,
     /// Votes that we have received but not yet taken into account.
-    pub new_votes: Vec<SignedVote>,
+    /// Maps validator id to signed vote.
+    pub latest_new_votes: HashMap<u64, SignedVote>,
     /// Initialize the chain with the genesis block.
     pub genesis_hash: B256,
     /// Number of validators.
@@ -63,7 +64,7 @@ impl LeanChain {
 
         LeanChain {
             store: Arc::new(Mutex::new(db)),
-            new_votes: Vec::new(),
+            latest_new_votes: HashMap::new(),
             genesis_hash: genesis_block_hash,
             num_validators: no_of_validators,
             safe_target: genesis_block_hash,
@@ -114,7 +115,7 @@ impl LeanChain {
 
         self.safe_target = get_fork_choice_head(
             self.store.clone(),
-            &self.new_votes,
+            &self.latest_new_votes,
             &latest_justified_root,
             min_target_score,
         )
@@ -132,7 +133,7 @@ impl LeanChain {
         };
 
         let mut votes_to_be_inserted = Vec::new();
-        for new_vote in self.new_votes.drain(..) {
+        for (_, new_vote) in self.latest_new_votes.drain() {
             if !known_votes_provider.contains(&new_vote)? {
                 votes_to_be_inserted.push(new_vote);
             }
@@ -159,10 +160,20 @@ impl LeanChain {
             )
         };
 
+        // TODO: remove this temporary one.
+        let known_votes_map = known_votes
+            .into_iter()
+            .map(|vote| (vote.validator_id, vote))
+            .collect::<HashMap<_, _>>();
+
         // Update head.
-        self.head =
-            get_fork_choice_head(self.store.clone(), &known_votes, &latest_justified_root, 0)
-                .await?;
+        self.head = get_fork_choice_head(
+            self.store.clone(),
+            &known_votes_map,
+            &latest_justified_root,
+            0,
+        )
+        .await?;
 
         // Update latest finalized checkpoint in DB.
         self.store

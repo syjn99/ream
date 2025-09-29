@@ -291,8 +291,8 @@ impl LeanChainService {
             self.lean_chain
                 .read()
                 .await
-                .new_votes
-                .contains(&signed_vote)
+                .latest_new_votes
+                .contains_key(&signed_vote.validator_id)
         };
 
         if is_known_vote || is_new_vote {
@@ -300,7 +300,9 @@ impl LeanChainService {
         } else if lean_block_provider.contains_key(signed_vote.message.head.root) {
             // We should acquire another write lock
             let mut lean_chain = self.lean_chain.write().await;
-            lean_chain.new_votes.push(signed_vote);
+            lean_chain
+                .latest_new_votes
+                .insert(signed_vote.validator_id, signed_vote);
         } else {
             self.dependencies
                 .entry(signed_vote.message.head.root)
