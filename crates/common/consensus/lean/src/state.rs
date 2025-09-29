@@ -305,8 +305,11 @@ impl LeanState {
                 .ok_or(anyhow!("Source slot not found in justified_slots"))?
             {
                 info!(
-                    "Skipping vote. Source slot not justified: validator_id={}, source={:?}, target={:?}",
-                    signed_vote.validator_id, vote.source, vote.target
+                    reason = "Source slot not justified",
+                    source_slot = vote.source.slot,
+                    target_slot = vote.target.slot,
+                    "Skipping vote by Validator {}",
+                    signed_vote.validator_id,
                 );
                 continue;
             }
@@ -321,8 +324,11 @@ impl LeanState {
                 .ok_or(anyhow!("Target slot not found in justified_slots"))?
             {
                 info!(
-                    "Skipping vote. Target slot already justified: validator_id={}, source={:?}, target={:?}",
-                    signed_vote.validator_id, vote.source, vote.target
+                    reason = "Target slot already justified",
+                    source_slot = vote.source.slot,
+                    target_slot = vote.target.slot,
+                    "Skipping vote by Validator {}",
+                    signed_vote.validator_id,
                 );
                 continue;
             }
@@ -334,8 +340,11 @@ impl LeanState {
                     .ok_or(anyhow!("Source slot not found in historical_block_hashes"))?
             {
                 info!(
-                    "Skipping vote. Source block not in historical block hashes: validator_id={}, source={:?}, target={:?}",
-                    signed_vote.validator_id, vote.source, vote.target
+                    reason = "Source block not in historical block hashes",
+                    source_slot = vote.source.slot,
+                    target_slot = vote.target.slot,
+                    "Skipping vote by Validator {}",
+                    signed_vote.validator_id,
                 );
                 continue;
             }
@@ -347,24 +356,33 @@ impl LeanState {
                     .ok_or(anyhow!("Target slot not found in historical_block_hashes"))?
             {
                 info!(
-                    "Skipping vote. Target block not in historical block hashes: validator_id={}, source={:?}, target={:?}",
-                    signed_vote.validator_id, vote.source, vote.target
+                    reason = "Target block not in historical block hashes",
+                    source_slot = vote.source.slot,
+                    target_slot = vote.target.slot,
+                    "Skipping vote by Validator {}",
+                    signed_vote.validator_id,
                 );
                 continue;
             }
 
             if vote.target.slot <= vote.source.slot {
                 info!(
-                    "Skipping vote. Target slot not greater than source slot: validator_id={}, source={:?}, target={:?}",
-                    signed_vote.validator_id, vote.source, vote.target
+                    reason = "Target slot not greater than source slot",
+                    source_slot = vote.source.slot,
+                    target_slot = vote.target.slot,
+                    "Skipping vote by Validator {}",
+                    signed_vote.validator_id,
                 );
                 continue;
             }
 
             if !is_justifiable_slot(self.latest_finalized.slot, vote.target.slot) {
                 info!(
-                    "Skipping vote. Target slot not justifiable: validator_id={}, source={:?}, target={:?}",
-                    signed_vote.validator_id, vote.source, vote.target
+                    reason = "Target slot not justifiable",
+                    source_slot = vote.source.slot,
+                    target_slot = vote.target.slot,
+                    "Skipping vote by Validator {}",
+                    signed_vote.validator_id,
                 );
                 continue;
             }
@@ -403,8 +421,9 @@ impl LeanState {
                 justifications_map.remove(&vote.target.root);
 
                 info!(
-                    "Block justified: checkpoint={:?}, num_votes={count}",
-                    vote.target
+                    slot = self.latest_justified.slot,
+                    root = ?self.latest_justified.root,
+                    "Justification event",
                 );
                 set_int_gauge_vec(&JUSTIFIED_SLOT, self.latest_justified.slot as i64, &[]);
 
@@ -417,7 +436,11 @@ impl LeanState {
                 if is_target_next_valid_justifiable_slot {
                     self.latest_finalized = vote.source.clone();
 
-                    info!("Block finalized: checkpoint={:?}", vote.source);
+                    info!(
+                        slot = self.latest_finalized.slot,
+                        root = ?self.latest_finalized.root,
+                        "Finalization event",
+                    );
                     set_int_gauge_vec(&FINALIZED_SLOT, self.latest_finalized.slot as i64, &[]);
                 }
             }

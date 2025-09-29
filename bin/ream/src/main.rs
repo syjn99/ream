@@ -209,7 +209,6 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor, ream_
             socket_port: config.socket_port,
             private_key_path: config.private_key_path,
         }),
-        lean_chain_reader.clone(),
         executor.clone(),
         chain_sender.clone(),
         outbound_p2p_receiver,

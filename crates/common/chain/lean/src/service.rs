@@ -9,7 +9,7 @@ use ream_consensus_lean::{
 use ream_network_spec::networks::lean_network_spec;
 use ream_storage::tables::{field::Field, table::Table};
 use tokio::sync::{mpsc, oneshot};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use tree_hash::TreeHash;
 
 use crate::{
@@ -50,8 +50,8 @@ impl LeanChainService {
 
     pub async fn start(mut self) -> anyhow::Result<()> {
         info!(
-            "LeanChainService started with genesis_time: {}",
-            lean_network_spec().genesis_time
+            genesis_time = lean_network_spec().genesis_time,
+            "LeanChainService started",
         );
 
         let mut tick_count = 0u64;
@@ -65,7 +65,6 @@ impl LeanChainService {
                     match tick_count % 4 {
                         0 => {
                             // First tick (t=0/4): Log current head state, including its justification/finalization status.
-                            let current_slot = get_current_slot();
                             let (head, store) = {
                                 let lean_chain = self.lean_chain.read().await;
                                 (lean_chain.head, lean_chain.store.clone())
@@ -75,21 +74,28 @@ impl LeanChainService {
                                 .get(head)?.ok_or_else(|| anyhow!("Post state not found for head: {head}"))?;
 
                             info!(
-                                "Current head state of slot {current_slot}: latest_justified.slot: {}, latest_finalized.slot: {}",
-                                head_state.latest_justified.slot,
-                                head_state.latest_finalized.slot
+                                slot = get_current_slot(),
+                                justified_slot = head_state.latest_justified.slot,
+                                finalized_slot = head_state.latest_finalized.slot,
+                                "Current head state information",
                             );
                         }
                         2 => {
                             // Third tick (t=2/4): Compute the safe target.
-                            let current_slot = get_current_slot();
-                            info!("Computing safe target at slot {current_slot} (tick {tick_count})");
+                            info!(
+                                slot = get_current_slot(),
+                                tick = tick_count,
+                                "Computing safe target"
+                            );
                             self.lean_chain.write().await.update_safe_target().await.expect("Failed to update safe target");
                         }
                         3 => {
                             // Fourth tick (t=3/4): Accept new votes.
-                            let current_slot = get_current_slot();
-                            info!("Accepting new votes at slot {current_slot} (tick {tick_count})");
+                            info!(
+                                slot = get_current_slot(),
+                                tick = tick_count,
+                                "Accepting new votes"
+                            );
                             self.lean_chain.write().await.accept_new_votes().await.expect("Failed to accept new votes");
                         }
                         _ => {
@@ -107,13 +113,19 @@ impl LeanChainService {
                         }
                         LeanChainServiceMessage::ProcessBlock { signed_block, is_trusted, need_gossip } => {
                             info!(
-                                "Processing block: slot={}, validator_id={}, root={}, parent={}, votes={}",
-                                signed_block.message.slot,
+                                slot = signed_block.message.slot,
+                                block_root = ?signed_block.message.tree_hash_root(),
+                                "Processing block built by Validator {}",
                                 signed_block.message.proposer_index,
-                                signed_block.message.tree_hash_root(),
-                                signed_block.message.parent_root,
-                                signed_block.message.body.attestations.len(),
                             );
+                            debug!(
+                                slot = signed_block.message.slot,
+                                parent_root = ?signed_block.message.parent_root,
+                                state_root = ?signed_block.message.state_root,
+                                attestations_length = signed_block.message.body.attestations.len(),
+                                "Block details",
+                            );
+
 
                             if let Err(err) = self.handle_process_block(signed_block.clone(), is_trusted).await {
                                 warn!("Failed to handle process block message: {err:?}");
@@ -125,11 +137,18 @@ impl LeanChainService {
                         }
                         LeanChainServiceMessage::ProcessVote { signed_vote, is_trusted, need_gossip } => {
                             info!(
-                                "Processing vote: slot={}, validator_id={}, source={:?}, target={:?}",
-                                signed_vote.message.slot,
+                                slot = signed_vote.message.slot,
+                                source_slot = signed_vote.message.source.slot,
+                                target_slot = signed_vote.message.target.slot,
+                                "Processing vote by Validator {}",
                                 signed_vote.validator_id,
-                                signed_vote.message.source,
-                                signed_vote.message.target
+                            );
+                            debug!(
+                                slot = signed_vote.message.slot,
+                                head = ?signed_vote.message.head,
+                                source = ?signed_vote.message.source,
+                                target = ?signed_vote.message.target,
+                                "Vote details",
                             );
 
                             if let Err(err) = self.handle_process_vote(signed_vote.clone(), is_trusted).await {
