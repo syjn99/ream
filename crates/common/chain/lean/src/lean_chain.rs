@@ -127,19 +127,19 @@ impl LeanChain {
     /// Process new votes that the staker has received. Vote processing is done
     /// at a particular time, because of safe target and view merge rule
     pub async fn accept_new_votes(&mut self) -> anyhow::Result<()> {
-        let known_votes_provider = {
+        let latest_known_votes_provider = {
             let db = self.store.lock().await;
-            db.known_votes_provider()
+            db.latest_known_votes_provider()
         };
 
         let mut votes_to_be_inserted = Vec::new();
         for (_, new_vote) in self.latest_new_votes.drain() {
-            if !known_votes_provider.contains(&new_vote)? {
+            if !latest_known_votes_provider.contains(&new_vote)? {
                 votes_to_be_inserted.push(new_vote);
             }
         }
 
-        known_votes_provider.batch_append(votes_to_be_inserted)?;
+        latest_known_votes_provider.batch_append(votes_to_be_inserted)?;
 
         self.update_head().await?;
         Ok(())
@@ -147,10 +147,10 @@ impl LeanChain {
 
     /// Done upon processing new votes or a new block
     pub async fn update_head(&mut self) -> anyhow::Result<()> {
-        let (known_votes, latest_justified_root, latest_finalized_checkpoint) = {
+        let (latest_known_votes, latest_justified_root, latest_finalized_checkpoint) = {
             let db = self.store.lock().await;
             (
-                db.known_votes_provider().get_all_votes()?,
+                db.latest_known_votes_provider().get_all_votes()?,
                 db.latest_justified_provider().get()?.root,
                 db.lean_state_provider()
                     .get(self.head)?
@@ -161,7 +161,7 @@ impl LeanChain {
         };
 
         // TODO: remove this temporary one.
-        let known_votes_map = known_votes
+        let latest_known_votes_map = latest_known_votes
             .into_iter()
             .map(|vote| (vote.validator_id, vote))
             .collect::<HashMap<_, _>>();
@@ -169,7 +169,7 @@ impl LeanChain {
         // Update head.
         self.head = get_fork_choice_head(
             self.store.clone(),
-            &known_votes_map,
+            &latest_known_votes_map,
             &latest_justified_root,
             0,
         )
@@ -240,9 +240,9 @@ impl LeanChain {
     pub async fn propose_block(&self, slot: u64) -> anyhow::Result<Block> {
         let initialize_block_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["initialize_block"]);
 
-        let (lean_state_provider, known_votes_provider) = {
+        let (lean_state_provider, latest_known_votes_provider) = {
             let db = self.store.lock().await;
-            (db.lean_state_provider(), db.known_votes_provider())
+            (db.lean_state_provider(), db.latest_known_votes_provider())
         };
 
         let head_state = lean_state_provider
@@ -272,7 +272,7 @@ impl LeanChain {
         let add_votes_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["add_valid_votes_to_block"]);
         loop {
             state.process_attestations(&new_block.message.body.attestations)?;
-            let new_votes_to_add = known_votes_provider
+            let new_votes_to_add = latest_known_votes_provider
                 .filter_new_votes_to_add(state.latest_justified.root, &new_block)?;
 
             if new_votes_to_add.is_empty() {

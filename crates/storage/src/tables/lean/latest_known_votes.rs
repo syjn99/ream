@@ -6,25 +6,25 @@ use redb::{Database, Durability, ReadableTable, ReadableTableMetadata, TableDefi
 
 use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
 
-/// Table definition for the Known Votes table
+/// Table definition for the Latest Known Votes table
 ///
 /// Key: index (u64, acts like position in an append-only array)
 /// Value: [SignedVote]
-pub(crate) const KNOWN_VOTES_TABLE: TableDefinition<u64, SSZEncoding<SignedVote>> =
-    TableDefinition::new("known_votes");
+pub(crate) const LATEST_KNOWN_VOTES_TABLE: TableDefinition<u64, SSZEncoding<SignedVote>> =
+    TableDefinition::new("latest_known_votes");
 
-pub struct KnownVotesTable {
+pub struct LatestKnownVotesTable {
     pub db: Arc<Database>,
 }
 
-impl KnownVotesTable {
+impl LatestKnownVotesTable {
     /// Append a vote to the end of the table.
     /// Returns the index at which it was inserted.
     pub fn append(&self, value: SignedVote) -> Result<(), StoreError> {
         let mut write_txn = self.db.begin_write()?;
         write_txn.set_durability(Durability::Immediate);
 
-        let mut table = write_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let mut table = write_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
 
         // Compute next index
         let next_index = match table.last()? {
@@ -48,7 +48,7 @@ impl KnownVotesTable {
         let mut write_txn = self.db.begin_write()?;
         write_txn.set_durability(Durability::Immediate);
 
-        let mut table = write_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let mut table = write_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
 
         // Find the next free index
         let mut next_index = match table.last()? {
@@ -72,7 +72,7 @@ impl KnownVotesTable {
     /// Check if a given vote exists in the append-only array.
     pub fn contains(&self, value: &SignedVote) -> Result<bool, StoreError> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
 
         for entry in table.iter()? {
             let (_, v) = entry?;
@@ -87,21 +87,21 @@ impl KnownVotesTable {
     /// Return number of votes (like `Vec::len`)
     pub fn len(&self) -> Result<u64, StoreError> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
         Ok(table.len()?)
     }
 
     /// Returns if there are no known votes
     pub fn is_empty(&self) -> Result<bool, StoreError> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
         Ok(table.len()? == 0)
     }
 
     /// Get all votes.
     pub fn get_all_votes(&self) -> Result<Vec<SignedVote>, StoreError> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
 
         let mut votes = Vec::with_capacity(table.len()? as usize);
 
@@ -121,7 +121,7 @@ impl KnownVotesTable {
         new_block: &SignedBlock,
     ) -> Result<Vec<SignedVote>, StoreError> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(KNOWN_VOTES_TABLE)?;
+        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
 
         let mut result = Vec::new();
 

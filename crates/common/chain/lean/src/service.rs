@@ -180,10 +180,10 @@ impl LeanChainService {
 
         let block_hash = signed_block.message.tree_hash_root();
 
-        let (lean_block_provider, known_votes_provider) = {
+        let (lean_block_provider, latest_known_votes_provider) = {
             let lean_chain = self.lean_chain.read().await;
             let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.known_votes_provider())
+            (db.lean_block_provider(), db.latest_known_votes_provider())
         };
 
         // If the block is already known, ignore it
@@ -208,7 +208,7 @@ impl LeanChainService {
                 let mut votes_to_add = Vec::new();
                 let mut lean_chain = self.lean_chain.write().await;
                 for vote in &signed_block.message.body.attestations {
-                    if !known_votes_provider.contains(vote)? {
+                    if !latest_known_votes_provider.contains(vote)? {
                         votes_to_add.push(vote.clone());
                     }
                 }
@@ -221,7 +221,8 @@ impl LeanChainService {
                         .insert(state.latest_justified.clone())?;
                     db.lean_state_provider().insert(block_hash, state)?;
 
-                    db.known_votes_provider().batch_append(votes_to_add)?;
+                    db.latest_known_votes_provider()
+                        .batch_append(votes_to_add)?;
                 }
 
                 lean_chain.update_head().await?;
@@ -280,13 +281,13 @@ impl LeanChainService {
             // TODO: Validate the signature.
         }
 
-        let (lean_block_provider, known_votes_provider) = {
+        let (lean_block_provider, latest_known_votes_provider) = {
             let lean_chain = self.lean_chain.read().await;
             let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.known_votes_provider())
+            (db.lean_block_provider(), db.latest_known_votes_provider())
         };
 
-        let is_known_vote = known_votes_provider.contains(&signed_vote)?;
+        let is_known_vote = latest_known_votes_provider.contains(&signed_vote)?;
         let is_new_vote = {
             self.lean_chain
                 .read()

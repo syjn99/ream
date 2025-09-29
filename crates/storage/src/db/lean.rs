@@ -3,9 +3,9 @@ use std::sync::Arc;
 use redb::Database;
 
 use crate::tables::lean::{
-    known_votes::KnownVotesTable, latest_finalized::LatestFinalizedField,
-    latest_justified::LatestJustifiedField, lean_block::LeanBlockTable, lean_state::LeanStateTable,
-    slot_index::SlotIndexTable, state_root_index::StateRootIndexTable,
+    latest_finalized::LatestFinalizedField, latest_justified::LatestJustifiedField,
+    latest_known_votes::LatestKnownVotesTable, lean_block::LeanBlockTable,
+    lean_state::LeanStateTable, slot_index::SlotIndexTable, state_root_index::StateRootIndexTable,
 };
 
 #[derive(Clone, Debug)]
@@ -37,8 +37,8 @@ impl LeanDB {
         }
     }
 
-    pub fn known_votes_provider(&self) -> KnownVotesTable {
-        KnownVotesTable {
+    pub fn latest_known_votes_provider(&self) -> LatestKnownVotesTable {
+        LatestKnownVotesTable {
             db: self.db.clone(),
         }
     }
