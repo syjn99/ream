@@ -9,8 +9,6 @@ $ ream account_manager --help
 Usage: ream account_manager [OPTIONS]
 
 Options:
-  -v, --verbosity <VERBOSITY>
-          Verbosity level [default: 3]
   -l, --lifetime <LIFETIME>
           Account lifetime in 2 ** lifetime slots [default: 18]
   -c, --chunk-size <CHUNK_SIZE>

@@ -9,8 +9,6 @@ $ ream voluntary_exit --help
 Usage: ream voluntary_exit [OPTIONS] --import-keystores <IMPORT_KEYSTORES> --validator-index <VALIDATOR_INDEX>
 
 Options:
-  -v, --verbosity <VERBOSITY>
-          Verbosity level [default: 3]
       --beacon-api-endpoint <BEACON_API_ENDPOINT>
           Set HTTP url of the beacon api endpoint [default: http://localhost:5052]
       --request-timeout <REQUEST_TIMEOUT>
