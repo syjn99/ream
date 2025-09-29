@@ -8,7 +8,7 @@ use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
 
 /// Table definition for the Latest Known Votes table
 ///
-/// Key: index (u64, acts like position in an append-only array)
+/// Key: u64 (validator index)
 /// Value: [SignedVote]
 pub(crate) const LATEST_KNOWN_VOTES_TABLE: TableDefinition<u64, SSZEncoding<SignedVote>> =
     TableDefinition::new("latest_known_votes");
@@ -18,57 +18,6 @@ pub struct LatestKnownVotesTable {
 }
 
 impl LatestKnownVotesTable {
-    /// Append a vote to the end of the table.
-    /// Returns the index at which it was inserted.
-    pub fn append(&self, value: SignedVote) -> Result<(), StoreError> {
-        let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
-
-        let mut table = write_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
-
-        // Compute next index
-        let next_index = match table.last()? {
-            Some((k, _)) => k.value() + 1,
-            None => 0,
-        };
-
-        table.insert(next_index, value)?;
-
-        drop(table);
-        write_txn.commit()?;
-        Ok(())
-    }
-
-    /// Append multiple votes in a single transaction.
-    /// Returns the starting index of the first inserted vote.
-    pub fn batch_append(
-        &self,
-        values: impl IntoIterator<Item = SignedVote>,
-    ) -> Result<u64, StoreError> {
-        let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
-
-        let mut table = write_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
-
-        // Find the next free index
-        let mut next_index = match table.last()? {
-            Some((k, _)) => k.value() + 1,
-            None => 0,
-        };
-
-        let start_index = next_index;
-
-        for value in values {
-            table.insert(next_index, value)?;
-            next_index += 1;
-        }
-
-        drop(table);
-        write_txn.commit()?;
-
-        Ok(start_index)
-    }
-
     /// Insert multiple votes with validator id in a single transaction.
     pub fn batch_insert(
         &self,
