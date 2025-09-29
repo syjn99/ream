@@ -75,16 +75,19 @@ pub const APP_NAME: &str = "ream";
 /// appropriate node type (beacon node, validator node, or account manager) based on the command
 /// line arguments. Handles graceful shutdown on Ctrl-C.
 fn main() {
-    // Set the default log level to `info` if not set
+    let cli = Cli::parse();
+
+    // Set the default log level based on verbosity flag or RUST_LOG env var
     let rust_log = env::var(EnvFilter::DEFAULT_ENV).unwrap_or_default();
     let env_filter = match rust_log.is_empty() {
-        true => EnvFilter::builder().parse_lossy("info,actix_server=warn,discv5=error"),
+        true => EnvFilter::builder().parse_lossy(format!(
+            "{},actix_server=warn,discv5=error",
+            cli.verbosity.directive()
+        )),
         false => EnvFilter::builder().parse_lossy(rust_log),
     };
 
     tracing_subscriber::fmt().with_env_filter(env_filter).init();
-
-    let cli = Cli::parse();
 
     let executor = ReamExecutor::new().expect("unable to create executor");
     let executor_clone = executor.clone();

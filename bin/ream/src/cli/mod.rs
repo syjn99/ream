@@ -5,6 +5,7 @@ pub mod generate_private_key;
 pub mod import_keystores;
 pub mod lean_node;
 pub mod validator_node;
+pub mod verbosity;
 pub mod voluntary_exit;
 
 use std::path::PathBuf;
@@ -15,12 +16,16 @@ use ream_node::version::FULL_VERSION;
 use crate::cli::{
     account_manager::AccountManagerConfig, beacon_node::BeaconNodeConfig,
     generate_private_key::GeneratePrivateKeyConfig, lean_node::LeanNodeConfig,
-    validator_node::ValidatorNodeConfig, voluntary_exit::VoluntaryExitConfig,
+    validator_node::ValidatorNodeConfig, verbosity::Verbosity, voluntary_exit::VoluntaryExitConfig,
 };
 
 #[derive(Debug, Parser)]
 #[command(author, version = FULL_VERSION, about, long_about = None)]
 pub struct Cli {
+    /// Verbosity level (1=error, 2=warn, 3=info, 4=debug, 5=trace)
+    #[arg(short, long, default_value = "3")]
+    pub verbosity: Verbosity,
+
     #[command(subcommand)]
     pub command: Commands,
 
@@ -86,8 +91,6 @@ mod tests {
         let cli = Cli::parse_from([
             "program",
             "lean_node",
-            "--verbosity",
-            "2",
             "--network",
             "./assets/lean/sample_spec.yml",
             "--validator-registry-path",
@@ -96,7 +99,7 @@ mod tests {
 
         match cli.command {
             Commands::LeanNode(config) => {
-                assert_eq!(config.verbosity, 2);
+                // assert_eq!(config.network, "./assets/lean/sample_spec.yml");
             }
             _ => unreachable!("This test should only validate the lean node cli"),
         }
@@ -107,8 +110,6 @@ mod tests {
         let cli = Cli::parse_from([
             "program",
             "beacon_node",
-            "--verbosity",
-            "2",
             "--socket-address",
             "127.0.0.1",
             "--socket-port",
@@ -120,7 +121,6 @@ mod tests {
         match cli.command {
             Commands::BeaconNode(config) => {
                 assert_eq!(config.network.network, Network::Mainnet);
-                assert_eq!(config.verbosity, 2);
                 assert_eq!(
                     config.socket_address,
                     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
@@ -137,8 +137,6 @@ mod tests {
         let cli = Cli::parse_from([
             "program",
             "validator_node",
-            "--verbosity",
-            "2",
             "--beacon-api-endpoint",
             "http://localhost:5052",
             "--request-timeout",
@@ -153,7 +151,6 @@ mod tests {
 
         match cli.command {
             Commands::ValidatorNode(config) => {
-                assert_eq!(config.verbosity, 2);
                 assert_eq!(
                     config.beacon_api_endpoint,
                     Url::parse(DEFAULT_BEACON_API_ENDPOINT).expect("Invalid URL")
@@ -169,8 +166,6 @@ mod tests {
         let cli = Cli::parse_from([
             "program",
             "account_manager",
-            "--verbosity",
-            "2",
             "--lifetime",
             "30",
             "--chunk-size",
@@ -183,7 +178,6 @@ mod tests {
 
         match cli.command {
             Commands::AccountManager(config) => {
-                assert_eq!(config.verbosity, 2);
                 assert_eq!(config.lifetime, 30);
                 assert_eq!(config.chunk_size, 10);
                 assert_eq!(config.activation_epoch, 100);

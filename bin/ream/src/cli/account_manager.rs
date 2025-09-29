@@ -5,10 +5,6 @@ const DEFAULT_NUM_ACTIVE_EPOCHS: u32 = 1 << 18;
 
 #[derive(Debug, Parser, Default)]
 pub struct AccountManagerConfig {
-    /// Verbosity level
-    #[arg(short, long, default_value_t = 3)]
-    pub verbosity: u8,
-
     /// Account lifetime in 2 ** lifetime slots
     #[arg(short, long, default_value_t = 18, value_parser = clap::value_parser!(u32).range(18..))]
     pub lifetime: u32,

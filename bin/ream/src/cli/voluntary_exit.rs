@@ -11,10 +11,6 @@ use crate::cli::{
 
 #[derive(Debug, Parser)]
 pub struct VoluntaryExitConfig {
-    /// Verbosity level
-    #[arg(short, long, default_value_t = 3)]
-    pub verbosity: u8,
-
     #[arg(long, help = "Set HTTP url of the beacon api endpoint", default_value = DEFAULT_BEACON_API_ENDPOINT)]
     pub beacon_api_endpoint: Url,
 
