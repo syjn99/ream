@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::B256;
 use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
-use redb::{Database, Durability, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{Database, Durability, ReadableTable, TableDefinition};
 
 use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
 
@@ -51,20 +51,6 @@ impl LatestKnownVotesTable {
         }
 
         Ok(false)
-    }
-
-    /// Return number of votes (like `Vec::len`)
-    pub fn len(&self) -> Result<u64, StoreError> {
-        let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
-        Ok(table.len()?)
-    }
-
-    /// Returns if there are no known votes
-    pub fn is_empty(&self) -> Result<bool, StoreError> {
-        let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
-        Ok(table.len()? == 0)
     }
 
     /// Get all votes.
