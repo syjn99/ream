@@ -260,7 +260,14 @@ impl LeanChain {
         loop {
             state.process_attestations(&new_block.message.body.attestations)?;
             let new_votes_to_add = latest_known_votes_provider
-                .filter_new_votes_to_add(state.latest_justified.root, &new_block)?;
+                .get_all_votes()?
+                .into_iter()
+                .filter_map(|(_, vote)| {
+                    (vote.message.source == state.latest_justified
+                        && !new_block.message.body.attestations.contains(&vote))
+                    .then_some(vote)
+                })
+                .collect::<Vec<_>>();
 
             if new_votes_to_add.is_empty() {
                 break;

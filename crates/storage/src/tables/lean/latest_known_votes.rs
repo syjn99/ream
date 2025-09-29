@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use alloy_primitives::B256;
-use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
+use ream_consensus_lean::vote::SignedVote;
 use redb::{Database, Durability, ReadableTable, TableDefinition};
 
 use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
@@ -65,31 +64,5 @@ impl LatestKnownVotesTable {
                 Ok((k.value(), v.value()))
             })
             .collect()
-    }
-
-    /// Get all votes whose `source.root` matches `state.latest_justified.root`
-    /// and that are not already in the block's attestations.
-    pub fn filter_new_votes_to_add(
-        &self,
-        justified_root: B256,
-        new_block: &SignedBlock,
-    ) -> Result<Vec<SignedVote>, StoreError> {
-        let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
-
-        let mut result = Vec::new();
-
-        for entry in table.iter()? {
-            let (_, v) = entry?;
-            let vote = v.value();
-
-            if vote.message.source.root == justified_root
-                && !new_block.message.body.attestations.contains(&vote)
-            {
-                result.push(vote);
-            }
-        }
-
-        Ok(result)
     }
 }
