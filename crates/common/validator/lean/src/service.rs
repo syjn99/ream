@@ -7,7 +7,7 @@ use ream_chain_lean::{
 use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
 use ream_network_spec::networks::lean_network_spec;
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, info};
+use tracing::{Level, debug, enabled, info};
 use tree_hash::TreeHash;
 
 use crate::registry::LeanKeystore;
@@ -101,19 +101,24 @@ impl ValidatorService {
 
                             // Build the vote from LeanChain, and modify its validator ID
                             let vote_template = self.lean_chain.read().await.build_vote(slot).await.expect("Failed to build vote");
-                            info!(
-                                slot = vote_template.slot,
-                                head_slot = vote_template.head.slot,
-                                source_slot = vote_template.source.slot,
-                                target_slot = vote_template.target.slot,
-                                "Building vote template finished",
-                            );
-                            debug!(
-                                "Vote template details: head={:?}, source={:?}, target={:?}",
-                                vote_template.head,
-                                vote_template.source,
-                                vote_template.target
-                            );
+
+                            if enabled!(Level::DEBUG) {
+                                debug!(
+                                    slot = vote_template.slot,
+                                    head = ?vote_template.head,
+                                    source = ?vote_template.source,
+                                    target = ?vote_template.target,
+                                    "Building vote template finished",
+                                );
+                            } else {
+                                info!(
+                                    slot = vote_template.slot,
+                                    head_slot = vote_template.head.slot,
+                                    source_slot = vote_template.source.slot,
+                                    target_slot = vote_template.target.slot,
+                                    "Building vote template finished",
+                                );
+                            }
 
                             // TODO: Sign the vote with the keystore.
                             let signed_votes = self.keystores.iter().map(|keystore| {

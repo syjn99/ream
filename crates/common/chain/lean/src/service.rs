@@ -9,7 +9,7 @@ use ream_consensus_lean::{
 use ream_network_spec::networks::lean_network_spec;
 use ream_storage::tables::{field::Field, table::Table};
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, error, info, warn};
+use tracing::{Level, debug, enabled, error, info, warn};
 use tree_hash::TreeHash;
 
 use crate::{
@@ -112,20 +112,24 @@ impl LeanChainService {
                             }
                         }
                         LeanChainServiceMessage::ProcessBlock { signed_block, is_trusted, need_gossip } => {
-                            info!(
-                                slot = signed_block.message.slot,
-                                block_root = ?signed_block.message.tree_hash_root(),
-                                "Processing block built by Validator {}",
-                                signed_block.message.proposer_index,
-                            );
-                            debug!(
-                                slot = signed_block.message.slot,
-                                parent_root = ?signed_block.message.parent_root,
-                                state_root = ?signed_block.message.state_root,
-                                attestations_length = signed_block.message.body.attestations.len(),
-                                "Block details",
-                            );
-
+                            if enabled!(Level::DEBUG) {
+                                debug!(
+                                    slot = signed_block.message.slot,
+                                    block_root = ?signed_block.message.tree_hash_root(),
+                                    parent_root = ?signed_block.message.parent_root,
+                                    state_root = ?signed_block.message.state_root,
+                                    attestations_length = signed_block.message.body.attestations.len(),
+                                    "Processing block built by Validator {}",
+                                    signed_block.message.proposer_index,
+                                );
+                            } else {
+                                info!(
+                                    slot = signed_block.message.slot,
+                                    block_root = ?signed_block.message.tree_hash_root(),
+                                    "Processing block built by Validator {}",
+                                    signed_block.message.proposer_index,
+                                );
+                            }
 
                             if let Err(err) = self.handle_process_block(signed_block.clone(), is_trusted).await {
                                 warn!("Failed to handle process block message: {err:?}");
@@ -136,20 +140,24 @@ impl LeanChainService {
                             }
                         }
                         LeanChainServiceMessage::ProcessVote { signed_vote, is_trusted, need_gossip } => {
-                            info!(
-                                slot = signed_vote.message.slot,
-                                source_slot = signed_vote.message.source.slot,
-                                target_slot = signed_vote.message.target.slot,
-                                "Processing vote by Validator {}",
-                                signed_vote.validator_id,
-                            );
-                            debug!(
-                                slot = signed_vote.message.slot,
-                                head = ?signed_vote.message.head,
-                                source = ?signed_vote.message.source,
-                                target = ?signed_vote.message.target,
-                                "Vote details",
-                            );
+                            if enabled!(Level::DEBUG) {
+                                debug!(
+                                    slot = signed_vote.message.slot,
+                                    head = ?signed_vote.message.head,
+                                    source = ?signed_vote.message.source,
+                                    target = ?signed_vote.message.target,
+                                    "Processing vote by Validator {}",
+                                    signed_vote.validator_id,
+                                );
+                            } else {
+                                info!(
+                                    slot = signed_vote.message.slot,
+                                    source_slot = signed_vote.message.source.slot,
+                                    target_slot = signed_vote.message.target.slot,
+                                    "Processing vote by Validator {}",
+                                    signed_vote.validator_id,
+                                );
+                            }
 
                             if let Err(err) = self.handle_process_vote(signed_vote.clone(), is_trusted).await {
                                 warn!("Failed to handle process block message: {err:?}");
