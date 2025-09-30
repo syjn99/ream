@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::B256;
 use anyhow::{Ok, anyhow};
-use ream_consensus_lean::vote::{SignedVote, Vote};
+use ream_consensus_lean::vote::SignedVote;
 use ream_storage::{db::lean::LeanDB, tables::table::Table};
 use tokio::sync::Mutex;
 
@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 /// latest known justified block)
 pub async fn get_fork_choice_head(
     store: Arc<Mutex<LeanDB>>,
-    votes: &[SignedVote],
+    latest_votes: &HashMap<u64, SignedVote>,
     provided_root: &B256,
     min_score: u64,
 ) -> anyhow::Result<B256> {
@@ -28,25 +28,13 @@ pub async fn get_fork_choice_head(
             .ok_or(anyhow!("No blocks found to calculate fork choice"))?;
     }
 
-    // Sort votes by ascending slots to ensure that new votes are inserted last
-    let mut sorted_votes = votes.to_owned();
-    sorted_votes.sort_by_key(|signed_vote| signed_vote.message.slot);
-
-    // Prepare a map of validator_id -> their vote
-    let mut latest_votes = HashMap::<u64, Vote>::new();
-
-    for signed_vote in sorted_votes {
-        let validator_id = signed_vote.validator_id;
-        latest_votes.insert(validator_id, signed_vote.message.clone());
-    }
-
     // For each block, count the number of votes for that block. A vote
     // for any descendant of a block also counts as a vote for that block
     let mut vote_weights = HashMap::<B256, u64>::new();
 
-    for vote in latest_votes.values() {
-        if lean_block_provider.contains_key(vote.head.root) {
-            let mut block_hash = vote.head.root;
+    for signed_vote in latest_votes.values() {
+        if lean_block_provider.contains_key(signed_vote.message.head.root) {
+            let mut block_hash = signed_vote.message.head.root;
             while {
                 let current_block = lean_block_provider
                     .get(block_hash)?

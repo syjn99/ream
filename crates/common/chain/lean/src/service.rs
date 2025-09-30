@@ -180,10 +180,10 @@ impl LeanChainService {
 
         let block_hash = signed_block.message.tree_hash_root();
 
-        let (lean_block_provider, known_votes_provider) = {
+        let lean_block_provider = {
             let lean_chain = self.lean_chain.read().await;
             let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.known_votes_provider())
+            db.lean_block_provider()
         };
 
         // If the block is already known, ignore it
@@ -205,13 +205,7 @@ impl LeanChainService {
                 let mut state = parent_state.clone();
                 state.state_transition(&signed_block, true, true)?;
 
-                let mut votes_to_add = Vec::new();
                 let mut lean_chain = self.lean_chain.write().await;
-                for vote in &signed_block.message.body.attestations {
-                    if !known_votes_provider.contains(vote)? {
-                        votes_to_add.push(vote.clone());
-                    }
-                }
                 {
                     let db = lean_chain.store.lock().await;
                     db.lean_block_provider()
@@ -221,7 +215,14 @@ impl LeanChainService {
                         .insert(state.latest_justified.clone())?;
                     db.lean_state_provider().insert(block_hash, state)?;
 
-                    db.known_votes_provider().batch_append(votes_to_add)?;
+                    db.latest_known_votes_provider().batch_insert(
+                        signed_block
+                            .message
+                            .body
+                            .attestations
+                            .into_iter()
+                            .map(|vote| (vote.validator_id, vote)),
+                    )?;
                 }
 
                 lean_chain.update_head().await?;
@@ -280,19 +281,19 @@ impl LeanChainService {
             // TODO: Validate the signature.
         }
 
-        let (lean_block_provider, known_votes_provider) = {
+        let (lean_block_provider, latest_known_votes_provider) = {
             let lean_chain = self.lean_chain.read().await;
             let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.known_votes_provider())
+            (db.lean_block_provider(), db.latest_known_votes_provider())
         };
 
-        let is_known_vote = known_votes_provider.contains(&signed_vote)?;
+        let is_known_vote = latest_known_votes_provider.contains(&signed_vote)?;
         let is_new_vote = {
             self.lean_chain
                 .read()
                 .await
-                .new_votes
-                .contains(&signed_vote)
+                .latest_new_votes
+                .contains_key(&signed_vote.validator_id)
         };
 
         if is_known_vote || is_new_vote {
@@ -300,7 +301,9 @@ impl LeanChainService {
         } else if lean_block_provider.contains_key(signed_vote.message.head.root) {
             // We should acquire another write lock
             let mut lean_chain = self.lean_chain.write().await;
-            lean_chain.new_votes.push(signed_vote);
+            lean_chain
+                .latest_new_votes
+                .insert(signed_vote.validator_id, signed_vote);
         } else {
             self.dependencies
                 .entry(signed_vote.message.head.root)

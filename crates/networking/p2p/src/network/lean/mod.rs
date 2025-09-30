@@ -387,7 +387,7 @@ impl LeanNetworkService {
 
 #[cfg(test)]
 mod tests {
-    use std::{net::Ipv4Addr, sync::Once, time::Duration};
+    use std::{collections::HashMap, net::Ipv4Addr, sync::Once, time::Duration};
 
     use alloy_primitives::B256;
     use libp2p::{Multiaddr, multiaddr::Protocol};
@@ -422,7 +422,7 @@ mod tests {
             store: Arc::new(Mutex::new(lean_db)),
             head: B256::default(),
             safe_target: B256::default(),
-            new_votes: Vec::new(),
+            latest_new_votes: HashMap::new(),
             genesis_hash: B256::default(),
             num_validators: 0,
         }

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy_primitives::{B256, FixedBytes};
 use anyhow::anyhow;
@@ -32,7 +32,8 @@ pub struct LeanChain {
     /// Database.
     pub store: Arc<Mutex<LeanDB>>,
     /// Votes that we have received but not yet taken into account.
-    pub new_votes: Vec<SignedVote>,
+    /// Maps validator id to signed vote.
+    pub latest_new_votes: HashMap<u64, SignedVote>,
     /// Initialize the chain with the genesis block.
     pub genesis_hash: B256,
     /// Number of validators.
@@ -63,7 +64,7 @@ impl LeanChain {
 
         LeanChain {
             store: Arc::new(Mutex::new(db)),
-            new_votes: Vec::new(),
+            latest_new_votes: HashMap::new(),
             genesis_hash: genesis_block_hash,
             num_validators: no_of_validators,
             safe_target: genesis_block_hash,
@@ -114,7 +115,7 @@ impl LeanChain {
 
         self.safe_target = get_fork_choice_head(
             self.store.clone(),
-            &self.new_votes,
+            &self.latest_new_votes,
             &latest_justified_root,
             min_target_score,
         )
@@ -126,19 +127,12 @@ impl LeanChain {
     /// Process new votes that the staker has received. Vote processing is done
     /// at a particular time, because of safe target and view merge rule
     pub async fn accept_new_votes(&mut self) -> anyhow::Result<()> {
-        let known_votes_provider = {
+        let latest_known_votes_provider = {
             let db = self.store.lock().await;
-            db.known_votes_provider()
+            db.latest_known_votes_provider()
         };
 
-        let mut votes_to_be_inserted = Vec::new();
-        for new_vote in self.new_votes.drain(..) {
-            if !known_votes_provider.contains(&new_vote)? {
-                votes_to_be_inserted.push(new_vote);
-            }
-        }
-
-        known_votes_provider.batch_append(votes_to_be_inserted)?;
+        latest_known_votes_provider.batch_insert(self.latest_new_votes.drain())?;
 
         self.update_head().await?;
         Ok(())
@@ -146,10 +140,10 @@ impl LeanChain {
 
     /// Done upon processing new votes or a new block
     pub async fn update_head(&mut self) -> anyhow::Result<()> {
-        let (known_votes, latest_justified_root, latest_finalized_checkpoint) = {
+        let (latest_known_votes, latest_justified_root, latest_finalized_checkpoint) = {
             let db = self.store.lock().await;
             (
-                db.known_votes_provider().get_all_votes()?,
+                db.latest_known_votes_provider().get_all_votes()?,
                 db.latest_justified_provider().get()?.root,
                 db.lean_state_provider()
                     .get(self.head)?
@@ -160,9 +154,13 @@ impl LeanChain {
         };
 
         // Update head.
-        self.head =
-            get_fork_choice_head(self.store.clone(), &known_votes, &latest_justified_root, 0)
-                .await?;
+        self.head = get_fork_choice_head(
+            self.store.clone(),
+            &latest_known_votes,
+            &latest_justified_root,
+            0,
+        )
+        .await?;
 
         // Update latest finalized checkpoint in DB.
         self.store
@@ -229,9 +227,9 @@ impl LeanChain {
     pub async fn propose_block(&self, slot: u64) -> anyhow::Result<Block> {
         let initialize_block_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["initialize_block"]);
 
-        let (lean_state_provider, known_votes_provider) = {
+        let (lean_state_provider, latest_known_votes_provider) = {
             let db = self.store.lock().await;
-            (db.lean_state_provider(), db.known_votes_provider())
+            (db.lean_state_provider(), db.latest_known_votes_provider())
         };
 
         let head_state = lean_state_provider
@@ -261,8 +259,15 @@ impl LeanChain {
         let add_votes_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["add_valid_votes_to_block"]);
         loop {
             state.process_attestations(&new_block.message.body.attestations)?;
-            let new_votes_to_add = known_votes_provider
-                .filter_new_votes_to_add(state.latest_justified.root, &new_block)?;
+            let new_votes_to_add = latest_known_votes_provider
+                .get_all_votes()?
+                .into_iter()
+                .filter_map(|(_, vote)| {
+                    (vote.message.source == state.latest_justified
+                        && !new_block.message.body.attestations.contains(&vote))
+                    .then_some(vote)
+                })
+                .collect::<Vec<_>>();
 
             if new_votes_to_add.is_empty() {
                 break;
