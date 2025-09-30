@@ -80,10 +80,7 @@ fn main() {
     // Set the default log level based on verbosity flag or RUST_LOG env var
     let rust_log = env::var(EnvFilter::DEFAULT_ENV).unwrap_or_default();
     let env_filter = match rust_log.is_empty() {
-        true => EnvFilter::builder().parse_lossy(format!(
-            "{},actix_server=warn,discv5=error",
-            cli.verbosity.directive()
-        )),
+        true => EnvFilter::builder().parse_lossy(cli.verbosity.directive()),
         false => EnvFilter::builder().parse_lossy(rust_log),
     };
 

@@ -14,16 +14,20 @@ use clap::{Parser, Subcommand};
 use ream_node::version::FULL_VERSION;
 
 use crate::cli::{
-    account_manager::AccountManagerConfig, beacon_node::BeaconNodeConfig,
-    generate_private_key::GeneratePrivateKeyConfig, lean_node::LeanNodeConfig,
-    validator_node::ValidatorNodeConfig, verbosity::Verbosity, voluntary_exit::VoluntaryExitConfig,
+    account_manager::AccountManagerConfig,
+    beacon_node::BeaconNodeConfig,
+    generate_private_key::GeneratePrivateKeyConfig,
+    lean_node::LeanNodeConfig,
+    validator_node::ValidatorNodeConfig,
+    verbosity::{Verbosity, verbosity_parser},
+    voluntary_exit::VoluntaryExitConfig,
 };
 
 #[derive(Debug, Parser)]
 #[command(author, version = FULL_VERSION, about, long_about = None)]
 pub struct Cli {
     /// Verbosity level (1=error, 2=warn, 3=info, 4=debug, 5=trace)
-    #[arg(short, long, default_value = "3")]
+    #[arg(short, long, default_value = "3", value_parser = verbosity_parser)]
     pub verbosity: Verbosity,
 
     #[command(subcommand)]
@@ -99,7 +103,7 @@ mod tests {
             "./assets/lean/validator_registry.yml",
         ]);
 
-        assert_eq!(cli.verbosity.directive(), "trace");
+        assert_eq!(cli.verbosity, Verbosity::Trace);
 
         match cli.command {
             Commands::LeanNode(config) => {
@@ -133,8 +137,7 @@ mod tests {
             "9002",
         ]);
 
-        // Verify verbosity level (2 = warn)
-        assert_eq!(cli.verbosity.directive(), "warn");
+        assert_eq!(cli.verbosity, Verbosity::Warn);
 
         match cli.command {
             Commands::BeaconNode(config) => {
@@ -169,8 +172,7 @@ mod tests {
             "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑", // Taken directly from EIP-2335's test keystores
         ]);
 
-        // Verify verbosity level (3 = info)
-        assert_eq!(cli.verbosity.directive(), "info");
+        assert_eq!(cli.verbosity, Verbosity::Info);
 
         match cli.command {
             Commands::ValidatorNode(config) => {
@@ -189,7 +191,7 @@ mod tests {
         let cli = Cli::parse_from([
             "program",
             "--verbosity",
-            "6",
+            "5",
             "account_manager",
             "--lifetime",
             "30",
@@ -201,8 +203,7 @@ mod tests {
             "5",
         ]);
 
-        // Verify verbosity level (6+ maps to trace)
-        assert_eq!(cli.verbosity.directive(), "trace");
+        assert_eq!(cli.verbosity, Verbosity::Trace);
 
         match cli.command {
             Commands::AccountManager(config) => {
@@ -219,34 +220,38 @@ mod tests {
     fn test_verbosity_levels() {
         // Test error level (1)
         let cli = Cli::parse_from(["program", "--verbosity", "1", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "error");
+        assert_eq!(cli.verbosity, Verbosity::Error);
 
         // Test warn level (2)
         let cli = Cli::parse_from(["program", "--verbosity", "2", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "warn");
+        assert_eq!(cli.verbosity, Verbosity::Warn);
 
         // Test info level (3)
         let cli = Cli::parse_from(["program", "--verbosity", "3", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "info");
+        assert_eq!(cli.verbosity, Verbosity::Info);
 
         // Test debug level (4)
         let cli = Cli::parse_from(["program", "--verbosity", "4", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "debug");
+        assert_eq!(cli.verbosity, Verbosity::Debug);
 
         // Test trace level (5)
         let cli = Cli::parse_from(["program", "--verbosity", "5", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "trace");
-
-        // Test trace level (6+)
-        let cli = Cli::parse_from(["program", "--verbosity", "10", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "trace");
+        assert_eq!(cli.verbosity, Verbosity::Trace);
 
         // Test default verbosity (should be 3 which maps to info)
         let cli = Cli::parse_from(["program", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "info");
+        assert_eq!(cli.verbosity, Verbosity::Info);
 
         // Test short flag -v
         let cli = Cli::parse_from(["program", "-v", "1", "beacon_node"]);
-        assert_eq!(cli.verbosity.directive(), "error");
+        assert_eq!(cli.verbosity, Verbosity::Error);
+
+        // Test invalid verbosity level (0)
+        let result = Cli::try_parse_from(["program", "--verbosity", "0", "beacon_node"]);
+        assert!(result.is_err());
+
+        // Test invalid verbosity level (6)
+        let result = Cli::try_parse_from(["program", "--verbosity", "6", "beacon_node"]);
+        assert!(result.is_err());
     }
 }

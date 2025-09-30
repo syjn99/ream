@@ -1,28 +1,42 @@
-#[derive(Debug, Clone, Copy)]
-pub struct Verbosity(pub u8);
+// Fixed verbosity levels for specific crates to reduce log noise
+const ACTIX_SERVER_DIRECTIVE: &str = "actix_server=warn";
+const DISCV5_DIRECTIVE: &str = "discv5=error";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verbosity {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
 
 impl Verbosity {
-    pub fn directive(&self) -> &str {
-        match self.0 - 1 {
-            0 => "error",
-            1 => "warn",
-            2 => "info",
-            3 => "debug",
-            _ => "trace",
-        }
+    pub fn directive(&self) -> String {
+        let directive = match self {
+            Verbosity::Error => "error",
+            Verbosity::Warn => "warn",
+            Verbosity::Info => "info",
+            Verbosity::Debug => "debug",
+            Verbosity::Trace => "trace",
+        };
+        format!("{directive},{ACTIX_SERVER_DIRECTIVE},{DISCV5_DIRECTIVE}")
     }
 }
 
-impl std::str::FromStr for Verbosity {
-    type Err = std::num::ParseIntError;
+pub fn verbosity_parser(s: &str) -> Result<Verbosity, String> {
+    let level = s.parse::<u8>().map_err(|err| err.to_string())?;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<u8>().map(Verbosity)
+    if !(1..=5).contains(&level) {
+        return Err(format!("verbosity must be between 1 and 5, got {level}"));
     }
-}
 
-impl std::fmt::Display for Verbosity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
+    Ok(match level {
+        1 => Verbosity::Error,
+        2 => Verbosity::Warn,
+        3 => Verbosity::Info,
+        4 => Verbosity::Debug,
+        5 => Verbosity::Trace,
+        _ => unreachable!(),
+    })
 }
