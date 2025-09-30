@@ -392,7 +392,7 @@ impl LeanNetworkService {
 
 #[cfg(test)]
 mod tests {
-    use std::{net::Ipv4Addr, sync::Once, time::Duration};
+    use std::{collections::HashMap, net::Ipv4Addr, sync::Once, time::Duration};
 
     use libp2p::{Multiaddr, multiaddr::Protocol};
     use ream_network_spec::networks::{LeanNetworkSpec, set_lean_network_spec};
