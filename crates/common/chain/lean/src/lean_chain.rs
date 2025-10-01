@@ -371,11 +371,11 @@ impl LeanChain {
             })?;
         state.state_transition(&signed_block, true, true)?;
 
-        lean_block_provider.insert(block_hash, signed_block.clone())?;
+        let attestations = signed_block.message.body.attestations.clone();
+        lean_block_provider.insert(block_hash, signed_block)?;
         latest_justified_provider.insert(state.latest_justified.clone())?;
         lean_state_provider.insert(block_hash, state)?;
-        self.on_attestation_from_block(signed_block.message.body.attestations)
-            .await?;
+        self.on_attestation_from_block(attestations).await?;
         self.update_head().await?;
 
         Ok(())
@@ -401,14 +401,6 @@ impl LeanChain {
                 let validator_id = signed_vote.validator_id;
 
                 // Clear from new votes if this is latest.
-                //
-                // This logic mirrors the Python spec:
-                // ```python
-                // # clear from new votes if this is latest
-                // latest_vote = store.latest_new_votes.get(validator_id)
-                // if latest_vote is not None and latest_vote.slot < vote.slot:
-                //     del store.latest_new_votes[validator_id]
-                // ```
                 if let Some(latest_vote) = self.latest_new_votes.get(&validator_id)
                     && latest_vote.message.slot < signed_vote.message.slot
                 {
@@ -416,15 +408,6 @@ impl LeanChain {
                 }
 
                 // Filter for batch insertion.
-                //
-                // This logic mirrors the Python spec:
-                //
-                // ```python
-                // # update latest known votes if this is latest
-                // latest_vote = store.latest_known_votes.get(validator_id)
-                // if latest_vote is None or latest_vote.slot < vote.slot:
-                //     store.latest_known_votes[validator_id] = vote
-                // ```
                 latest_known_votes_provider
                     .get(validator_id)
                     .ok()
@@ -444,13 +427,7 @@ impl LeanChain {
     pub fn on_attestation_from_gossip(&mut self, signed_vote: SignedVote) {
         let validator_id = signed_vote.validator_id;
 
-        // The below logic mirrors the Python spec:
-        // ```
-        // # update latest new votes if this is the latest
-        // latest_vote = store.latest_new_votes.get(validator_id)
-        // if latest_vote is None or latest_vote.slot < vote.slot:
-        //     store.latest_new_votes[validator_id] = vote
-        // ```
+        // Update latest new votes if this is the latest
         if self
             .latest_new_votes
             .get(&validator_id)
