@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-
-use alloy_primitives::B256;
 use anyhow::{Context, anyhow};
 use ream_consensus_lean::{
     block::{Block, SignedBlock},
@@ -25,25 +22,19 @@ use crate::{
 pub struct LeanChainService {
     lean_chain: LeanChainWriter,
     receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
-    sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
-    // Objects that we will process once we have processed their parents
-    dependencies: HashMap<B256, Vec<SignedVote>>,
 }
 
 impl LeanChainService {
     pub async fn new(
         lean_chain: LeanChainWriter,
         receiver: mpsc::UnboundedReceiver<LeanChainServiceMessage>,
-        sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
         outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     ) -> Self {
         LeanChainService {
             lean_chain,
             receiver,
-            sender,
             outbound_gossip,
-            dependencies: HashMap::new(),
         }
     }
 
