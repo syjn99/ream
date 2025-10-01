@@ -177,13 +177,8 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor, ream_
     let (chain_sender, chain_receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
     let (outbound_p2p_sender, outbound_p2p_receiver) = mpsc::unbounded_channel::<LeanP2PRequest>();
 
-    let chain_service = LeanChainService::new(
-        lean_chain_writer,
-        chain_receiver,
-        chain_sender.clone(),
-        outbound_p2p_sender,
-    )
-    .await;
+    let chain_service =
+        LeanChainService::new(lean_chain_writer, chain_receiver, outbound_p2p_sender).await;
 
     let fork = "devnet0".to_string();
     let topics: Vec<LeanGossipTopic> = vec![

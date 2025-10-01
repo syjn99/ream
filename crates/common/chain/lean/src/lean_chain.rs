@@ -339,4 +339,102 @@ impl LeanChain {
             source,
         })
     }
+
+    /// Processes a new block, updates the store, and triggers a head update.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/ee16b19825a1f358b00a6fc2d7847be549daa03b/docs/client/forkchoice.md?plain=1#L314-L342>
+    pub async fn on_block(&mut self, signed_block: SignedBlock) -> anyhow::Result<()> {
+        let block_hash = signed_block.message.tree_hash_root();
+
+        let (lean_block_provider, latest_justified_provider, lean_state_provider) = {
+            let db = self.store.lock().await;
+            (
+                db.lean_block_provider(),
+                db.latest_justified_provider(),
+                db.lean_state_provider(),
+            )
+        };
+
+        // If the block is already known, ignore it
+        if lean_block_provider.contains_key(block_hash) {
+            return Ok(());
+        }
+
+        let mut state = lean_state_provider
+            .get(signed_block.message.parent_root)?
+            .ok_or_else(|| {
+                anyhow!(
+                    "Parent state not found for block: {block_hash}, parent: {}",
+                    signed_block.message.parent_root
+                )
+            })?;
+        state.state_transition(&signed_block, true, true)?;
+
+        let attestations = signed_block.message.body.attestations.clone();
+        lean_block_provider.insert(block_hash, signed_block)?;
+        latest_justified_provider.insert(state.latest_justified.clone())?;
+        lean_state_provider.insert(block_hash, state)?;
+        self.on_attestation_from_block(attestations).await?;
+        self.update_head().await?;
+
+        Ok(())
+    }
+
+    /// Process multiple attestations (multiple [SignedVote]s) from [SignedBlock].
+    /// Main reason to have this function is to avoid multiple DB transactions by
+    /// batch inserting votes.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/ee16b19825a1f358b00a6fc2d7847be549daa03b/docs/client/forkchoice.md?plain=1#L279-L312>
+    pub async fn on_attestation_from_block(
+        &mut self,
+        signed_votes: impl IntoIterator<Item = SignedVote>,
+    ) -> anyhow::Result<()> {
+        let latest_known_votes_provider = {
+            let db = self.store.lock().await;
+            db.latest_known_votes_provider()
+        };
+
+        latest_known_votes_provider.batch_insert(signed_votes.into_iter().filter_map(
+            |signed_vote| {
+                let validator_id = signed_vote.validator_id;
+
+                // Clear from new votes if this is latest.
+                if let Some(latest_vote) = self.latest_new_votes.get(&validator_id)
+                    && latest_vote.message.slot < signed_vote.message.slot
+                {
+                    self.latest_new_votes.remove(&validator_id);
+                }
+
+                // Filter for batch insertion.
+                latest_known_votes_provider
+                    .get(validator_id)
+                    .ok()
+                    .flatten()
+                    .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
+                    .then_some((validator_id, signed_vote))
+            },
+        ))?;
+
+        Ok(())
+    }
+
+    /// Processes a single attestation ([SignedVote]) from gossip.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/ee16b19825a1f358b00a6fc2d7847be549daa03b/docs/client/forkchoice.md?plain=1#L279-L312>
+    pub fn on_attestation_from_gossip(&mut self, signed_vote: SignedVote) {
+        let validator_id = signed_vote.validator_id;
+
+        // Update latest new votes if this is the latest
+        if self
+            .latest_new_votes
+            .get(&validator_id)
+            .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
+        {
+            self.latest_new_votes
+                .insert(validator_id, signed_vote.clone());
+        }
+    }
 }
