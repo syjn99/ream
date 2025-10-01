@@ -368,9 +368,7 @@ impl LeanChain {
             // ```
             if latest_known_votes_provider
                 .get(validator_id)?
-                .map_or(true, |latest_vote| {
-                    latest_vote.message.slot < signed_vote.message.slot
-                })
+                .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
             {
                 latest_known_votes_provider.insert(validator_id, signed_vote.clone())?;
             }
@@ -398,9 +396,7 @@ impl LeanChain {
             if self
                 .latest_new_votes
                 .get(&validator_id)
-                .map_or(true, |latest_vote| {
-                    latest_vote.message.slot < signed_vote.message.slot
-                })
+                .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
             {
                 self.latest_new_votes
                     .insert(validator_id, signed_vote.clone());
