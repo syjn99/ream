@@ -15,10 +15,6 @@ use crate::cli::constants::{
 
 #[derive(Debug, Parser)]
 pub struct BeaconNodeConfig {
-    /// Verbosity level
-    #[arg(short, long, default_value_t = 3)]
-    pub verbosity: u8,
-
     #[arg(
       long,
       help = "Choose mainnet, holesky, sepolia, hoodi, dev or provide a path to a YAML config file",

@@ -9,8 +9,6 @@ $ ream validator_node --help
 Usage: ream validator_node [OPTIONS] --import-keystores <IMPORT_KEYSTORES> --suggested-fee-recipient <SUGGESTED_FEE_RECIPIENT>
 
 Options:
-  -v, --verbosity <VERBOSITY>
-          Verbosity level [default: 3]
       --beacon-api-endpoint <BEACON_API_ENDPOINT>
           Set HTTP url of the beacon api endpoint [default: http://localhost:5052]
       --request-timeout <REQUEST_TIMEOUT>

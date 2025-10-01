@@ -9,8 +9,6 @@ $ ream beacon_node --help
 Usage: ream beacon_node [OPTIONS]
 
 Options:
-  -v, --verbosity <VERBOSITY>
-          Verbosity level [default: 3]
       --network <NETWORK>
           Choose mainnet, holesky, sepolia, hoodi, dev or provide a path to a YAML config file [default: mainnet]
       --http-address <HTTP_ADDRESS>

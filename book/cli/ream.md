@@ -18,9 +18,10 @@ Commands:
   help                  Print this message or the help of the given subcommand(s)
 
 Options:
-      --data-dir <DATA_DIR>  The directory for storing application data. If used together with --ephemeral, new child directory will be created.
-  -e, --ephemeral            Use new data directory, located in OS temporary directory. If used together with --data-dir, new directory will be created there instead.
-      --purge-db             Purges the database.
-  -h, --help                 Print help
-  -V, --version              Print version
+  -v, --verbosity <VERBOSITY>  Verbosity level (1=error, 2=warn, 3=info, 4=debug, 5=trace) [default: 3]
+      --data-dir <DATA_DIR>    The directory for storing application data. If used together with --ephemeral, new child directory will be created.
+  -e, --ephemeral              Use new data directory, located in OS temporary directory. If used together with --data-dir, new directory will be created there instead.
+      --purge-db               Purges the database.
+  -h, --help                   Print help
+  -V, --version                Print version
 ```

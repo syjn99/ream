@@ -9,8 +9,6 @@ $ ream lean_node --help
 Usage: ream lean_node [OPTIONS] --network <NETWORK> --validator-registry-path <VALIDATOR_REGISTRY_PATH>
 
 Options:
-  -v, --verbosity <VERBOSITY>
-          Verbosity level [default: 3]
       --network <NETWORK>
           Provide a path to a YAML config file, or use 'ephemery' for the Ephemery network
       --bootnodes <BOOTNODES>

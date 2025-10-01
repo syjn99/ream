@@ -7,7 +7,7 @@ use ream_chain_lean::{
 use ream_consensus_lean::{block::SignedBlock, vote::SignedVote};
 use ream_network_spec::networks::lean_network_spec;
 use tokio::sync::{mpsc, oneshot};
-use tracing::info;
+use tracing::{Level, debug, enabled, info};
 use tree_hash::TreeHash;
 
 use crate::registry::LeanKeystore;
@@ -41,9 +41,9 @@ impl ValidatorService {
 
     pub async fn start(self) -> anyhow::Result<()> {
         info!(
-            "ValidatorService started with {} validator(s), genesis_time: {}",
-            self.keystores.len(),
-            lean_network_spec().genesis_time
+            genesis_time = lean_network_spec().genesis_time,
+            "ValidatorService started with {} validator(s)",
+            self.keystores.len()
         );
 
         let mut tick_count = 0u64;
@@ -63,7 +63,7 @@ impl ValidatorService {
 
                             // First tick (t=0): Propose a block.
                             if let Some(keystore) = self.is_proposer(slot) {
-                                info!("Validator {} proposing block for slot {slot} (tick {tick_count})", keystore.validator_id);
+                                info!(slot, tick = tick_count, "Proposing block by Validator {}", keystore.validator_id);
 
                                 let (tx, rx) = oneshot::channel();
                                 self.chain_sender
@@ -74,13 +74,10 @@ impl ValidatorService {
                                 let new_block = rx.await.expect("Failed to receive block from LeanChainService");
 
                                 info!(
-                                    "Validator {} built block: slot={}, root={:?}, parent={:?}, votes={}, state_root={:?}",
+                                    slot = new_block.slot,
+                                    block_root = ?new_block.tree_hash_root(),
+                                    "Building block finished by Validator {}",
                                     keystore.validator_id,
-                                    new_block.slot,
-                                    new_block.tree_hash_root(),
-                                    new_block.parent_root,
-                                    new_block.body.attestations.len(),
-                                    new_block.state_root
                                 );
 
                                 // TODO: Sign the block with the keystore.
@@ -100,17 +97,28 @@ impl ValidatorService {
                         }
                         1 => {
                             // Second tick (t=1/4): Vote.
-                            info!("Starting vote phase at slot {slot} (tick {tick_count}): {} validator(s) voting", self.keystores.len());
+                            info!(slot, tick = tick_count, "Starting vote phase: {} validator(s) voting", self.keystores.len());
 
                             // Build the vote from LeanChain, and modify its validator ID
                             let vote_template = self.lean_chain.read().await.build_vote(slot).await.expect("Failed to build vote");
-                            info!(
-                                "Built vote template for head={:?}, slot={}, source={:?}, target={:?}",
-                                vote_template.head,
-                                vote_template.slot,
-                                vote_template.source,
-                                vote_template.target
-                            );
+
+                            if enabled!(Level::DEBUG) {
+                                debug!(
+                                    slot = vote_template.slot,
+                                    head = ?vote_template.head,
+                                    source = ?vote_template.source,
+                                    target = ?vote_template.target,
+                                    "Building vote template finished",
+                                );
+                            } else {
+                                info!(
+                                    slot = vote_template.slot,
+                                    head_slot = vote_template.head.slot,
+                                    source_slot = vote_template.source.slot,
+                                    target_slot = vote_template.target.slot,
+                                    "Building vote template finished",
+                                );
+                            }
 
                             // TODO: Sign the vote with the keystore.
                             let signed_votes = self.keystores.iter().map(|keystore| {

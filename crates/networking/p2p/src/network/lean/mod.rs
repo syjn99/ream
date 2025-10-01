@@ -19,9 +19,7 @@ use libp2p::{
 };
 use libp2p_identity::{Keypair, PeerId, secp256k1};
 use parking_lot::Mutex;
-use ream_chain_lean::{
-    lean_chain::LeanChainReader, messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest,
-};
+use ream_chain_lean::{messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest};
 use ream_executor::ReamExecutor;
 use ssz::Encode;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -79,7 +77,6 @@ pub struct LeanNetworkConfig {
 ///
 /// TBD: It will be best if we reuse the existing NetworkManagerService for the beacon node.
 pub struct LeanNetworkService {
-    lean_chain: LeanChainReader,
     network_config: Arc<LeanNetworkConfig>,
     swarm: Swarm<ReamBehaviour>,
     peer_table: Arc<Mutex<HashMap<PeerId, ConnectionState>>>,
@@ -90,7 +87,6 @@ pub struct LeanNetworkService {
 impl LeanNetworkService {
     pub async fn new(
         network_config: Arc<LeanNetworkConfig>,
-        lean_chain: LeanChainReader,
         executor: ReamExecutor,
         chain_message_sender: UnboundedSender<LeanChainServiceMessage>,
         outbound_p2p_request: UnboundedReceiver<LeanP2PRequest>,
@@ -170,7 +166,6 @@ impl LeanNetworkService {
         };
 
         let mut lean_network_service = LeanNetworkService {
-            lean_chain,
             network_config: network_config.clone(),
             swarm,
             peer_table: Arc::new(Mutex::new(HashMap::new())),
@@ -206,10 +201,6 @@ impl LeanNetworkService {
 
     pub async fn start(&mut self, bootnodes: Bootnodes) -> anyhow::Result<()> {
         info!("LeanNetworkService started");
-        info!(
-            "Current LeanChain head: {}",
-            self.lean_chain.read().await.head
-        );
 
         self.connect_to_peers(bootnodes.to_multiaddrs_lean()).await;
         loop {
@@ -231,9 +222,16 @@ impl LeanNetworkService {
                                     signed_block.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish block for slot {} failed: {err:?}", signed_block.message.slot);
+                                warn!(
+                                    slot = signed_block.message.slot,
+                                    error = ?err,
+                                    "Publish block failed"
+                                );
                             } else {
-                                info!("broadcasted block for slot {}", signed_block.message.slot);
+                                info!(
+                                    slot = signed_block.message.slot,
+                                    "Broadcasted block"
+                                );
                             }
                         }
                         LeanP2PRequest::GossipVote(signed_vote) => {
@@ -251,9 +249,16 @@ impl LeanNetworkService {
                                     signed_vote.as_ssz_bytes(),
                                 )
                             {
-                                warn!("publish vote for slot {} failed: {err:?}", signed_vote.message.slot);
+                                warn!(
+                                    slot = signed_vote.message.slot,
+                                    error = ?err,
+                                    "Publish vote failed"
+                                );
                             } else {
-                                info!("broadcasted vote for slot {}", signed_vote.message.slot);
+                                info!(
+                                    slot = signed_vote.message.slot,
+                                    "Broadcasted vote"
+                                );
                             }
                         }
                     }
@@ -387,16 +392,11 @@ impl LeanNetworkService {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, net::Ipv4Addr, sync::Once, time::Duration};
+    use std::{net::Ipv4Addr, sync::Once, time::Duration};
 
-    use alloy_primitives::B256;
     use libp2p::{Multiaddr, multiaddr::Protocol};
-    use ream_chain_lean::lean_chain::LeanChain;
     use ream_network_spec::networks::{LeanNetworkSpec, set_lean_network_spec};
-    use ream_storage::db::ReamDB;
-    use ream_sync::rwlock::Writer;
-    use tempdir::TempDir;
-    use tokio::sync::{Mutex, mpsc};
+    use tokio::sync::mpsc;
     use tracing_test::traced_test;
 
     use super::*;
@@ -410,30 +410,11 @@ mod tests {
         });
     }
 
-    fn create_lean_chain() -> LeanChain {
-        let temp_dir = TempDir::new("lean_node_test").unwrap();
-        let temp_path = temp_dir.path().to_path_buf();
-
-        let ream_db = ReamDB::new(temp_path).expect("unable to init Ream Database");
-        let lean_db = ream_db
-            .init_lean_db()
-            .expect("unable to init Ream Lean Database");
-        LeanChain {
-            store: Arc::new(Mutex::new(lean_db)),
-            head: B256::default(),
-            safe_target: B256::default(),
-            latest_new_votes: HashMap::new(),
-            genesis_hash: B256::default(),
-            num_validators: 0,
-        }
-    }
-
     pub async fn setup_lean_node(
         socket_port: u16,
     ) -> anyhow::Result<(LeanNetworkService, Multiaddr)> {
         ensure_network_spec_init();
 
-        let (_, lean_chain_reader) = Writer::new(create_lean_chain());
         let executor = ReamExecutor::new().expect("Failed to create executor");
         let config = Arc::new(LeanNetworkConfig {
             gossipsub_config: LeanGossipsubConfig::default(),
@@ -444,14 +425,9 @@ mod tests {
         let (sender, _receiver) = mpsc::unbounded_channel::<LeanChainServiceMessage>();
         let (_outbound_request_sender_unused, outbound_request_receiver) =
             mpsc::unbounded_channel::<LeanP2PRequest>();
-        let node = LeanNetworkService::new(
-            config.clone(),
-            lean_chain_reader,
-            executor,
-            sender,
-            outbound_request_receiver,
-        )
-        .await?;
+        let node =
+            LeanNetworkService::new(config.clone(), executor, sender, outbound_request_receiver)
+                .await?;
         let multi_addr: Multiaddr = config.socket_address.into();
         Ok((node, multi_addr))
     }
