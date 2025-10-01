@@ -217,7 +217,7 @@ impl LeanChainService {
             return Ok(());
         }
 
-        let parent_state = self
+        let mut state = self
             .lean_chain
             .read()
             .await
@@ -232,8 +232,6 @@ impl LeanChainService {
                     signed_block.message.parent_root
                 )
             })?;
-
-        let mut state = parent_state.clone();
         state.state_transition(&signed_block, true, true)?;
 
         let mut lean_chain = self.lean_chain.write().await;
