@@ -3,7 +3,10 @@ use std::{collections::HashMap, sync::Arc};
 use ream_consensus_lean::vote::SignedVote;
 use redb::{Database, Durability, ReadableTable, TableDefinition};
 
-use crate::{errors::StoreError, tables::ssz_encoder::SSZEncoding};
+use crate::{
+    errors::StoreError,
+    tables::{ssz_encoder::SSZEncoding, table::Table},
+};
 
 /// Table definition for the Latest Known Votes table
 ///
@@ -14,6 +17,30 @@ pub(crate) const LATEST_KNOWN_VOTES_TABLE: TableDefinition<u64, SSZEncoding<Sign
 
 pub struct LatestKnownVotesTable {
     pub db: Arc<Database>,
+}
+
+impl Table for LatestKnownVotesTable {
+    type Key = u64;
+
+    type Value = SignedVote;
+
+    fn get(&self, key: Self::Key) -> Result<Option<Self::Value>, StoreError> {
+        let read_txn = self.db.begin_read()?;
+
+        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
+        let result = table.get(key)?;
+        Ok(result.map(|res| res.value()))
+    }
+
+    fn insert(&self, key: Self::Key, value: Self::Value) -> Result<(), StoreError> {
+        let mut write_txn = self.db.begin_write()?;
+        write_txn.set_durability(Durability::Immediate);
+        let mut table = write_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
+        table.insert(key, value)?;
+        drop(table);
+        write_txn.commit()?;
+        Ok(())
+    }
 }
 
 impl LatestKnownVotesTable {
