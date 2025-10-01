@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use alloy_primitives::{B256, FixedBytes};
+use alloy_primitives::B256;
 use anyhow::{Context, anyhow};
 use ream_consensus_lean::{
     block::{Block, SignedBlock},
@@ -205,94 +205,77 @@ impl LeanChainService {
             // TODO: Validate the signature.
         }
 
-        let block_hash = signed_block.message.tree_hash_root();
-
         let lean_block_provider = {
             let lean_chain = self.lean_chain.read().await;
             let db = lean_chain.store.lock().await;
             db.lean_block_provider()
         };
 
+        let block_hash = signed_block.message.tree_hash_root();
+
         // If the block is already known, ignore it
         if lean_block_provider.contains_key(block_hash) {
             return Ok(());
         }
 
-        let state = {
-            let lean_chain = self.lean_chain.read().await;
-            lean_chain
-                .store
-                .lock()
-                .await
-                .lean_state_provider()
-                .get(signed_block.message.parent_root)?
-        };
-        match state {
-            Some(parent_state) => {
-                let mut state = parent_state.clone();
-                state.state_transition(&signed_block, true, true)?;
+        let parent_state = self
+            .lean_chain
+            .read()
+            .await
+            .store
+            .lock()
+            .await
+            .lean_state_provider()
+            .get(signed_block.message.parent_root)?
+            .ok_or_else(|| {
+                anyhow!(
+                    "Parent state not found for block: {block_hash}, parent: {}",
+                    signed_block.message.parent_root
+                )
+            })?;
 
-                let mut lean_chain = self.lean_chain.write().await;
-                {
-                    let db = lean_chain.store.lock().await;
-                    db.lean_block_provider()
-                        .insert(block_hash, signed_block.clone())?;
+        let mut state = parent_state.clone();
+        state.state_transition(&signed_block, true, true)?;
 
-                    db.latest_justified_provider()
-                        .insert(state.latest_justified.clone())?;
-                    db.lean_state_provider().insert(block_hash, state)?;
+        let mut lean_chain = self.lean_chain.write().await;
+        {
+            let db = lean_chain.store.lock().await;
+            db.lean_block_provider()
+                .insert(block_hash, signed_block.clone())?;
+            db.latest_justified_provider()
+                .insert(state.latest_justified.clone())?;
+            db.lean_state_provider().insert(block_hash, state)?;
+            db.latest_known_votes_provider().batch_insert(
+                signed_block
+                    .message
+                    .body
+                    .attestations
+                    .into_iter()
+                    .map(|vote| (vote.validator_id, vote)),
+            )?;
+        }
 
-                    db.latest_known_votes_provider().batch_insert(
-                        signed_block
-                            .message
-                            .body
-                            .attestations
-                            .into_iter()
-                            .map(|vote| (vote.validator_id, vote)),
-                    )?;
-                }
+        lean_chain.update_head().await?;
 
-                lean_chain.update_head().await?;
+        drop(lean_chain);
 
-                drop(lean_chain);
+        // Once we have received a block, also process all of its dependencies
+        // by sending them to this service itself.
+        // NOTE 1: As we already verified all QueueItems before appending them, we can trust
+        // their validity.
+        // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
+        // only.
+        if let Some(queue_items) = self.dependencies.remove(&block_hash) {
+            for item in queue_items {
+                let message = match item {
+                    QueueItem::SignedVote(signed_vote) => LeanChainServiceMessage::ProcessVote {
+                        signed_vote: *signed_vote,
+                        is_trusted: true,
+                        need_gossip: false,
+                    },
+                };
 
-                // Once we have received a block, also process all of its dependencies
-                // by sending them to this service itself.
-                // NOTE 1: As we already verified all QueueItems before appending them, we can trust
-                // their validity.
-                // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
-                // only.
-                if let Some(queue_items) = self.dependencies.remove(&block_hash) {
-                    for item in queue_items {
-                        let message = match item {
-                            QueueItem::Block(block) => LeanChainServiceMessage::ProcessBlock {
-                                signed_block: SignedBlock {
-                                    message: block,
-                                    signature: FixedBytes::default(),
-                                },
-                                is_trusted: true,
-                                need_gossip: false,
-                            },
-                            QueueItem::SignedVote(signed_vote) => {
-                                LeanChainServiceMessage::ProcessVote {
-                                    signed_vote: *signed_vote,
-                                    is_trusted: true,
-                                    need_gossip: false,
-                                }
-                            }
-                        };
-
-                        self.sender.send(message)?;
-                    }
-                }
-            }
-            None => {
-                // If we have not yet seen the block's parent, ignore for now,
-                // process later once we actually see the parent
-                self.dependencies
-                    .entry(signed_block.message.parent_root)
-                    .or_default()
-                    .push(QueueItem::Block(signed_block.message));
+                self.sender.send(message)?;
             }
         }
 
