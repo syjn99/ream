@@ -14,8 +14,7 @@ use tree_hash::TreeHash;
 
 use crate::{
     clock::create_lean_clock_interval, lean_chain::LeanChainWriter,
-    messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest, queue_item::QueueItem,
-    slot::get_current_slot,
+    messages::LeanChainServiceMessage, p2p_request::LeanP2PRequest, slot::get_current_slot,
 };
 
 /// LeanChainService is responsible for updating the [LeanChain] state. `LeanChain` is updated when:
@@ -29,7 +28,7 @@ pub struct LeanChainService {
     sender: mpsc::UnboundedSender<LeanChainServiceMessage>,
     outbound_gossip: mpsc::UnboundedSender<LeanP2PRequest>,
     // Objects that we will process once we have processed their parents
-    dependencies: HashMap<B256, Vec<QueueItem>>,
+    dependencies: HashMap<B256, Vec<SignedVote>>,
 }
 
 impl LeanChainService {
@@ -265,17 +264,13 @@ impl LeanChainService {
         // their validity.
         // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
         // only.
-        if let Some(queue_items) = self.dependencies.remove(&block_hash) {
-            for item in queue_items {
-                let message = match item {
-                    QueueItem::SignedVote(signed_vote) => LeanChainServiceMessage::ProcessVote {
-                        signed_vote: *signed_vote,
-                        is_trusted: true,
-                        need_gossip: false,
-                    },
-                };
-
-                self.sender.send(message)?;
+        if let Some(signed_votes) = self.dependencies.remove(&block_hash) {
+            for signed_vote in signed_votes {
+                self.sender.send(LeanChainServiceMessage::ProcessVote {
+                    signed_vote,
+                    is_trusted: true,
+                    need_gossip: false,
+                })?;
             }
         }
 
@@ -318,7 +313,7 @@ impl LeanChainService {
             self.dependencies
                 .entry(signed_vote.message.head.root)
                 .or_default()
-                .push(QueueItem::SignedVote(Box::new(signed_vote)));
+                .push(signed_vote);
         }
 
         Ok(())
