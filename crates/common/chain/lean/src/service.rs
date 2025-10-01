@@ -216,8 +216,7 @@ impl LeanChainService {
         self.lean_chain
             .write()
             .await
-            .on_attestation(signed_vote.clone(), false)
-            .await?;
+            .on_attestation_from_gossip(signed_vote);
 
         Ok(())
     }

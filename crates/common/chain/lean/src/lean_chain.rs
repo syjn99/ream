@@ -373,83 +373,91 @@ impl LeanChain {
 
         lean_block_provider.insert(block_hash, signed_block.clone())?;
         latest_justified_provider.insert(state.latest_justified.clone())?;
-        lean_state_provider.insert(block_hash, state.clone())?;
-        for signed_vote in signed_block.message.body.attestations {
-            self.on_attestation(signed_vote, true).await?;
-        }
+        lean_state_provider.insert(block_hash, state)?;
+        self.on_attestation_from_block(signed_block.message.body.attestations)
+            .await?;
         self.update_head().await?;
 
         Ok(())
     }
 
-    /// Validates and processes a new attestation (a signed vote), updating the store's
-    /// latest votes.
+    /// Process multiple attestations (multiple [SignedVote]s) from [SignedBlock].
+    /// Main reason to have this function is to avoid multiple DB transactions by
+    /// batch inserting votes.
     ///
     /// See lean specification:
     /// <https://github.com/leanEthereum/leanSpec/blob/ee16b19825a1f358b00a6fc2d7847be549daa03b/docs/client/forkchoice.md?plain=1#L279-L312>
-    pub async fn on_attestation(
+    pub async fn on_attestation_from_block(
         &mut self,
-        signed_vote: SignedVote,
-        is_from_block: bool,
+        signed_votes: impl IntoIterator<Item = SignedVote>,
     ) -> anyhow::Result<()> {
-        let validator_id = signed_vote.validator_id;
-
-        // Case 1. Attestation from gossip
-        if !is_from_block {
-            // The below logic mirrors the Python spec:
-            // ```
-            // # update latest new votes if this is the latest
-            // latest_vote = store.latest_new_votes.get(validator_id)
-            // if latest_vote is None or latest_vote.slot < vote.slot:
-            //     store.latest_new_votes[validator_id] = vote
-            // ```
-            if self
-                .latest_new_votes
-                .get(&validator_id)
-                .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
-            {
-                self.latest_new_votes
-                    .insert(validator_id, signed_vote.clone());
-            }
-
-            return Ok(());
-        }
-
-        // Case 2. Attestation from a block
-
         let latest_known_votes_provider = {
             let db = self.store.lock().await;
             db.latest_known_votes_provider()
         };
 
-        // The below logic mirrors the Python spec:
-        //
-        // ```python
-        // # update latest known votes if this is latest
-        // latest_vote = store.latest_known_votes.get(validator_id)
-        // if latest_vote is None or latest_vote.slot < vote.slot:
-        //     store.latest_known_votes[validator_id] = vote
-        // ```
-        if latest_known_votes_provider
-            .get(validator_id)?
-            .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
-        {
-            latest_known_votes_provider.insert(validator_id, signed_vote.clone())?;
-        }
+        latest_known_votes_provider.batch_insert(signed_votes.into_iter().filter_map(
+            |signed_vote| {
+                let validator_id = signed_vote.validator_id;
 
-        // The below logic mirrors the Python spec:
-        // ```python
-        // # clear from new votes if this is latest
-        // latest_vote = store.latest_new_votes.get(validator_id)
-        // if latest_vote is not None and latest_vote.slot < vote.slot:
-        //     del store.latest_new_votes[validator_id]
-        // ```
-        if let Some(latest_vote) = self.latest_new_votes.get(&validator_id)
-            && latest_vote.message.slot < signed_vote.message.slot
-        {
-            self.latest_new_votes.remove_entry(&validator_id);
-        }
+                // Clear from new votes if this is latest.
+                //
+                // This logic mirrors the Python spec:
+                // ```python
+                // # clear from new votes if this is latest
+                // latest_vote = store.latest_new_votes.get(validator_id)
+                // if latest_vote is not None and latest_vote.slot < vote.slot:
+                //     del store.latest_new_votes[validator_id]
+                // ```
+                if let Some(latest_vote) = self.latest_new_votes.get(&validator_id)
+                    && latest_vote.message.slot < signed_vote.message.slot
+                {
+                    self.latest_new_votes.remove(&validator_id);
+                }
+
+                // Filter for batch insertion.
+                //
+                // This logic mirrors the Python spec:
+                //
+                // ```python
+                // # update latest known votes if this is latest
+                // latest_vote = store.latest_known_votes.get(validator_id)
+                // if latest_vote is None or latest_vote.slot < vote.slot:
+                //     store.latest_known_votes[validator_id] = vote
+                // ```
+                latest_known_votes_provider
+                    .get(validator_id)
+                    .ok()
+                    .flatten()
+                    .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
+                    .then_some((validator_id, signed_vote))
+            },
+        ))?;
 
         Ok(())
+    }
+
+    /// Processes a single attestation ([SignedVote]) from gossip.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/ee16b19825a1f358b00a6fc2d7847be549daa03b/docs/client/forkchoice.md?plain=1#L279-L312>
+    pub fn on_attestation_from_gossip(&mut self, signed_vote: SignedVote) {
+        let validator_id = signed_vote.validator_id;
+
+        // The below logic mirrors the Python spec:
+        // ```
+        // # update latest new votes if this is the latest
+        // latest_vote = store.latest_new_votes.get(validator_id)
+        // if latest_vote is None or latest_vote.slot < vote.slot:
+        //     store.latest_new_votes[validator_id] = vote
+        // ```
+        if self
+            .latest_new_votes
+            .get(&validator_id)
+            .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
+        {
+            self.latest_new_votes
+                .insert(validator_id, signed_vote.clone());
+        }
     }
 }
