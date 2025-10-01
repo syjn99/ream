@@ -242,35 +242,12 @@ impl LeanChainService {
             db.latest_justified_provider()
                 .insert(state.latest_justified.clone())?;
             db.lean_state_provider().insert(block_hash, state)?;
-            db.latest_known_votes_provider().batch_insert(
-                signed_block
-                    .message
-                    .body
-                    .attestations
-                    .into_iter()
-                    .map(|vote| (vote.validator_id, vote)),
-            )?;
         }
 
+        for signed_vote in signed_block.message.body.attestations {
+            lean_chain.on_attestation(signed_vote, true).await?;
+        }
         lean_chain.update_head().await?;
-
-        drop(lean_chain);
-
-        // Once we have received a block, also process all of its dependencies
-        // by sending them to this service itself.
-        // NOTE 1: As we already verified all QueueItems before appending them, we can trust
-        // their validity.
-        // NOTE 2: We don't need to gossip this, as dependencies are for internal processing
-        // only.
-        if let Some(signed_votes) = self.dependencies.remove(&block_hash) {
-            for signed_vote in signed_votes {
-                self.sender.send(LeanChainServiceMessage::ProcessVote {
-                    signed_vote,
-                    is_trusted: true,
-                    need_gossip: false,
-                })?;
-            }
-        }
 
         Ok(())
     }
@@ -284,35 +261,11 @@ impl LeanChainService {
             // TODO: Validate the signature.
         }
 
-        let (lean_block_provider, latest_known_votes_provider) = {
-            let lean_chain = self.lean_chain.read().await;
-            let db = lean_chain.store.lock().await;
-            (db.lean_block_provider(), db.latest_known_votes_provider())
-        };
-
-        let is_known_vote = latest_known_votes_provider.contains(&signed_vote)?;
-        let is_new_vote = {
-            self.lean_chain
-                .read()
-                .await
-                .latest_new_votes
-                .contains_key(&signed_vote.validator_id)
-        };
-
-        if is_known_vote || is_new_vote {
-            // Do nothing
-        } else if lean_block_provider.contains_key(signed_vote.message.head.root) {
-            // We should acquire another write lock
-            let mut lean_chain = self.lean_chain.write().await;
-            lean_chain
-                .latest_new_votes
-                .insert(signed_vote.validator_id, signed_vote);
-        } else {
-            self.dependencies
-                .entry(signed_vote.message.head.root)
-                .or_default()
-                .push(signed_vote);
-        }
+        self.lean_chain
+            .write()
+            .await
+            .on_attestation(signed_vote.clone(), false)
+            .await?;
 
         Ok(())
     }
