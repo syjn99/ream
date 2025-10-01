@@ -394,40 +394,8 @@ impl LeanChain {
     ) -> anyhow::Result<()> {
         let validator_id = signed_vote.validator_id;
 
-        if is_from_block {
-            let latest_known_votes_provider = {
-                let db = self.store.lock().await;
-                db.latest_known_votes_provider()
-            };
-
-            // The below logic mirrors the Python spec:
-            //
-            // ```python
-            // # update latest known votes if this is latest
-            // latest_vote = store.latest_known_votes.get(validator_id)
-            // if latest_vote is None or latest_vote.slot < vote.slot:
-            //     store.latest_known_votes[validator_id] = vote
-            // ```
-            if latest_known_votes_provider
-                .get(validator_id)?
-                .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
-            {
-                latest_known_votes_provider.insert(validator_id, signed_vote.clone())?;
-            }
-
-            // The below logic mirrors the Python spec:
-            // ```python
-            // # clear from new votes if this is latest
-            // latest_vote = store.latest_new_votes.get(validator_id)
-            // if latest_vote is not None and latest_vote.slot < vote.slot:
-            //     del store.latest_new_votes[validator_id]
-            // ```
-            if let Some(latest_vote) = self.latest_new_votes.get(&validator_id)
-                && latest_vote.message.slot < signed_vote.message.slot
-            {
-                self.latest_new_votes.remove_entry(&validator_id);
-            }
-        } else {
+        // Case 1. Attestation from gossip
+        if !is_from_block {
             // The below logic mirrors the Python spec:
             // ```
             // # update latest new votes if this is the latest
@@ -443,6 +411,43 @@ impl LeanChain {
                 self.latest_new_votes
                     .insert(validator_id, signed_vote.clone());
             }
+
+            return Ok(());
+        }
+
+        // Case 2. Attestation from a block
+
+        let latest_known_votes_provider = {
+            let db = self.store.lock().await;
+            db.latest_known_votes_provider()
+        };
+
+        // The below logic mirrors the Python spec:
+        //
+        // ```python
+        // # update latest known votes if this is latest
+        // latest_vote = store.latest_known_votes.get(validator_id)
+        // if latest_vote is None or latest_vote.slot < vote.slot:
+        //     store.latest_known_votes[validator_id] = vote
+        // ```
+        if latest_known_votes_provider
+            .get(validator_id)?
+            .is_none_or(|latest_vote| latest_vote.message.slot < signed_vote.message.slot)
+        {
+            latest_known_votes_provider.insert(validator_id, signed_vote.clone())?;
+        }
+
+        // The below logic mirrors the Python spec:
+        // ```python
+        // # clear from new votes if this is latest
+        // latest_vote = store.latest_new_votes.get(validator_id)
+        // if latest_vote is not None and latest_vote.slot < vote.slot:
+        //     del store.latest_new_votes[validator_id]
+        // ```
+        if let Some(latest_vote) = self.latest_new_votes.get(&validator_id)
+            && latest_vote.message.slot < signed_vote.message.slot
+        {
+            self.latest_new_votes.remove_entry(&validator_id);
         }
 
         Ok(())
