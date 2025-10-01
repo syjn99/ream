@@ -4,7 +4,7 @@ use ream_consensus_lean::{
     vote::SignedVote,
 };
 use ream_network_spec::networks::lean_network_spec;
-use ream_storage::tables::{field::Field, table::Table};
+use ream_storage::tables::table::Table;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{Level, debug, enabled, error, info, warn};
 use tree_hash::TreeHash;
@@ -195,50 +195,11 @@ impl LeanChainService {
             // TODO: Validate the signature.
         }
 
-        let lean_block_provider = {
-            let lean_chain = self.lean_chain.read().await;
-            let db = lean_chain.store.lock().await;
-            db.lean_block_provider()
-        };
-
-        let block_hash = signed_block.message.tree_hash_root();
-
-        // If the block is already known, ignore it
-        if lean_block_provider.contains_key(block_hash) {
-            return Ok(());
-        }
-
-        let mut state = self
-            .lean_chain
-            .read()
+        self.lean_chain
+            .write()
             .await
-            .store
-            .lock()
-            .await
-            .lean_state_provider()
-            .get(signed_block.message.parent_root)?
-            .ok_or_else(|| {
-                anyhow!(
-                    "Parent state not found for block: {block_hash}, parent: {}",
-                    signed_block.message.parent_root
-                )
-            })?;
-        state.state_transition(&signed_block, true, true)?;
-
-        let mut lean_chain = self.lean_chain.write().await;
-        {
-            let db = lean_chain.store.lock().await;
-            db.lean_block_provider()
-                .insert(block_hash, signed_block.clone())?;
-            db.latest_justified_provider()
-                .insert(state.latest_justified.clone())?;
-            db.lean_state_provider().insert(block_hash, state)?;
-        }
-
-        for signed_vote in signed_block.message.body.attestations {
-            lean_chain.on_attestation(signed_vote, true).await?;
-        }
-        lean_chain.update_head().await?;
+            .on_block(signed_block.clone())
+            .await?;
 
         Ok(())
     }

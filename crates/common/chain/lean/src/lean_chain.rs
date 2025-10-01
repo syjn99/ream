@@ -340,6 +340,48 @@ impl LeanChain {
         })
     }
 
+    /// Processes a new block, updates the store, and triggers a head update.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/ee16b19825a1f358b00a6fc2d7847be549daa03b/docs/client/forkchoice.md?plain=1#L314-L342>
+    pub async fn on_block(&mut self, signed_block: SignedBlock) -> anyhow::Result<()> {
+        let block_hash = signed_block.message.tree_hash_root();
+
+        let (lean_block_provider, latest_justified_provider, lean_state_provider) = {
+            let db = self.store.lock().await;
+            (
+                db.lean_block_provider(),
+                db.latest_justified_provider(),
+                db.lean_state_provider(),
+            )
+        };
+
+        // If the block is already known, ignore it
+        if lean_block_provider.contains_key(block_hash) {
+            return Ok(());
+        }
+
+        let mut state = lean_state_provider
+            .get(signed_block.message.parent_root)?
+            .ok_or_else(|| {
+                anyhow!(
+                    "Parent state not found for block: {block_hash}, parent: {}",
+                    signed_block.message.parent_root
+                )
+            })?;
+        state.state_transition(&signed_block, true, true)?;
+
+        lean_block_provider.insert(block_hash, signed_block.clone())?;
+        latest_justified_provider.insert(state.latest_justified.clone())?;
+        lean_state_provider.insert(block_hash, state.clone())?;
+        for signed_vote in signed_block.message.body.attestations {
+            self.on_attestation(signed_vote, true).await?;
+        }
+        self.update_head().await?;
+
+        Ok(())
+    }
+
     /// Validates and processes a new attestation (a signed vote), updating the store's
     /// latest votes.
     ///
