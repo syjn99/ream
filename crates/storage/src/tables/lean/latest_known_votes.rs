@@ -64,21 +64,6 @@ impl LatestKnownVotesTable {
         Ok(())
     }
 
-    /// Check if a given vote exists in the append-only array.
-    pub fn contains(&self, value: &SignedVote) -> Result<bool, StoreError> {
-        let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(LATEST_KNOWN_VOTES_TABLE)?;
-
-        for entry in table.iter()? {
-            let (_, v) = entry?;
-            if &v.value() == value {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
     /// Get all votes.
     pub fn get_all_votes(&self) -> Result<HashMap<u64, SignedVote>, StoreError> {
         let read_txn = self.db.begin_read()?;
