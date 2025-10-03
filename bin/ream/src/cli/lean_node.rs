@@ -35,7 +35,11 @@ pub struct LeanNodeConfig {
     )]
     pub node_id: String,
 
-    #[arg(long, help = "The path to the hex encoded secp256k1 libp2p key")]
+    #[arg(
+        long,
+        help = "The path to the hex encoded secp256k1 libp2p key",
+        alias = "node-key"
+    )]
     pub private_key_path: Option<PathBuf>,
 
     #[arg(long, help = "Set P2P socket address", default_value_t = DEFAULT_SOCKET_ADDRESS)]
