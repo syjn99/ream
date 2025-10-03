@@ -101,6 +101,9 @@ mod tests {
             "./assets/lean/sample_spec.yml",
             "--validator-registry-path",
             "./assets/lean/validator_registry.yml",
+            // Test for alias of `private-key-path`
+            "--node-key",
+            "awesome-node0.key",
         ]);
 
         assert_eq!(cli.verbosity, Verbosity::Trace);
@@ -117,6 +120,11 @@ mod tests {
                 assert_eq!(config.network.genesis_time, 0);
                 assert_eq!(config.network.justification_lookback_slots, 3);
                 assert_eq!(config.network.num_validators, 4);
+
+                assert_eq!(
+                    config.private_key_path.as_ref().unwrap().to_str().unwrap(),
+                    "awesome-node0.key"
+                );
             }
             _ => unreachable!("This test should only validate the lean node cli"),
         }
