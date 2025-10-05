@@ -37,7 +37,7 @@ pub struct LeanState {
     pub latest_finalized: Checkpoint,
 
     pub historical_block_hashes: VariableList<B256, U262144>,
-    pub justified_slots: VariableList<bool, U262144>,
+    pub justified_slots: BitList<U262144>,
 
     pub justifications_roots: VariableList<B256, U262144>,
     pub justifications_validators: BitList<U1073741824>,
@@ -60,7 +60,8 @@ impl LeanState {
             latest_finalized: Checkpoint::default(),
 
             historical_block_hashes: VariableList::empty(),
-            justified_slots: VariableList::empty(),
+            justified_slots: BitList::with_capacity(0)
+                .expect("Failed to initialize an empty BitList"),
 
             justifications_roots: VariableList::empty(),
             justifications_validators: BitList::with_capacity(0)
@@ -248,9 +249,18 @@ impl LeanState {
             })?;
 
         // genesis block is always justified
-        self.justified_slots
-            .push(self.latest_block_header.slot == 0)
-            .map_err(|err| anyhow!("Failed to add to justified_slots: {err:?}"))?;
+        let length = self.justified_slots.len();
+        let mut new_bitlist = BitList::with_capacity(length + 1)
+            .map_err(|err| anyhow!("Failed to resize justified_slots BitList: {err:?}"))?;
+        new_bitlist
+            .set(length, self.latest_block_header.slot == 0)
+            .map_err(|err| {
+                anyhow!(
+                    "Failed to set justified slot for slot {}: {err:?}",
+                    self.latest_block_header.slot
+                )
+            })?;
+        self.justified_slots = new_bitlist.union(&self.justified_slots);
 
         // if there were empty slots, push zero hash for those ancestors
         let num_empty_slots = block.slot - self.latest_block_header.slot - 1;
@@ -259,9 +269,16 @@ impl LeanState {
                 .push(B256::ZERO)
                 .map_err(|err| anyhow!("Failed to prefill historical_block_hashes: {err:?}"))?;
 
-            self.justified_slots
-                .push(false)
-                .map_err(|err| anyhow!("Failed to prefill justified_slots: {err:?}"))?;
+            let length = self.justified_slots.len();
+            let mut new_bitlist = BitList::with_capacity(length + 1)
+                .map_err(|err| anyhow!("Failed to resize justified_slots BitList: {err:?}"))?;
+            new_bitlist.set(length, false).map_err(|err| {
+                anyhow!(
+                    "Failed to set justified slot for empty slot {}: {err:?}",
+                    length
+                )
+            })?;
+            self.justified_slots = new_bitlist.union(&self.justified_slots);
         }
 
         // Cache current block as the new latest block
@@ -297,10 +314,10 @@ impl LeanState {
             // Ignore votes whose source is not already justified,
             // or whose target is not in the history, or whose target is not a
             // valid justifiable slot
-            if !*self
+            if !self
                 .justified_slots
                 .get(vote.source.slot as usize)
-                .ok_or(anyhow!("Source slot not found in justified_slots"))?
+                .map_err(|err| anyhow!("Failed to get justified slot: {err:?}"))?
             {
                 info!(
                     reason = "Source slot not justified",
@@ -316,10 +333,10 @@ impl LeanState {
             // we don't want to re-introduce the target again for remaining votes if
             // the slot is already justified and its tracking already cleared out
             // from justifications map
-            if *self
+            if self
                 .justified_slots
                 .get(vote.target.slot as usize)
-                .ok_or(anyhow!("Target slot not found in justified_slots"))?
+                .map_err(|err| anyhow!("Failed to get justified slot: {err:?}"))?
             {
                 info!(
                     reason = "Target slot already justified",
@@ -414,7 +431,14 @@ impl LeanState {
             // justifying specially if the num_validators is low in testing scenarios
             if 3 * count >= (2 * self.config.num_validators) as usize {
                 self.latest_justified = vote.target.clone();
-                self.justified_slots[vote.target.slot as usize] = true;
+                self.justified_slots
+                    .set(vote.target.slot as usize, true)
+                    .map_err(|err| {
+                        anyhow!(
+                            "Failed to set justified slot for slot {}: {err:?}",
+                            vote.target.slot
+                        )
+                    })?;
 
                 justifications_map.remove(&vote.target.root);
 
