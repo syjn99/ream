@@ -164,6 +164,13 @@ pub async fn run_lean_node(config: LeanNodeConfig, executor: ReamExecutor, ream_
 
     // Initialize the lean chain with genesis block and state.
     let (genesis_block, genesis_state) = lean_genesis::setup_genesis();
+
+    // TODO: Remove this.
+    info!(
+        "Lean state: {}",
+        serde_json::to_string_pretty(&genesis_state).unwrap()
+    );
+
     let (lean_chain_writer, lean_chain_reader) = Writer::new(LeanChain::new(
         SignedBlock {
             message: genesis_block,
