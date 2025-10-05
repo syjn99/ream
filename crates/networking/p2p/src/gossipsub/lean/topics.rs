@@ -1,5 +1,4 @@
 use LeanGossipTopicKind::*;
-use alloy_primitives::hex::ToHexExt;
 use libp2p::gossipsub::{IdentTopic as Topic, TopicHash};
 
 use crate::gossipsub::error::GossipsubError;
@@ -48,8 +47,7 @@ impl std::fmt::Display for LeanGossipTopic {
         write!(
             f,
             "/{TOPIC_PREFIX}/{}/{}/{ENCODING_POSTFIX}",
-            self.fork.encode_hex(),
-            self.kind,
+            self.fork, self.kind,
         )
     }
 }
@@ -74,7 +72,7 @@ impl From<LeanGossipTopic> for TopicHash {
         };
         TopicHash::from_raw(format!(
             "/{TOPIC_PREFIX}/{}/{kind_str}/{ENCODING_POSTFIX}",
-            val.fork.encode_hex(),
+            val.fork,
         ))
     }
 }
