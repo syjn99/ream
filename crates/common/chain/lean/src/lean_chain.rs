@@ -47,6 +47,11 @@ pub struct LeanChain {
 
 impl LeanChain {
     pub fn new(genesis_block: SignedBlock, genesis_state: LeanState, db: LeanDB) -> LeanChain {
+        assert_eq!(
+            genesis_block.message.state_root,
+            genesis_state.tree_hash_root()
+        );
+
         let genesis_block_hash = genesis_block.message.tree_hash_root();
         let no_of_validators = genesis_state.config.num_validators;
         db.lean_block_provider()
