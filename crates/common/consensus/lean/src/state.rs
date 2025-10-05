@@ -64,7 +64,7 @@ impl LeanState {
 
             justifications_roots: VariableList::empty(),
             justifications_validators: BitList::with_capacity(0)
-            .expect("Failed to initialize an empty BitList"),
+                .expect("Failed to initialize an empty BitList"),
         }
     }
 
