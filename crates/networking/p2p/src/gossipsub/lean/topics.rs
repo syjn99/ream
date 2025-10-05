@@ -73,7 +73,7 @@ impl From<LeanGossipTopic> for TopicHash {
         };
         TopicHash::from_raw(format!(
             "/{TOPIC_PREFIX}/{}/{kind_str}/{ENCODING_POSTFIX}",
-            val.fork.encode_hex(),
+            val.fork,
         ))
     }
 }
