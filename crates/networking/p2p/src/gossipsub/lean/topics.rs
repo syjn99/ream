@@ -1,5 +1,4 @@
 use LeanGossipTopicKind::*;
-use alloy_primitives::hex::ToHexExt;
 use libp2p::gossipsub::{IdentTopic as Topic, TopicHash};
 
 use crate::gossipsub::error::GossipsubError;
