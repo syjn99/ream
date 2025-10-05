@@ -48,8 +48,7 @@ impl std::fmt::Display for LeanGossipTopic {
         write!(
             f,
             "/{TOPIC_PREFIX}/{}/{}/{ENCODING_POSTFIX}",
-            self.fork.encode_hex(),
-            self.kind,
+            self.fork, self.kind,
         )
     }
 }
