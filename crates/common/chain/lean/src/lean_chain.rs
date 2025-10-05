@@ -553,6 +553,7 @@ mod tests {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Helper function to save SignedBlock to a JSON file
     fn save_block_to_json(block: &SignedBlock, path: &str) -> anyhow::Result<()> {
         let json_str = serde_json::to_string_pretty(block)?;
