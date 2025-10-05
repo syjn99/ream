@@ -179,7 +179,7 @@ impl LeanState {
         Ok(())
     }
 
-    fn process_slots(&mut self, slot: u64) -> anyhow::Result<()> {
+    pub fn process_slots(&mut self, slot: u64) -> anyhow::Result<()> {
         ensure!(self.slot < slot, "State slot must be less than block slot");
 
         while self.slot < slot {
@@ -199,7 +199,7 @@ impl LeanState {
         Ok(())
     }
 
-    fn process_block(&mut self, block: &Block) -> anyhow::Result<()> {
+    pub fn process_block(&mut self, block: &Block) -> anyhow::Result<()> {
         self.process_block_header(block)?;
         self.process_operations(&block.body)?;
 
