@@ -438,3 +438,158 @@ impl LeanChain {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::genesis::setup_genesis;
+    use alloy_primitives::FixedBytes;
+    use ream_consensus_lean::checkpoint::Checkpoint;
+    use ream_network_spec::networks::lean::initialize_test_lean_network_spec;
+    use ream_storage::db::ReamDB;
+    use std::fs;
+    use tempdir::TempDir;
+
+    fn create_test_chain() -> LeanChain {
+        initialize_test_lean_network_spec();
+
+        let temp_dir = TempDir::new("ream_state").unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
+        let ream_db = ReamDB::new(temp_path).expect("unable to init Ream Database");
+        let db = ream_db.init_lean_db().unwrap();
+
+        let (genesis_block, genesis_state) = setup_genesis();
+        let signed_genesis = SignedBlock {
+            message: genesis_block,
+            signature: FixedBytes::default(),
+        };
+        LeanChain::new(signed_genesis, genesis_state, db)
+    }
+
+    #[test]
+    fn test_new_lean_chain() {
+        let chain = create_test_chain();
+
+        assert_eq!(chain.head, chain.genesis_hash);
+        assert_eq!(chain.safe_target, chain.genesis_hash);
+        assert_eq!(chain.latest_new_votes.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_head() {
+        let chain = create_test_chain();
+        let head = chain
+            .store
+            .lock()
+            .await
+            .lean_state_provider()
+            .get(chain.head)
+            .unwrap()
+            .unwrap();
+
+        println!("{}", serde_json::to_string_pretty(&head).unwrap());
+
+        assert_eq!(head.latest_finalized, Checkpoint::default());
+        assert_eq!(head.latest_justified, Checkpoint::default());
+        assert_eq!(head.slot, 0);
+    }
+
+    #[tokio::test]
+    async fn test_state_transition() {
+        let chain = create_test_chain();
+        let head = chain
+            .store
+            .lock()
+            .await
+            .lean_state_provider()
+            .get(chain.head)
+            .unwrap()
+            .unwrap();
+
+        println!("{}", serde_json::to_string_pretty(&head).unwrap());
+
+        let mut state = head.clone();
+        let signed_block = SignedBlock {
+            message: Block {
+                slot: 1,
+                proposer_index: 1,
+                parent_root: chain.head,
+                state_root: B256::ZERO,
+                body: BlockBody::default(),
+            },
+            signature: FixedBytes::default(),
+        };
+
+        state.state_transition(&signed_block, true, false).unwrap();
+
+        assert_eq!(state.latest_finalized, Checkpoint::default());
+        assert_eq!(state.latest_justified, Checkpoint::default());
+        assert_eq!(state.slot, 0);
+    }
+
+    /// Helper function to load LeanState from a JSON file
+    fn load_state_from_json(path: &str) -> anyhow::Result<LeanState> {
+        let json_str = fs::read_to_string(path)?;
+        let state: LeanState = serde_json::from_str(&json_str)?;
+        Ok(state)
+    }
+
+    /// Helper function to load SignedBlock from a JSON file
+    fn load_block_from_json(path: &str) -> anyhow::Result<SignedBlock> {
+        let json_str = fs::read_to_string(path)?;
+        let block: SignedBlock = serde_json::from_str(&json_str)?;
+        Ok(block)
+    }
+
+    /// Helper function to save LeanState to a JSON file
+    fn save_state_to_json(state: &LeanState, path: &str) -> anyhow::Result<()> {
+        let json_str = serde_json::to_string_pretty(state)?;
+        fs::write(path, json_str)?;
+        Ok(())
+    }
+
+    /// Helper function to save SignedBlock to a JSON file
+    fn save_block_to_json(block: &SignedBlock, path: &str) -> anyhow::Result<()> {
+        let json_str = serde_json::to_string_pretty(block)?;
+        fs::write(path, json_str)?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_chain_with_external_fixtures() {
+        initialize_test_lean_network_spec();
+
+        // Load from JSON - use test_data relative to crate root
+        let state_path =
+            std::env::var("STATE_JSON_PATH").unwrap_or_else(|_| "test_data/state.json".to_string());
+        let block_path =
+            std::env::var("BLOCK_JSON_PATH").unwrap_or_else(|_| "test_data/block.json".to_string());
+
+        let loaded_state = load_state_from_json(&state_path)
+            .expect(&format!("Failed to load state from {}", state_path));
+        let loaded_block = load_block_from_json(&block_path)
+            .expect(&format!("Failed to load block from {}", block_path));
+
+        // Create chain with loaded data
+        let temp_dir = TempDir::new("ream_state").unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
+        let ream_db = ReamDB::new(temp_path).expect("unable to init Ream Database");
+        let db = ream_db.init_lean_db().unwrap();
+
+        let mut chain = LeanChain::new(loaded_block, loaded_state, db);
+
+        // Verify chain state
+        assert_eq!(chain.head, chain.genesis_hash);
+        assert_eq!(chain.safe_target, chain.genesis_hash);
+
+        // Test proposing a block at slot 1
+        let proposed_block = chain.propose_block(1).await;
+        assert!(
+            proposed_block.is_ok(),
+            "Failed to propose block at slot 1: {:?}",
+            proposed_block.err()
+        );
+        let proposed_block = proposed_block.unwrap();
+        assert_eq!(proposed_block.slot, 1);
+    }
+}

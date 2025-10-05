@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, OnceLock},
+    sync::{Arc, Once, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -7,6 +7,13 @@ use serde::Deserialize;
 
 /// Static specification of the Lean Chain network.
 pub static LEAN_NETWORK_SPEC: OnceLock<Arc<LeanNetworkSpec>> = OnceLock::new();
+pub static HAS_LEAN_NETWORK_SPEC_BEEN_INITIALIZED: Once = Once::new();
+
+pub fn initialize_test_lean_network_spec() {
+    HAS_LEAN_NETWORK_SPEC_BEEN_INITIALIZED.call_once(|| {
+        set_lean_network_spec(LeanNetworkSpec::ephemery());
+    });
+}
 
 /// Use 3 as the default justification lookback slots if not specified.
 fn default_justification_lookback_slots() -> u64 {
