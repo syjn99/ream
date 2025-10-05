@@ -51,7 +51,10 @@ impl LeanState {
                 genesis_time,
             },
             slot: 0,
-            latest_block_header: BlockHeader::default(),
+            latest_block_header: BlockHeader {
+                body_root: BlockBody::default().tree_hash_root(),
+                ..BlockHeader::default()
+            },
 
             latest_justified: Checkpoint::default(),
             latest_finalized: Checkpoint::default(),
