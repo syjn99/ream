@@ -242,7 +242,14 @@ impl LeanChain {
         })
     }
 
-    pub async fn propose_block(&self, slot: u64) -> anyhow::Result<Block> {
+    pub async fn get_proposal_head(&mut self) -> anyhow::Result<B256> {
+        self.accept_new_votes().await?;
+        Ok(self.head)
+    }
+
+    pub async fn propose_block(&mut self, slot: u64) -> anyhow::Result<Block> {
+        let head = self.get_proposal_head().await?;
+
         let initialize_block_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["initialize_block"]);
 
         let (lean_state_provider, latest_known_votes_provider) = {
@@ -251,14 +258,14 @@ impl LeanChain {
         };
 
         let head_state = lean_state_provider
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("Post state not found for head: {}", self.head))?;
+            .get(head)?
+            .ok_or_else(|| anyhow!("Post state not found for head: {head}"))?;
 
         let mut new_block = SignedBlock {
             message: Block {
                 slot,
                 proposer_index: slot % lean_network_spec().num_validators,
-                parent_root: self.head,
+                parent_root: head,
                 // Diverged from Python implementation: Using `B256::ZERO` instead of `None`)
                 state_root: B256::ZERO,
                 body: BlockBody::default(),
@@ -546,6 +553,7 @@ mod tests {
         Ok(block)
     }
 
+    #[allow(dead_code)]
     /// Helper function to save LeanState to a JSON file
     fn save_state_to_json(state: &LeanState, path: &str) -> anyhow::Result<()> {
         let json_str = serde_json::to_string_pretty(state)?;
