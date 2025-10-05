@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use anyhow::{Context, anyhow, ensure};
 use itertools::Itertools;
-use ream_consensus_misc::constants::lean::{MAX_HISTORICAL_BLOCK_HASHES, VALIDATOR_REGISTRY_LIMIT};
+use ream_consensus_misc::constants::lean::VALIDATOR_REGISTRY_LIMIT;
 use ream_metrics::{FINALIZED_SLOT, JUSTIFIED_SLOT, set_int_gauge_vec};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
@@ -63,10 +63,8 @@ impl LeanState {
             justified_slots: VariableList::empty(),
 
             justifications_roots: VariableList::empty(),
-            justifications_validators: BitList::with_capacity(
-                (num_validators * MAX_HISTORICAL_BLOCK_HASHES) as usize,
-            )
-            .expect("Failed to initialize an empty BitList"),
+            justifications_validators: BitList::with_capacity(0)
+                .expect("Failed to initialize an empty BitList"),
         }
     }
 
