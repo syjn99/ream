@@ -48,21 +48,18 @@ impl ValidatorService {
 
         let mut tick_count = 0u64;
 
-        // Start from slot 0, will be incremented for every slot boundary.
-        let mut slot = 0;
-
         let mut interval =
             create_lean_clock_interval().context("Failed to create clock interval")?;
 
         loop {
             tokio::select! {
                 _ = interval.tick() => {
+                    let slot = tick_count / 4;
+
                     match tick_count % 4 {
                         0 => {
-                            slot += 1;
-
                             // First tick (t=0): Propose a block.
-                            if let Some(keystore) = self.is_proposer(slot) {
+                            if slot > 0 && let Some(keystore) = self.is_proposer(slot) {
                                 info!(slot, tick = tick_count, "Proposing block by Validator {}", keystore.validator_id);
 
                                 let (tx, rx) = oneshot::channel();
