@@ -237,7 +237,19 @@ impl LeanChain {
         })
     }
 
-    pub async fn propose_block(&self, slot: u64) -> anyhow::Result<Block> {
+    /// Get the head for block proposal at given slot.
+    /// Ensures store is up-to-date and processes any pending votes.
+    ///
+    /// See lean specification:
+    /// <https://github.com/leanEthereum/leanSpec/blob/4b750f2748a3718fe3e1e9cdb3c65e3a7ddabff5/src/lean_spec/subspecs/forkchoice/store.py#L319-L339>
+    pub async fn get_proposal_head(&mut self) -> anyhow::Result<B256> {
+        self.accept_new_votes().await?;
+        Ok(self.head)
+    }
+
+    pub async fn propose_block(&mut self, slot: u64) -> anyhow::Result<Block> {
+        let head = self.get_proposal_head().await?;
+
         let initialize_block_timer = start_timer_vec(&PROPOSE_BLOCK_TIME, &["initialize_block"]);
 
         let (lean_state_provider, latest_known_votes_provider) = {
@@ -246,14 +258,14 @@ impl LeanChain {
         };
 
         let head_state = lean_state_provider
-            .get(self.head)?
-            .ok_or_else(|| anyhow!("Post state not found for head: {}", self.head))?;
+            .get(head)?
+            .ok_or_else(|| anyhow!("Post state not found for head: {head}"))?;
 
         let mut new_block = SignedBlock {
             message: Block {
                 slot,
                 proposer_index: slot % lean_network_spec().num_validators,
-                parent_root: self.head,
+                parent_root: head,
                 // Diverged from Python implementation: Using `B256::ZERO` instead of `None`)
                 state_root: B256::ZERO,
                 body: BlockBody::default(),
