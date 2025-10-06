@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use alloy_primitives::B256;
 use anyhow::{Context, anyhow, ensure};
 use itertools::Itertools;
-use ream_consensus_misc::constants::lean::MAX_HISTORICAL_BLOCK_HASHES;
 use ream_metrics::{FINALIZED_SLOT, JUSTIFIED_SLOT, set_int_gauge_vec};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
@@ -37,7 +36,7 @@ pub struct LeanState {
     pub latest_finalized: Checkpoint,
 
     pub historical_block_hashes: VariableList<B256, U262144>,
-    pub justified_slots: VariableList<bool, U262144>,
+    pub justified_slots: BitList<U262144>,
 
     pub justifications_roots: VariableList<B256, U262144>,
     pub justifications_validators: BitList<U1073741824>,
@@ -51,19 +50,21 @@ impl LeanState {
                 genesis_time,
             },
             slot: 0,
-            latest_block_header: BlockHeader::default(),
+            latest_block_header: BlockHeader {
+                body_root: BlockBody::default().tree_hash_root(),
+                ..BlockHeader::default()
+            },
 
             latest_justified: Checkpoint::default(),
             latest_finalized: Checkpoint::default(),
 
             historical_block_hashes: VariableList::empty(),
-            justified_slots: VariableList::empty(),
+            justified_slots: BitList::with_capacity(0)
+                .expect("Failed to initialize an empty BitList"),
 
             justifications_roots: VariableList::empty(),
-            justifications_validators: BitList::with_capacity(
-                (num_validators * MAX_HISTORICAL_BLOCK_HASHES) as usize,
-            )
-            .expect("Failed to initialize an empty BitList"),
+            justifications_validators: BitList::with_capacity(0)
+                .expect("Failed to initialize an empty BitList"),
         }
     }
 
@@ -115,7 +116,9 @@ impl LeanState {
             // If the length is incorrect, the constructed bitlist will be corrupt.
             ensure!(
                 justifications_for_root.len() == self.config.num_validators as usize,
-                "Justifications length does not match validator registry limit"
+                "Justifications length ({}) does not match validators length ({})",
+                justifications_for_root.len(),
+                self.config.num_validators
             );
 
             justifications_roots
@@ -247,9 +250,18 @@ impl LeanState {
             })?;
 
         // genesis block is always justified
-        self.justified_slots
-            .push(self.latest_block_header.slot == 0)
-            .map_err(|err| anyhow!("Failed to add to justified_slots: {err:?}"))?;
+        let length = self.justified_slots.len();
+        let mut new_bitlist = BitList::with_capacity(length + 1)
+            .map_err(|err| anyhow!("Failed to resize justified_slots BitList: {err:?}"))?;
+        new_bitlist
+            .set(length, self.latest_block_header.slot == 0)
+            .map_err(|err| {
+                anyhow!(
+                    "Failed to set justified slot for slot {}: {err:?}",
+                    self.latest_block_header.slot
+                )
+            })?;
+        self.justified_slots = new_bitlist.union(&self.justified_slots);
 
         // if there were empty slots, push zero hash for those ancestors
         let num_empty_slots = block.slot - self.latest_block_header.slot - 1;
@@ -258,9 +270,16 @@ impl LeanState {
                 .push(B256::ZERO)
                 .map_err(|err| anyhow!("Failed to prefill historical_block_hashes: {err:?}"))?;
 
-            self.justified_slots
-                .push(false)
-                .map_err(|err| anyhow!("Failed to prefill justified_slots: {err:?}"))?;
+            let length = self.justified_slots.len();
+            let mut new_bitlist = BitList::with_capacity(length + 1)
+                .map_err(|err| anyhow!("Failed to resize justified_slots BitList: {err:?}"))?;
+            new_bitlist.set(length, false).map_err(|err| {
+                anyhow!(
+                    "Failed to set justified slot for empty slot {}: {err:?}",
+                    length
+                )
+            })?;
+            self.justified_slots = new_bitlist.union(&self.justified_slots);
         }
 
         // Cache current block as the new latest block
@@ -296,10 +315,10 @@ impl LeanState {
             // Ignore votes whose source is not already justified,
             // or whose target is not in the history, or whose target is not a
             // valid justifiable slot
-            if !*self
+            if !self
                 .justified_slots
                 .get(vote.source.slot as usize)
-                .ok_or(anyhow!("Source slot not found in justified_slots"))?
+                .map_err(|err| anyhow!("Failed to get justified slot: {err:?}"))?
             {
                 info!(
                     reason = "Source slot not justified",
@@ -315,10 +334,10 @@ impl LeanState {
             // we don't want to re-introduce the target again for remaining votes if
             // the slot is already justified and its tracking already cleared out
             // from justifications map
-            if *self
+            if self
                 .justified_slots
                 .get(vote.target.slot as usize)
-                .ok_or(anyhow!("Target slot not found in justified_slots"))?
+                .map_err(|err| anyhow!("Failed to get justified slot: {err:?}"))?
             {
                 info!(
                     reason = "Target slot already justified",
@@ -413,7 +432,14 @@ impl LeanState {
             // justifying specially if the num_validators is low in testing scenarios
             if 3 * count >= (2 * self.config.num_validators) as usize {
                 self.latest_justified = vote.target.clone();
-                self.justified_slots[vote.target.slot as usize] = true;
+                self.justified_slots
+                    .set(vote.target.slot as usize, true)
+                    .map_err(|err| {
+                        anyhow!(
+                            "Failed to set justified slot for slot {}: {err:?}",
+                            vote.target.slot
+                        )
+                    })?;
 
                 justifications_map.remove(&vote.target.root);
 
@@ -470,6 +496,7 @@ mod test {
     fn get_justifications_single_root() {
         let num_validators: u64 = 3;
         let mut state = LeanState::new(num_validators, 0);
+        state.justifications_validators = BitList::with_capacity(num_validators as usize).unwrap();
         let root = B256::repeat_byte(1);
 
         state.justifications_roots.push(root).unwrap();
@@ -490,6 +517,7 @@ mod test {
     fn get_justifications_multiple_roots() {
         let num_validators = 3;
         let mut state = LeanState::new(num_validators as u64, 0);
+        state.justifications_validators = BitList::with_capacity(num_validators * 3).unwrap();
         let root0 = B256::repeat_byte(0);
         let root1 = B256::repeat_byte(1);
         let root2 = B256::repeat_byte(2);
@@ -541,6 +569,8 @@ mod test {
     #[test]
     fn set_justifications_empty() {
         let mut state = LeanState::new(10, 0);
+        state.justifications_validators =
+            BitList::with_capacity(state.config.num_validators as usize).unwrap();
         state
             .justifications_roots
             .push(B256::repeat_byte(1))

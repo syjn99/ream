@@ -168,15 +168,7 @@ impl LeanChainService {
         slot: u64,
         response: oneshot::Sender<Block>,
     ) -> anyhow::Result<()> {
-        let new_block = {
-            let mut lean_chain = self.lean_chain.write().await;
-
-            // Accept new votes and modify the lean chain.
-            lean_chain.accept_new_votes().await?;
-
-            // Build a block and propose the block.
-            lean_chain.propose_block(slot).await?
-        };
+        let new_block = self.lean_chain.write().await.propose_block(slot).await?;
 
         // Send the produced block back to the requester
         response
