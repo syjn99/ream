@@ -116,7 +116,7 @@ impl LeanState {
             // If the length is incorrect, the constructed bitlist will be corrupt.
             ensure!(
                 justifications_for_root.len() == self.config.num_validators as usize,
-                "Justifications length ({}) does not match validator registry limit ({})",
+                "Justifications length ({}) does not match validators length ({})",
                 justifications_for_root.len(),
                 self.config.num_validators
             );
