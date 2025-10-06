@@ -497,6 +497,7 @@ mod test {
     fn get_justifications_single_root() {
         let num_validators: u64 = 3;
         let mut state = LeanState::new(num_validators, 0);
+        state.justifications_validators = BitList::with_capacity(num_validators as usize).unwrap();
         let root = B256::repeat_byte(1);
 
         state.justifications_roots.push(root).unwrap();
@@ -517,6 +518,7 @@ mod test {
     fn get_justifications_multiple_roots() {
         let num_validators = 3;
         let mut state = LeanState::new(num_validators as u64, 0);
+        state.justifications_validators = BitList::with_capacity(num_validators * 3).unwrap();
         let root0 = B256::repeat_byte(0);
         let root1 = B256::repeat_byte(1);
         let root2 = B256::repeat_byte(2);
@@ -568,6 +570,8 @@ mod test {
     #[test]
     fn set_justifications_empty() {
         let mut state = LeanState::new(10, 0);
+        state.justifications_validators =
+            BitList::with_capacity(state.config.num_validators as usize).unwrap();
         state
             .justifications_roots
             .push(B256::repeat_byte(1))
