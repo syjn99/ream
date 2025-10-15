@@ -24,19 +24,20 @@ const BINCODE_CONFIG: bincode::config::Configuration<LittleEndian, Fixint, NoLim
 
 /// Wrapper around the `GeneralizedXMSSPublicKey` from the hashsig crate.
 ///
-/// With current signature parameters, the serialized public key is 52 bytes
-/// Public key is composed of:
+/// With current signature parameters, the serialized public key is 52 bytes:
+/// - Public key consists of:
 /// - the root of the merkle tree (an array of 8 finite field elements),
 /// - a parameter for the tweakable hash (an array of 5 finite field elements).
-/// Each KoalaBear finite field element is 32-bit, so the total size is:
-/// 32 bits * (8 + 5) = 416 bits = 52 bytes
+/// - One KoalaBear finite field element is 32 bits (4 bytes).
+/// - The total size is 52 bytes.
 ///
-/// Use [FixedVector] to easily derive traits like [ssz::Encode], [ssz::Decode], and [tree_hash::TreeHash],
-/// so that we can use this type in the lean state.
-/// NOTE: [SignatureScheme::PublicKey] is a Rust trait that only implements [serde::Serialize] and [serde::Deserialize].
-/// So it's impossible to implement [From] or [Into] traits for it.
+/// Use [FixedVector] to easily derive traits like [ssz::Encode], [ssz::Decode], and
+/// [tree_hash::TreeHash], so that we can use this type in the lean state.
+/// NOTE: [SignatureScheme::PublicKey] is a Rust trait that only implements [serde::Serialize] and
+/// [serde::Deserialize]. So it's impossible to implement [From] or [Into] traits for it.
 ///
-/// NOTE 2: We might use caching here (e.g., `OnceCell`) if serialization/deserialization becomes a bottleneck.
+/// NOTE 2: We might use caching here (e.g., `OnceCell`) if serialization/deserialization becomes a
+/// bottleneck.
 #[derive(Debug, PartialEq, Clone, Encode, Decode, TreeHash, Default, Eq, Hash)]
 pub struct PublicKey {
     inner: FixedVector<u8, U52>,
